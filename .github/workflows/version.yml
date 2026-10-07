@@ -1,0 +1,45 @@
+name: Version packages
+
+on:
+  push:
+    branches: [master]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+  pull-requests: write
+  actions: write
+
+concurrency:
+  group: version-packages
+  cancel-in-progress: false
+
+jobs:
+  version:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+      - uses: pnpm/action-setup@0977fd99725f1db4007ccb2928dbb4e90d06cc86 # v6
+      - uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6
+        with:
+          node-version-file: .node-version
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - name: Create version and changelog PR
+        id: changesets
+        uses: changesets/action/version@ae32849d5ba541f9ae29e40e22a623bc13562f51 # v2.1.2
+        with:
+          script: pnpm version-packages
+          commit-message: 'chore: version packages'
+          pr-title: 'chore: version packages'
+          pr-base-branch: master
+      # PRs created with GITHUB_TOKEN do not trigger pull_request workflows.
+      - name: Dispatch CI for the version PR
+        if: steps.changesets.outputs.pr-number != ''
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+          PR_NUMBER: ${{ steps.changesets.outputs.pr-number }}
+        run: |
+          branch=$(gh pr view "$PR_NUMBER" --json headRefName --jq .headRefName)
+          gh workflow run ci.yml --ref "$branch"
