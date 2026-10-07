@@ -16,14 +16,21 @@ CI includes the server matrix and the runnable examples.
 ## Open release targets
 
 The core and Redis entries exceed the original PRD size targets after adding
-shared concurrency and pub/sub. Measured gzip sizes are core 8,294 bytes, Redis 3,516 bytes, and headers 1,127
+shared concurrency and pub/sub. Measured gzip sizes are core 8,299 bytes, Redis 3,516 bytes, and headers 1,127
 bytes. CI ceilings are 8,704, 4,096, and 2,048 bytes respectively. See
-the benchmark comparison for the final measured sizes and workload results.
+the benchmark reports for measured sizes and workload results.
 
-Over 2,000 jobs at 100 per second, p99 delay beyond the preceding allowed start
-was 2.371ms. Delay from the original ideal sequence accumulates, and the PRD's
-5ms ideal-sequence target is unmet. See the repository's benchmark results for
-the conditions and raw measurements.
+After removing positive jitter from rate eligibility waits with local concurrency,
+the latest 200-job comparison at 100/sec measures 98.52 jobs/sec
+and 39.951ms p99 ideal-sequence delay. The longer 2,000-job run
+measures 376.061ms p99 ideal-sequence delay. The original 5ms
+target remains unmet. Small scheduling delays accumulate under strict burst-1
+admission; Valve does not introduce catch-up starts.
+
+Global concurrency waits retain polling jitter because they may be waiting
+for slots. `packages/valve/bench/COMPARISON.md` records the full current
+comparison, shared budgets, injected latency, and links to all raw results.
+These measurements describe scheduler workloads, not production HTTP throughput.
 
 The npm package has not been published and publishing is still deferred.
 These measured gaps are recorded in the private PRD as well as the public

@@ -1,0 +1,682 @@
+{
+  "measuredAt": "2026-10-07T14:54:08.700Z",
+  "node": "v26.10.0",
+  "cpu": "12th Gen Intel(R) Core(TM) i5-12450H",
+  "library": "../src/index.js",
+  "revision": "8fe45e2-with-eligibility-wakeups",
+  "repeats": 5,
+  "rows": [
+    {
+      "backend": "memory",
+      "workers": 1,
+      "injectedRttMs": 0,
+      "jobs": 200,
+      "throughput": 98.33681644303914,
+      "samples": [
+        {
+          "elapsedMs": 2031.288455,
+          "throughput": 98.459674453277,
+          "p99WaitMs": 2020.806332,
+          "p99SpacingOvershootMs": 0.43745899999998983,
+          "p99IdealDelayMs": 40.69131400000015,
+          "minCallbackGapMs": 9.206739000000027,
+          "cpuMs": 35.689,
+          "acquires": 200,
+          "denied": 0,
+          "commands": 0,
+          "workerLastStartMs": [2031.1656110000001]
+        },
+        {
+          "elapsedMs": 2034.635913,
+          "throughput": 98.29768496767903,
+          "p99WaitMs": 2024.351506,
+          "p99SpacingOvershootMs": 0.46397099999967395,
+          "p99IdealDelayMs": 44.2202599999996,
+          "minCallbackGapMs": 9.155313000000206,
+          "cpuMs": 32.526,
+          "acquires": 200,
+          "denied": 0,
+          "commands": 0,
+          "workerLastStartMs": [2034.613727]
+        },
+        {
+          "elapsedMs": 2028.4429060000002,
+          "throughput": 98.59779607718473,
+          "p99WaitMs": 2018.0208629999997,
+          "p99SpacingOvershootMs": 1.3673149999995076,
+          "p99IdealDelayMs": 37.96139399999993,
+          "minCallbackGapMs": 9.129361000000245,
+          "cpuMs": 32.487,
+          "acquires": 200,
+          "denied": 0,
+          "commands": 0,
+          "workerLastStartMs": [2028.3977009999999]
+        },
+        {
+          "elapsedMs": 2040.5641429999996,
+          "throughput": 98.01211134973866,
+          "p99WaitMs": 2030.1030210000008,
+          "p99SpacingOvershootMs": 1.3419279999998253,
+          "p99IdealDelayMs": 50.02633100000094,
+          "minCallbackGapMs": 9.237774999999601,
+          "cpuMs": 22.856,
+          "acquires": 201,
+          "denied": 1,
+          "commands": 0,
+          "workerLastStartMs": [2040.4888690000007]
+        },
+        {
+          "elapsedMs": 2033.8262639999994,
+          "throughput": 98.33681644303914,
+          "p99WaitMs": 2023.6414329999989,
+          "p99SpacingOvershootMs": 1.3146370000013121,
+          "p99IdealDelayMs": 43.51115799999934,
+          "minCallbackGapMs": 9.191247999999177,
+          "cpuMs": 21.393,
+          "acquires": 200,
+          "denied": 0,
+          "commands": 0,
+          "workerLastStartMs": [2033.7995030000002]
+        }
+      ]
+    },
+    {
+      "backend": "memory",
+      "workers": 8,
+      "injectedRttMs": 0,
+      "jobs": 200,
+      "throughput": 99.00010639986932,
+      "samples": [
+        {
+          "elapsedMs": 2023.2298950000004,
+          "throughput": 98.85184105585785,
+          "p99WaitMs": 2012.903527999999,
+          "p99SpacingOvershootMs": 1.2231579999988753,
+          "p99IdealDelayMs": 32.8491869999998,
+          "minCallbackGapMs": 9.173239000001558,
+          "cpuMs": 35.915,
+          "acquires": 1144,
+          "denied": 944,
+          "commands": 0,
+          "workerLastStartMs": [
+            1260.8533560000014, 1941.0810579999998, 1971.8940579999999,
+            2023.2035620000006, 587.5801080000001, 1778.5422049999997,
+            933.9535230000001, 1046.645281000001
+          ]
+        },
+        {
+          "elapsedMs": 2012.0220800000006,
+          "throughput": 99.402487670513,
+          "p99WaitMs": 2001.676399,
+          "p99SpacingOvershootMs": 0.5548089999992953,
+          "p99IdealDelayMs": 21.772907000000487,
+          "minCallbackGapMs": 9.158329999998386,
+          "cpuMs": 31.343,
+          "acquires": 1294,
+          "denied": 1094,
+          "commands": 0,
+          "workerLastStartMs": [
+            1547.7281280000007, 1264.4169039999997, 1991.5337369999997,
+            2011.993015, 1900.4472870000009, 1425.8751900000007,
+            1032.3962659999997, 1808.886034000001
+          ]
+        },
+        {
+          "elapsedMs": 2021.0831479999997,
+          "throughput": 98.9568391572181,
+          "p99WaitMs": 2010.7874890000003,
+          "p99SpacingOvershootMs": 0.5438999999987573,
+          "p99IdealDelayMs": 30.718172000000777,
+          "minCallbackGapMs": 9.15484699999979,
+          "cpuMs": 29.225,
+          "acquires": 1149,
+          "denied": 949,
+          "commands": 0,
+          "workerLastStartMs": [
+            1615.4092790000013, 2021.0600810000014, 556.9687489999997,
+            1696.373404, 924.52837, 1371.4982569999993, 1848.4295199999997,
+            1554.2271579999997
+          ]
+        },
+        {
+          "elapsedMs": 2011.4123259999978,
+          "throughput": 99.4326212555984,
+          "p99WaitMs": 2001.090698,
+          "p99SpacingOvershootMs": 0.4623710000014398,
+          "p99IdealDelayMs": 21.054665999999997,
+          "minCallbackGapMs": 9.150817999998253,
+          "cpuMs": 30.835,
+          "acquires": 1244,
+          "denied": 1044,
+          "commands": 0,
+          "workerLastStartMs": [
+            2011.3813789999986, 1929.802940999998, 1495.0328219999974,
+            1504.2178139999996, 1565.2995159999991, 695.2840309999992,
+            1595.7961729999988, 1687.6369109999978
+          ]
+        },
+        {
+          "elapsedMs": 2020.1998490000005,
+          "throughput": 99.00010639986932,
+          "p99WaitMs": 2009.8281650000026,
+          "p99SpacingOvershootMs": 0.5059520000031625,
+          "p99IdealDelayMs": 29.705423000003066,
+          "minCallbackGapMs": 9.124152000000322,
+          "cpuMs": 29.345,
+          "acquires": 1056,
+          "denied": 856,
+          "commands": 0,
+          "workerLastStartMs": [
+            384.61463000000003, 639.071479000002, 2009.891590000003,
+            1336.9295920000004, 1479.2769540000008, 1113.8986650000006,
+            1622.382023000002, 2020.18275
+          ]
+        }
+      ]
+    },
+    {
+      "backend": "redis",
+      "workers": 1,
+      "injectedRttMs": 0,
+      "jobs": 200,
+      "throughput": 94.94912913831382,
+      "samples": [
+        {
+          "elapsedMs": 2134.0570279999993,
+          "throughput": 93.71820779664753,
+          "p99WaitMs": 2123.2985149999986,
+          "p99SpacingOvershootMs": 1.3140979999989213,
+          "p99IdealDelayMs": 142.80104700000084,
+          "minCallbackGapMs": 10.132594999999128,
+          "cpuMs": 85.606,
+          "acquires": 207,
+          "denied": 7,
+          "commands": 207,
+          "workerLastStartMs": [2134.048047]
+        },
+        {
+          "elapsedMs": 2123.997933999999,
+          "throughput": 94.16205015950834,
+          "p99WaitMs": 2113.4321990000026,
+          "p99SpacingOvershootMs": 1.2552560000003723,
+          "p99IdealDelayMs": 133.0898670000024,
+          "minCallbackGapMs": 10.361563000002207,
+          "cpuMs": 80.071,
+          "acquires": 205,
+          "denied": 5,
+          "commands": 205,
+          "workerLastStartMs": [2123.9889409999996]
+        },
+        {
+          "elapsedMs": 2106.3910939999987,
+          "throughput": 94.94912913831382,
+          "p99WaitMs": 2095.689798000003,
+          "p99SpacingOvershootMs": 0.9277469999979076,
+          "p99IdealDelayMs": 115.33433900000091,
+          "minCallbackGapMs": 10.064540999999736,
+          "cpuMs": 72.807,
+          "acquires": 204,
+          "denied": 4,
+          "commands": 204,
+          "workerLastStartMs": [2106.3784379999997]
+        },
+        {
+          "elapsedMs": 2105.5845279999994,
+          "throughput": 94.98550038737748,
+          "p99WaitMs": 2094.8652309999998,
+          "p99SpacingOvershootMs": 0.9772139999986393,
+          "p99IdealDelayMs": 114.53859799999918,
+          "minCallbackGapMs": 10.295538999998826,
+          "cpuMs": 54.828,
+          "acquires": 203,
+          "denied": 3,
+          "commands": 203,
+          "workerLastStartMs": [2105.567594]
+        },
+        {
+          "elapsedMs": 2103.922961,
+          "throughput": 95.06051490827376,
+          "p99WaitMs": 2093.4339390000023,
+          "p99SpacingOvershootMs": 1.124922000002698,
+          "p99IdealDelayMs": 113.1757660000003,
+          "minCallbackGapMs": 10.250147999999172,
+          "cpuMs": 57.287,
+          "acquires": 201,
+          "denied": 1,
+          "commands": 201,
+          "workerLastStartMs": [2103.912504]
+        }
+      ]
+    },
+    {
+      "backend": "redis",
+      "workers": 1,
+      "injectedRttMs": 5,
+      "jobs": 200,
+      "throughput": 63.0077416840362,
+      "samples": [
+        {
+          "elapsedMs": 3174.2131150000023,
+          "throughput": 63.0077416840362,
+          "p99WaitMs": 3158.269030999996,
+          "p99SpacingOvershootMs": 6.402199000003748,
+          "p99IdealDelayMs": 1172.5837689999971,
+          "minCallbackGapMs": 14.792264000003343,
+          "cpuMs": 88.228,
+          "acquires": 200,
+          "denied": 0,
+          "commands": 200,
+          "workerLastStartMs": [3174.2001920000002]
+        },
+        {
+          "elapsedMs": 3163.827126999997,
+          "throughput": 63.2145790435914,
+          "p99WaitMs": 3147.862043000001,
+          "p99SpacingOvershootMs": 6.250815999999759,
+          "p99IdealDelayMs": 1161.7250819999972,
+          "minCallbackGapMs": 14.139690000003611,
+          "cpuMs": 80.911,
+          "acquires": 200,
+          "denied": 0,
+          "commands": 200,
+          "workerLastStartMs": [3163.8100449999984]
+        },
+        {
+          "elapsedMs": 3165.5794229999956,
+          "throughput": 63.17958682283242,
+          "p99WaitMs": 3149.2759439999936,
+          "p99SpacingOvershootMs": 6.562363000004552,
+          "p99IdealDelayMs": 1163.483978999997,
+          "minCallbackGapMs": 14.523243999996339,
+          "cpuMs": 96.295,
+          "acquires": 200,
+          "denied": 0,
+          "commands": 200,
+          "workerLastStartMs": [3165.5375159999967]
+        },
+        {
+          "elapsedMs": 3175.343541000002,
+          "throughput": 62.98531085459011,
+          "p99WaitMs": 3159.1362910000025,
+          "p99SpacingOvershootMs": 6.381101999999373,
+          "p99IdealDelayMs": 1172.9599480000034,
+          "minCallbackGapMs": 14.780486999996356,
+          "cpuMs": 92.301,
+          "acquires": 200,
+          "denied": 0,
+          "commands": 200,
+          "workerLastStartMs": [3175.3304209999988]
+        },
+        {
+          "elapsedMs": 3185.958641999998,
+          "throughput": 62.775453944514865,
+          "p99WaitMs": 3169.778521,
+          "p99SpacingOvershootMs": 6.468572999998287,
+          "p99IdealDelayMs": 1184.0209939999986,
+          "minCallbackGapMs": 14.890795999999682,
+          "cpuMs": 94.302,
+          "acquires": 200,
+          "denied": 0,
+          "commands": 200,
+          "workerLastStartMs": [3185.9418799999985]
+        }
+      ]
+    },
+    {
+      "backend": "redis",
+      "workers": 1,
+      "injectedRttMs": 25,
+      "jobs": 200,
+      "throughput": 27.878070627562828,
+      "samples": [
+        {
+          "elapsedMs": 7174.097614999999,
+          "throughput": 27.878070627562828,
+          "p99WaitMs": 7138.158609999999,
+          "p99SpacingOvershootMs": 26.3944979999942,
+          "p99IdealDelayMs": 5132.100717000001,
+          "minCallbackGapMs": 34.65559799999755,
+          "cpuMs": 93.979,
+          "acquires": 200,
+          "denied": 0,
+          "commands": 200,
+          "workerLastStartMs": [7174.073698]
+        },
+        {
+          "elapsedMs": 7170.016678,
+          "throughput": 27.893937905844297,
+          "p99WaitMs": 7134.282781000002,
+          "p99SpacingOvershootMs": 26.488432999998622,
+          "p99IdealDelayMs": 5128.514396000006,
+          "minCallbackGapMs": 34.696084000002884,
+          "cpuMs": 98.106,
+          "acquires": 200,
+          "denied": 0,
+          "commands": 200,
+          "workerLastStartMs": [7169.997945999996]
+        },
+        {
+          "elapsedMs": 7168.911774,
+          "throughput": 27.89823704140901,
+          "p99WaitMs": 7132.649012000002,
+          "p99SpacingOvershootMs": 26.381592999998247,
+          "p99IdealDelayMs": 5126.640509999997,
+          "minCallbackGapMs": 34.83465099999739,
+          "cpuMs": 96.815,
+          "acquires": 200,
+          "denied": 0,
+          "commands": 200,
+          "workerLastStartMs": [7168.875882]
+        },
+        {
+          "elapsedMs": 7177.609937000001,
+          "throughput": 27.864428654588224,
+          "p99WaitMs": 7141.493964000008,
+          "p99SpacingOvershootMs": 26.306861999997636,
+          "p99IdealDelayMs": 5135.518744000001,
+          "minCallbackGapMs": 34.8022229999915,
+          "cpuMs": 94.97,
+          "acquires": 200,
+          "denied": 0,
+          "commands": 200,
+          "workerLastStartMs": [7177.581720999995]
+        },
+        {
+          "elapsedMs": 7174.6927,
+          "throughput": 27.8757583582639,
+          "p99WaitMs": 7138.505626000013,
+          "p99SpacingOvershootMs": 26.359089999998105,
+          "p99IdealDelayMs": 5132.311275,
+          "minCallbackGapMs": 34.50355100000161,
+          "cpuMs": 97.995,
+          "acquires": 200,
+          "denied": 0,
+          "commands": 200,
+          "workerLastStartMs": [7174.675880999988]
+        }
+      ]
+    },
+    {
+      "backend": "redis",
+      "workers": 8,
+      "injectedRttMs": 0,
+      "jobs": 200,
+      "throughput": 94.21426562817446,
+      "samples": [
+        {
+          "elapsedMs": 2123.836282999997,
+          "throughput": 94.16921709120284,
+          "p99WaitMs": 2112.881275000007,
+          "p99SpacingOvershootMs": 1.329041999997571,
+          "p99IdealDelayMs": 132.35198300000047,
+          "minCallbackGapMs": 10.347947999995085,
+          "cpuMs": 91.851,
+          "acquires": 1229,
+          "denied": 1029,
+          "commands": 1229,
+          "workerLastStartMs": [
+            1955.728138999999, 2123.818407999992, 570.4635560000024,
+            1902.9615340000018, 1028.5048649999953, 1391.4750910000002,
+            1913.462102000005, 1762.7953220000054
+          ]
+        },
+        {
+          "elapsedMs": 2122.820770999999,
+          "throughput": 94.21426562817446,
+          "p99WaitMs": 2112.143576000002,
+          "p99SpacingOvershootMs": 1.3625109999993583,
+          "p99IdealDelayMs": 131.8305459999974,
+          "minCallbackGapMs": 10.126761999999871,
+          "cpuMs": 105.846,
+          "acquires": 938,
+          "denied": 738,
+          "commands": 938,
+          "workerLastStartMs": [
+            256.0831770000077, 801.871026000008, 598.1456990000006,
+            1058.2089790000027, 1601.9219100000046, 1858.1433689999976,
+            2122.802990000011, 1421.6305460000003
+          ]
+        },
+        {
+          "elapsedMs": 2128.4641830000037,
+          "throughput": 93.96446583287404,
+          "p99WaitMs": 2117.9477939999924,
+          "p99SpacingOvershootMs": 1.3780250000127126,
+          "p99IdealDelayMs": 137.2464089999994,
+          "minCallbackGapMs": 10.323971000005258,
+          "cpuMs": 87.349,
+          "acquires": 1153,
+          "denied": 953,
+          "commands": 1153,
+          "workerLastStartMs": [
+            257.9497990000091, 1970.2946340000053, 2128.455571000013,
+            1244.8805860000139, 1373.9968240000017, 1502.1037600000127,
+            1768.0129570000136, 1842.3356870000134
+          ]
+        },
+        {
+          "elapsedMs": 2113.59792,
+          "throughput": 94.62537699696448,
+          "p99WaitMs": 2103.0002079999977,
+          "p99SpacingOvershootMs": 1.2334369999880437,
+          "p99IdealDelayMs": 122.59033099999942,
+          "minCallbackGapMs": 10.316043999991962,
+          "cpuMs": 70.405,
+          "acquires": 984,
+          "denied": 784,
+          "commands": 984,
+          "workerLastStartMs": [
+            256.937539999999, 521.877714000002, 786.5876209999988,
+            1532.1392350000096, 1796.7420380000112, 1965.7267460000003,
+            1298.982216000004, 2113.581585000007
+          ]
+        },
+        {
+          "elapsedMs": 2121.047909000001,
+          "throughput": 94.29301391607554,
+          "p99WaitMs": 2110.438904999988,
+          "p99SpacingOvershootMs": 1.385123999993084,
+          "p99IdealDelayMs": 129.8184970000002,
+          "minCallbackGapMs": 10.301974000001792,
+          "cpuMs": 90.953,
+          "acquires": 925,
+          "denied": 725,
+          "commands": 925,
+          "workerLastStartMs": [
+            258.223278999998, 559.3750449999934, 827.2148920000036,
+            1092.392571999997, 1347.3361029999942, 1613.0730659999972,
+            1855.4559379999992, 2121.0339549999917
+          ]
+        }
+      ]
+    },
+    {
+      "backend": "redis",
+      "workers": 8,
+      "injectedRttMs": 5,
+      "jobs": 200,
+      "throughput": 63.27584450773688,
+      "samples": [
+        {
+          "elapsedMs": 3161.064845000001,
+          "throughput": 63.26981881322335,
+          "p99WaitMs": 3145.213606000005,
+          "p99SpacingOvershootMs": 6.954515999997966,
+          "p99IdealDelayMs": 1159.4118410000083,
+          "minCallbackGapMs": 14.087006999994628,
+          "cpuMs": 130.055,
+          "acquires": 977,
+          "denied": 777,
+          "commands": 977,
+          "workerLastStartMs": [
+            390.22073499999533, 1894.273205999998, 2765.063538000002,
+            3161.0473379999894, 1211.5020439999935, 1611.2950839999976,
+            2022.2664249999943, 2371.272014999995
+          ]
+        },
+        {
+          "elapsedMs": 3178.0099069999997,
+          "throughput": 62.9324658678605,
+          "p99WaitMs": 3161.798391999997,
+          "p99SpacingOvershootMs": 6.7203540000045905,
+          "p99IdealDelayMs": 1176.06706999999,
+          "minCallbackGapMs": 14.106973999994807,
+          "cpuMs": 106.798,
+          "acquires": 924,
+          "denied": 724,
+          "commands": 924,
+          "workerLastStartMs": [
+            787.0650350000069, 1189.0849639999942, 1984.477635999996,
+            2379.4853580000054, 1746.4879260000016, 2780.545119999995,
+            3177.9768500000064, 611.5418110000028
+          ]
+        },
+        {
+          "elapsedMs": 3150.6890529999946,
+          "throughput": 63.478177832104954,
+          "p99WaitMs": 3134.5698269999993,
+          "p99SpacingOvershootMs": 6.7442880000016885,
+          "p99IdealDelayMs": 1148.6770030000043,
+          "minCallbackGapMs": 14.079446999996435,
+          "cpuMs": 128.868,
+          "acquires": 1004,
+          "denied": 804,
+          "commands": 1004,
+          "workerLastStartMs": [
+            386.81805899999745, 798.6186290000041, 3150.6778550000017,
+            1176.9306780000043, 1853.4021139999968, 2975.5067439999984,
+            3086.503402000002, 2356.362328999996
+          ]
+        },
+        {
+          "elapsedMs": 3154.266951999991,
+          "throughput": 63.40617425332001,
+          "p99WaitMs": 3138.3361700000096,
+          "p99SpacingOvershootMs": 6.603917999993428,
+          "p99IdealDelayMs": 1152.2411490000086,
+          "minCallbackGapMs": 14.086757999990368,
+          "cpuMs": 114.008,
+          "acquires": 1170,
+          "denied": 970,
+          "commands": 1170,
+          "workerLastStartMs": [
+            2300.993881999995, 3154.2492649999913, 2695.181421000001,
+            3090.6340109999874, 1800.5167849999998, 2177.0315770000016,
+            2285.2147889999906, 943.7815469999914
+          ]
+        },
+        {
+          "elapsedMs": 3160.763819999993,
+          "throughput": 63.27584450773688,
+          "p99WaitMs": 3144.801762999996,
+          "p99SpacingOvershootMs": 6.726206999999704,
+          "p99IdealDelayMs": 1158.8298970000033,
+          "minCallbackGapMs": 14.060033000001567,
+          "cpuMs": 105.923,
+          "acquires": 954,
+          "denied": 754,
+          "commands": 954,
+          "workerLastStartMs": [
+            389.87857000000076, 788.4682339999999, 1186.3134719999944,
+            1593.897273999988, 2765.2108679999947, 3160.7473499999905,
+            2194.934347000002, 2986.993883999996
+          ]
+        }
+      ]
+    },
+    {
+      "backend": "redis",
+      "workers": 8,
+      "injectedRttMs": 25,
+      "jobs": 200,
+      "throughput": 27.902840120884274,
+      "samples": [
+        {
+          "elapsedMs": 7157.624079999994,
+          "throughput": 27.942233032165635,
+          "p99WaitMs": 7121.752506000004,
+          "p99SpacingOvershootMs": 26.872182999999495,
+          "p99IdealDelayMs": 5115.965358000001,
+          "minCallbackGapMs": 34.10065300000133,
+          "cpuMs": 115.083,
+          "acquires": 963,
+          "denied": 763,
+          "commands": 963,
+          "workerLastStartMs": [
+            886.1543649999949, 2632.840228000001, 6510.623263999994,
+            7157.608118000004, 3208.0783339999907, 3855.603634999992,
+            4752.765880999999, 5401.192717999991
+          ]
+        },
+        {
+          "elapsedMs": 7167.721751999998,
+          "throughput": 27.90286885009094,
+          "p99WaitMs": 7131.848073000001,
+          "p99SpacingOvershootMs": 26.839663999999175,
+          "p99IdealDelayMs": 5125.777967999995,
+          "minCallbackGapMs": 34.31012899999041,
+          "cpuMs": 115.572,
+          "acquires": 993,
+          "denied": 793,
+          "commands": 993,
+          "workerLastStartMs": [
+            884.8728300000075, 6309.912408000004, 5057.675715000005,
+            5953.892315000005, 7167.704691000006, 1786.2546350000048,
+            4914.763978000003, 3511.3555760000017
+          ]
+        },
+        {
+          "elapsedMs": 7171.709053999992,
+          "throughput": 27.887355509556095,
+          "p99WaitMs": 7135.643379999994,
+          "p99SpacingOvershootMs": 26.575815000003786,
+          "p99IdealDelayMs": 5129.609118999986,
+          "minCallbackGapMs": 34.09077099998831,
+          "cpuMs": 155.735,
+          "acquires": 922,
+          "denied": 722,
+          "commands": 922,
+          "workerLastStartMs": [
+            1784.3934920000029, 2680.170324999999, 3582.101241000011,
+            4480.642126999985, 5374.520318999988, 7171.6933229999995,
+            6273.310796999998, 1676.6097489999956
+          ]
+        },
+        {
+          "elapsedMs": 7175.584453999996,
+          "throughput": 27.87229406637545,
+          "p99WaitMs": 7139.26885600001,
+          "p99SpacingOvershootMs": 26.575672000006307,
+          "p99IdealDelayMs": 5133.4923780000245,
+          "minCallbackGapMs": 34.3245670000033,
+          "cpuMs": 119.178,
+          "acquires": 934,
+          "denied": 734,
+          "commands": 934,
+          "workerLastStartMs": [
+            1789.8313170000038, 2688.9944740000064, 3585.154806000006,
+            4587.658618999994, 5487.40578999999, 6419.824783999997, 7175.567744,
+            1753.9181289999979
+          ]
+        },
+        {
+          "elapsedMs": 7167.729131999979,
+          "throughput": 27.902840120884274,
+          "p99WaitMs": 7131.340117000014,
+          "p99SpacingOvershootMs": 26.88833399998839,
+          "p99IdealDelayMs": 5125.583531000011,
+          "minCallbackGapMs": 34.21431899999152,
+          "cpuMs": 111.426,
+          "acquires": 925,
+          "denied": 725,
+          "commands": 925,
+          "workerLastStartMs": [
+            1031.96185599998, 2686.003636999987, 5373.178543999995,
+            2541.075907999999, 6267.344299999997, 3581.1295619999873,
+            7167.7023289999925, 4474.765029000002
+          ]
+        }
+      ]
+    }
+  ]
+}

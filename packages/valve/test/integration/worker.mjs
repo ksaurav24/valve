@@ -34,14 +34,18 @@ const adapter = {
 const acquireSha = createHash('sha1').update(ACQUIRE).digest('hex');
 const api = createValve({
   id,
-  rate: { limit: mode === 'pause' ? 100 : 1000, interval: '1s', burst: 32 },
+  rate: {
+    limit: mode === 'bound' ? 1000 : 100,
+    interval: '1s',
+    burst: mode === 'paced' ? 1 : 32,
+  },
   concurrency: 32,
   store: redisStore({ adapter }),
 });
 const record =
   "local t=redis.call('TIME'); local n=tonumber(t[1])*1000+tonumber(t[2])/1000; redis.call('RPUSH', KEYS[1], string.format('%.17g',n)); return 1";
 process.send?.({ ready: true });
-if (mode === 'pause')
+if (mode === 'pause' || mode === 'paced')
   await new Promise((resolve) => process.once('message', resolve));
 await Promise.all(
   Array.from({ length: Number(count) }, () =>

@@ -67,7 +67,7 @@ search index into `docs/out/`. After `pnpm docs:build`, run
 `pnpm --filter @valve/docs test:browser` for browser checks. Install Chromium
 with `pnpm --filter @valve/docs exec playwright install chromium` first.
 
-See `packages/valve/bench/RESULTS.md` for measured targets that remain open.
+See `packages/valve/bench/COMPARISON.md` for measured targets that remain open.
 Keep `pvt/` untracked; source checks use the tracked TODO register for CI.
 
 ## Code navigation and performance

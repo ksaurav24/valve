@@ -123,21 +123,76 @@ describe('queue and execution', () => {
     await vi.advanceTimersByTimeAsync(10000);
     expect(spy).toHaveBeenCalledTimes(count);
   });
+  it.each(['sync', 'async'])(
+    'wakes at GCRA eligibility without jitter with a %s store',
+    async (kind) => {
+      const random = vi.spyOn(Math, 'random').mockReturnValue(0.99);
+      try {
+        const store = memoryStore();
+        if (kind === 'async') delete store.acquireSync;
+        const valve = make({
+          id: 'paced',
+          rate: { limit: 100, interval: 1000 },
+          store,
+        });
+        const times: number[] = [];
+        const tasks = Array.from({ length: 4 }, () =>
+          valve.run(() => times.push(Date.now())),
+        );
+        await vi.runAllTimersAsync();
+        await Promise.all(tasks);
+        expect(times).toEqual([0, 10, 20, 30]);
+        expect(random).not.toHaveBeenCalled();
+        expect(vi.getTimerCount()).toBe(0);
+      } finally {
+        random.mockRestore();
+      }
+    },
+  );
+  it('rechecks shared admission when several valves wake at the same deadline', async () => {
+    const store = memoryStore();
+    const times: number[] = [];
+    const workers = Array.from({ length: 8 }, () =>
+      make({ id: 'shared', rate: { limit: 100, interval: 1000 }, store }),
+    );
+    const tasks = Array.from({ length: 32 }, (_, i) =>
+      workers[i % workers.length]!.run(() => times.push(Date.now())),
+    );
+    await vi.runAllTimersAsync();
+    await Promise.all(tasks);
+    expect(times).toEqual(Array.from({ length: 32 }, (_, i) => i * 10));
+    expect(vi.getTimerCount()).toBe(0);
+  });
+  it('does not catch up admissions after a delayed wakeup', async () => {
+    const valve = make({ id: 'late', rate: { limit: 100, interval: 1000 } });
+    const times: number[] = [];
+    const tasks = Array.from({ length: 3 }, () =>
+      valve.run(() => times.push(Date.now())),
+    );
+    await tick();
+    vi.setSystemTime(100);
+    await vi.runAllTimersAsync();
+    await Promise.all(tasks);
+    expect(times).toEqual([0, 110, 120]);
+  });
   it('allows a fixed-window burst with weighted jobs', async () => {
     const valve = make({
       id: 'x',
       rate: { limit: 4, interval: 100, algorithm: 'fixed-window' },
     });
+    const nextWindow = vi.fn(() => Date.now());
     const tasks = [
       valve.run(() => 1, { cost: 3 }),
       valve.run(() => 2),
-      valve.run(() => Date.now()),
+      valve.run(nextWindow),
     ];
     await tick();
     expect(await tasks[0]).toBe(1);
     expect(await tasks[1]).toBe(2);
-    await vi.advanceTimersByTimeAsync(120);
-    expect(await tasks[2]).toBeGreaterThanOrEqual(100);
+    expect(nextWindow).not.toHaveBeenCalled();
+    await vi.advanceTimersByTimeAsync(100);
+    expect(nextWindow).toHaveBeenCalledOnce();
+    expect(await tasks[2]).toBe(100);
   });
   it('passes job errors through without wrapping', async () => {
     const valve = make({ id: 'x', concurrency: 1 });
@@ -461,6 +516,62 @@ describe('pauses and feedback', () => {
 });
 
 describe('store error policies', () => {
+  it('retains jitter for outage retries', async () => {
+    const random = vi.spyOn(Math, 'random').mockReturnValue(0.5);
+    try {
+      const acquire = vi
+        .fn<Store['acquire']>()
+        .mockRejectedValueOnce(new Error('offline'))
+        .mockResolvedValue({ granted: 1, retryAfterMs: 0, pausedMs: 0 });
+      const valve = make({
+        id: 'outage',
+        concurrency: 1,
+        store: failing(acquire),
+      });
+      const job = valve.run(() => Date.now());
+      await vi.advanceTimersByTimeAsync(104);
+      expect(acquire).toHaveBeenCalledTimes(1);
+      await vi.advanceTimersByTimeAsync(1);
+      expect(await job).toBe(105);
+      expect(random).toHaveBeenCalledTimes(1);
+    } finally {
+      random.mockRestore();
+    }
+  });
+  it('retains jitter for global-slot polling', async () => {
+    const random = vi.spyOn(Math, 'random').mockReturnValue(0.5);
+    try {
+      const acquire = vi
+        .fn<Store['acquire']>()
+        .mockResolvedValueOnce({ granted: 0, retryAfterMs: 1000, pausedMs: 0 })
+        .mockResolvedValue({
+          granted: 1,
+          retryAfterMs: 0,
+          pausedMs: 0,
+          leases: ['slot'],
+        });
+      const store = {
+        ...failing(acquire),
+        release: async () => {},
+        renew: async () => true,
+      };
+      const valve = make({
+        id: 'slots',
+        concurrency: { limit: 1, scope: 'global' },
+        store,
+      });
+      const job = valve.run(() => Date.now());
+      await vi.advanceTimersByTimeAsync(62);
+      expect(acquire).toHaveBeenCalledTimes(1);
+      await vi.advanceTimersByTimeAsync(1);
+      expect(await job).toBe(63);
+      expect(random).toHaveBeenCalledTimes(1);
+      await valve.close();
+      expect(vi.getTimerCount()).toBe(0);
+    } finally {
+      random.mockRestore();
+    }
+  });
   it.each(['open', 'throw'] as const)(
     'handles %s without breaking concurrency',
     async (policy) => {

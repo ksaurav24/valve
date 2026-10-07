@@ -1,0 +1,9 @@
+{
+  "description": "Current Redis/Valkey acquisition and mitata benchmark console output.",
+  "node": "v26.10.0",
+  "comparisonMeasuredAt": "2026-10-07T14:51:33.144Z",
+  "redis": "backlog: 32 acquires / 1000 jobs = 0.0320 round trips per job\nlight: 10 acquires / 10 jobs = 1.0000 round trips per job\n",
+  "valkey": "backlog: 32 acquires / 1000 jobs = 0.0320 round trips per job\nlight: 10 acquires / 10 jobs = 1.0000 round trips per job\n",
+  "mitata": "clk: ~4.19 GHz\ncpu: 12th Gen Intel(R) Core(TM) i5-12450H\nruntime: node 26.10.0 (x64-linux)\n\nbenchmark                      avg (min \u2026 max) p75 / p99    (min \u2026 top 1%)\n---------------------------------------------- -------------------------------\nvalve, 1000 queued no-op jobs   376.24 \u00b5s/iter 384.52 \u00b5s  \u2588                   \n                         (266.47 \u00b5s \u2026 2.16 ms) 900.99 \u00b5s  \u2588\u2586\u2582                 \n                       (129.77 kb \u2026   2.25 mb)   1.10 mb \u2582\u2588\u2588\u2588\u2587\u2585\u2582\u2582\u2581\u2581\u2581\u2582\u2582\u2582\u2581\u2582\u2582\u2581\u2581\u2581\u2581\n\np-queue, 1000 queued no-op jobs 700.83 \u00b5s/iter 683.68 \u00b5s  \u2586\u2588                  \n                         (481.50 \u00b5s \u2026 3.10 ms)   1.91 ms  \u2588\u2588\u2585                 \n                       (414.80 kb \u2026   3.30 mb)   1.96 mb \u2586\u2588\u2588\u2588\u2583\u2582\u2582\u2582\u2581\u2581\u2581\u2581\u2581\u2581\u2581\u2582\u2581\u2582\u2582\u2581\u2581\n",
+  "bundleSizes": "$ node ../../scripts/check-size.mjs\nindex: 8299 bytes minified + gzip (budget 8704)\nredis/index: 3516 bytes minified + gzip (budget 4096)\nheaders/index: 1127 bytes minified + gzip (budget 2048)\n"
+}

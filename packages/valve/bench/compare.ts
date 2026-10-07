@@ -7,11 +7,15 @@ import pLimit from 'p-limit';
 import Bottleneck from 'bottleneck';
 import { Redis } from 'ioredis5';
 import { createClient } from 'redis5';
-import { createValve } from '../src/index.js';
 import { redisStore } from '../src/redis/index.js';
 import type { RateRule, ValveOptions } from '../src/index.js';
+const { createValve }: typeof import('../src/index.js') = await import(
+  process.env.VALVE_BENCH_LIBRARY ?? '../src/index.js'
+);
 const repeats = Number(process.env.VALVE_BENCH_REPEATS ?? 5);
 const count = Number(process.env.VALVE_BENCH_JOBS ?? 10000);
+const sharedCount = process.env.VALVE_BENCH_SHARED_JOBS;
+const scenarios = process.env.VALVE_BENCH_SCENARIOS?.split(',');
 const redisUrl = process.env.REDIS_URL;
 const valkeyUrl = process.env.VALKEY_URL;
 const sleep = (ms: number) =>
@@ -206,7 +210,7 @@ for (const [server, url] of [
         factories.push({
           scenario: `${server}/${family}/${kind}`,
           library: 'valve',
-          count: 2000,
+          count: Number(sharedCount ?? 2000),
           workMs: 0,
           factory: valveFactory(
             { rate, store: measured },
@@ -217,7 +221,7 @@ for (const [server, url] of [
       factories.push({
         scenario: `${server}/${family}/global-16`,
         library: 'valve',
-        count: 1000,
+        count: Number(sharedCount ?? 1000),
         workMs: 0,
         factory: valveFactory({
           rate: gcra,
@@ -246,7 +250,7 @@ for (const [server, url] of [
     factories.push({
       scenario: `${server}/global-16`,
       library: 'Bottleneck',
-      count: 1000,
+      count: Number(sharedCount ?? 1000),
       workMs: 0,
       factory: async () => {
         const limiter = new Bottleneck({
@@ -374,7 +378,13 @@ async function measure(item: (typeof factories)[number]) {
   console.log(JSON.stringify(row));
 }
 try {
-  for (const item of factories) await measure(item);
+  for (const item of factories)
+    if (
+      (!scenarios || scenarios.includes(item.scenario)) &&
+      (!process.env.VALVE_BENCH_SKIP_BOTTLENECK ||
+        item.library !== 'Bottleneck')
+    )
+      await measure(item);
 } finally {
   await Promise.all(cleanup.map((close) => close()));
 }
@@ -398,6 +408,8 @@ const output = {
   logicalCpus: cpus().length,
   totalMemory: totalmem(),
   repeats,
+  library: process.env.VALVE_BENCH_LIBRARY ?? '../src/index.js',
+  revision: process.env.VALVE_BENCH_REVISION,
   versions,
   notes: [
     'All jobs return promises; setup and warmup excluded.',
