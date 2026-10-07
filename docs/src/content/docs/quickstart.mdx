@@ -1,0 +1,49 @@
+---
+title: Run your first valve
+description: Build the library locally and queue requests in a single process.
+---
+
+## Prepare the workspace
+
+Use Node.js 24 and pnpm 11.28.4 for development. The built library targets
+Node.js 20 or newer and uses web standard APIs in its core.
+
+```sh
+pnpm install
+pnpm build
+pnpm --filter @valve/example-memory start
+```
+
+The package is named `@ksaurav24/valve`. It is not published yet. Examples use
+the workspace package. To try it elsewhere, run `pnpm --filter @ksaurav24/valve
+pack --out /tmp/valve-0.1.0.tgz` and install the generated tarball in that project.
+
+## Queue a call
+
+```ts
+import { createValve } from '@ksaurav24/valve';
+
+const api = createValve({
+  id: 'github:my-script',
+  rate: { limit: 5, interval: '1s' },
+  concurrency: 2,
+});
+
+const results = await Promise.all(
+  [1, 2, 3].map((id) => api.run(() => Promise.resolve({ id }))),
+);
+console.log(results);
+await api.close();
+```
+
+Jobs start at least 200ms apart on the store clock. They retain their result
+and error types. A fresh private memory store is the default, so separate
+valves share nothing until you give them the same store instance.
+
+## Add Redis
+
+Pass a connected client from `ioredis` or `redis`. valve neither opens nor
+closes your connection. Every worker must use the same server, prefix, id,
+and rule configuration.
+
+[Continue to the shared quota guide](/guides/share-a-quota/).

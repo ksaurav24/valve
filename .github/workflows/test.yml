@@ -1,0 +1,87 @@
+name: Tests and package
+on:
+  pull_request:
+    branches: [master]
+  push:
+    branches: [master]
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  unit:
+    name: tests
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803
+      - uses: pnpm/action-setup@0977fd99725f1db4007ccb2928dbb4e90d06cc86
+      - uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38
+        with:
+          node-version-file: .node-version
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm test:coverage
+      - run: pnpm test:types
+      - run: pnpm --filter @ksaurav24/valve build
+      - run: pnpm check:source
+      - run: pnpm check:package
+      - run: pnpm check:size
+      - run: pnpm --filter @ksaurav24/valve docs:api
+      - run: pnpm docs:build
+      - run: pnpm --filter @valve/docs exec playwright install --with-deps chromium
+      - run: pnpm --filter @valve/docs test:browser
+  integration:
+    name: integration (${{ matrix.image }})
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        image:
+          [
+            'redis:6.2',
+            'redis:7.4',
+            'redis:8',
+            'valkey/valkey:7.2',
+            'valkey/valkey:8',
+          ]
+    services:
+      store:
+        image: ${{ matrix.image }}
+        ports: ['6379:6379']
+        options: >-
+          --health-cmd "redis-cli ping || valkey-cli ping"
+          --health-interval 5s
+          --health-timeout 3s
+          --health-retries 10
+    steps:
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803
+      - uses: pnpm/action-setup@0977fd99725f1db4007ccb2928dbb4e90d06cc86
+      - uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38
+        with:
+          node-version-file: .node-version
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm --filter @ksaurav24/valve build
+      - run: pnpm test:integration
+        env:
+          REDIS_URL: redis://127.0.0.1:6379
+      - run: pnpm examples
+        env:
+          REDIS_URL: redis://127.0.0.1:6379
+  cluster-and-recovery:
+    name: cluster and recovery
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803
+      - uses: pnpm/action-setup@0977fd99725f1db4007ccb2928dbb4e90d06cc86
+      - uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38
+        with:
+          node-version-file: .node-version
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: sudo apt-get update && sudo apt-get install -y redis-server
+      - run: bash scripts/cluster-test.sh
+      - run: pnpm --filter @ksaurav24/valve build
+      - run: pnpm test:integration
+        env:
+          REDIS_CLUSTER_URL: redis://127.0.0.1:17300
+          REDIS_SERVER_BIN: /usr/bin/redis-server

@@ -21,7 +21,19 @@
     "build": "pnpm --recursive --if-present build",
     "changeset": "changeset",
     "version-packages": "changeset version && pnpm install --lockfile-only && pnpm format",
-    "prepare": "husky"
+    "prepare": "husky",
+    "test": "pnpm --filter @ksaurav24/valve test",
+    "test:coverage": "pnpm --filter @ksaurav24/valve test:coverage",
+    "test:integration": "pnpm --filter @ksaurav24/valve test:integration",
+    "test:types": "pnpm --filter @ksaurav24/valve test:types",
+    "docs:dev": "pnpm --filter @valve/docs dev",
+    "docs:build": "pnpm --filter @valve/docs build",
+    "check:source": "node scripts/check-source.mjs",
+    "check:package": "pnpm --filter @ksaurav24/valve check:package",
+    "check:size": "pnpm --filter @ksaurav24/valve check:size",
+    "check": "pnpm lint && pnpm typecheck && pnpm test:coverage && pnpm test:types && pnpm build && pnpm check:source && pnpm check:package && pnpm check:size",
+    "bench": "pnpm --filter @ksaurav24/valve exec tsx bench/local.ts",
+    "examples": "pnpm --recursive --workspace-concurrency=1 --filter \"@valve/example-*\" start"
   },
   "lint-staged": {
     "*.{js,cjs,mjs,ts,tsx}": [

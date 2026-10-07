@@ -1,0 +1,34 @@
+---
+// A small interactive illustration of a budget shared across workers.
+---
+<section class="budget-demo" aria-label="Shared budget illustration">
+  <label for="worker-count">Workers sharing this valve: <output id="worker-output">6</output></label>
+  <input id="worker-count" type="range" min="1" max="8" value="6" />
+  <div class="budget-flow"><div id="workers" class="workers" aria-hidden="true">{Array.from({ length: 6 }, (_, i) => <span>Worker {i + 1}</span>)}</div><div class="shared"><strong>One shared budget</strong><span>100 cost units per second</span></div><div class="provider">Provider API</div></div>
+  <p aria-live="polite" id="budget-result">6 workers. The total budget stays at 100 units per second.</p>
+  <p class="note">Each worker queues locally. Redis grants starts atomically across the shared budget. Cross-process fairness is not guaranteed.</p>
+</section>
+<script>
+  const slider = document.querySelector<HTMLInputElement>('#worker-count');
+  const output = document.querySelector('#worker-output');
+  const workers = document.querySelector('#workers');
+  const result = document.querySelector('#budget-result');
+  slider?.addEventListener('input', () => {
+    if (!output || !workers || !result) return;
+    output.textContent = slider.value;
+    workers.replaceChildren(...Array.from({ length: Number(slider.value) }, (_, i) => { const node = document.createElement('span'); node.textContent = `Worker ${i + 1}`; return node; }));
+    result.textContent = `${slider.value} ${slider.value === '1' ? 'worker' : 'workers'}. The total budget stays at 100 units per second.`;
+  });
+</script>
+<style>
+  .budget-demo { margin: 2rem 0; padding: 1.5rem 0; border-block: 1px solid var(--sl-color-hairline-light); }
+  label { font-weight: 600; display: block; }
+  input { width: min(100%, 22rem); accent-color: var(--sl-color-accent); margin-block: .8rem; }
+  .budget-flow { display: grid; grid-template-columns: 1fr 1.4fr 1fr; align-items: center; gap: 1.5rem; margin-block: 1.5rem; }
+  .workers { display: grid; gap: .3rem; }
+  .workers :global(span) { border-inline-start: 3px solid var(--sl-color-accent); padding-inline-start: .6rem; font-size: .85rem; }
+  .shared { border: 2px solid var(--sl-color-accent); padding: 1rem; display: grid; gap: .4rem; }
+  .shared span, .provider { font-size: .9rem; }
+  .note { font-size: .85rem; color: var(--sl-color-gray-2); }
+  @media (max-width: 32rem) { .budget-flow { grid-template-columns: 1fr; gap: 1rem; } .workers { grid-template-columns: repeat(2, 1fr); } }
+</style>

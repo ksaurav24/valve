@@ -1,4 +1,10 @@
 packages:
   - 'packages/*'
+  - 'docs'
+  - 'examples/*'
 
-onlyBuiltDependencies: []
+allowBuilds:
+  esbuild: true
+  sharp: true
+saveExact: true
+engineStrict: true

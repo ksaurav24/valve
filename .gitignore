@@ -7,3 +7,8 @@ coverage/
 .env.*
 !.env.example
 .DS_Store
+pvt/
+.astro/
+docs/public/api/
+test-results/
+playwright-report/

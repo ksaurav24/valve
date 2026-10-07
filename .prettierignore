@@ -4,3 +4,7 @@ dist/
 build/
 coverage/
 LICENSE
+pvt/
+docs/public/api/
+test-results/
+playwright-report/

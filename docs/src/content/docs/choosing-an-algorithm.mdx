@@ -1,0 +1,42 @@
+---
+title: Choose an algorithm
+description: Match smooth or fixed-window rules to your provider's documented quota.
+---
+
+## GCRA for smooth starts
+
+GCRA is the default. With `limit: 10`, `interval: '1s'`, and `burst: 1`, one
+unit can start every 100ms. A job with `cost: 2` cannot fit until `burst` is
+at least 2. Cost is spent against every rule.
+
+```ts
+rate: { limit: 10, interval: '1s', burst: 5 }
+```
+
+A burst of 5 allows five units together after idle time. The rolling bound
+becomes 14 units per second: `limit + burst - 1`. Burst increases the bound,
+so choose it deliberately.
+
+## Fixed windows for aligned quotas
+
+```ts
+rate: { limit: 100, interval: '1m', algorithm: 'fixed-window' }
+```
+
+This allows 100 units per minute aligned to the store's epoch clock. Near
+the boundary, the two windows can admit 200 units close together.
+
+## Several quotas at once
+
+```ts
+rate: [
+  { limit: 10, interval: '1s' },
+  { limit: 1000, interval: '1h', algorithm: 'fixed-window' },
+];
+```
+
+The store grants a prefix of each batch only when every rule accepts its
+cost. One rule rejecting a job does not spend that job's units in the others.
+Rules use stable keys based on algorithm and interval. Avoid mixing different
+rule configurations across workers; changing a limit preserves existing state,
+but the shared bound is defined by the configuration each worker uses.

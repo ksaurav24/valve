@@ -1,0 +1,37 @@
+---
+title: Implementation status
+description: What 0.1.0 implements and which measured release targets remain open.
+---
+
+The 0.1.0 implementation includes every core method, both rate algorithms,
+atomic multi-rule acquisition, local concurrency, weighted priorities, queue
+bounds, cancellation, queue deadlines, shared pauses, provider feedback,
+fetch retries, and memory plus Redis/Valkey stores.
+
+Unit and property suites, type inference, ESM/CommonJS packaging, TypeDoc,
+real-store parity, eight-process bounds, shared feedback pauses, script-cache
+recovery, timeouts, actual server restarts, and Redis Cluster are covered.
+CI includes the server matrix and the runnable examples.
+
+## Open release targets
+
+The core entry measured 6,395 bytes minified and gzipped, above the 4,096-byte
+PRD target. CI temporarily limits regression to 6,656 bytes. The Redis and
+header entries meet their size targets.
+
+Over 2,000 jobs at 100 per second, p99 delay beyond the preceding allowed start
+was 2.371ms. Delay from the original ideal sequence accumulates, and the PRD's
+5ms ideal-sequence target is unmet. See the repository's benchmark results for
+the conditions and raw measurements.
+
+The npm package has not been published and publishing is still deferred.
+These measured gaps are recorded in the private PRD as well as the public
+benchmark report. The implementation does not claim all release criteria pass.
+
+## Decisions retained from the PRD
+
+Default burst remains 1. Lua parity injects time into a test-only copy of the
+production source. Performance targets still need CI hardware calibration.
+IETF field names remain tagged for verification against later draft revisions.
+Global concurrency, Postgres, pub/sub resume, and feedback counter syncing
+remain outside 0.1.0.

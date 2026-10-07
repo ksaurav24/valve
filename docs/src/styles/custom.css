@@ -1,0 +1,59 @@
+/* Quiet reading surfaces with a single rust accent and generous code space. */
+:root {
+  --sl-color-accent-low: #35160c;
+  --sl-color-accent: #ce6846;
+  --sl-color-accent-high: #ffc8ad;
+  --sl-color-bg: #000;
+  --sl-font: 'Inter', system-ui, sans-serif;
+  --sl-content-width: 52rem;
+  --sl-text-h1: 2.8rem;
+}
+:root[data-theme='light'] {
+  --sl-color-accent-low: #fce8dd;
+  --sl-color-accent: #ae3e20;
+  --sl-color-accent-high: #742611;
+  --sl-color-bg: #fffdf8;
+  --sl-color-bg-sidebar: #f5f1e9;
+  --sl-color-bg-nav: #fffdf8;
+  --sl-color-hairline-light: #ddd6c9;
+}
+.site-title {
+  font-weight: 800;
+  letter-spacing: -0.06em;
+  font-size: 1.8rem;
+}
+h1,
+h2,
+h3 {
+  letter-spacing: -0.035em;
+}
+.sl-markdown-content {
+  line-height: 1.8;
+}
+.sl-markdown-content h2 {
+  margin-top: 2.5rem;
+}
+.sl-markdown-content table {
+  font-size: 0.9rem;
+}
+.sl-markdown-content a {
+  text-underline-offset: 0.18em;
+}
+:focus-visible {
+  outline: 3px solid var(--sl-color-accent);
+  outline-offset: 4px;
+}
+@media (max-width: 50rem) {
+  :root {
+    --sl-text-h1: 2.2rem;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    scroll-behavior: auto !important;
+    animation: none !important;
+    transition: none !important;
+  }
+}

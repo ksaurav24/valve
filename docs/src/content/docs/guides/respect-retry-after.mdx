@@ -1,0 +1,55 @@
+---
+title: Respect Retry-After across workers
+description: Read provider feedback and pause a shared quota after a rate limit response.
+---
+
+`wrapFetch()` observes every response and retries 429s, plus 503s carrying
+`Retry-After`. Its default is two retries. Each retry re-enters the queue,
+keeps its sequence, and releases the concurrency slot between attempts.
+
+```ts
+const limitedFetch = api.wrapFetch(fetch, { retries: 2 });
+const response = await limitedFetch('https://api.example.com/contacts');
+```
+
+A final 429 is returned unchanged. Network errors and unrelated HTTP failures
+are not retried. Set `retries: 0` to read feedback without retrying.
+
+## Feed another client
+
+```ts
+const response = await api.run(() => client.get(url), {
+  observe: (result) => ({ status: result.status, headers: result.headers }),
+});
+```
+
+Or call `api.observe({ status, headers })` after a request. It returns `void`
+and schedules a shared pause write without waiting. Feedback never reads
+response bodies.
+
+## Header support
+
+- `Retry-After`: seconds or an HTTP date, on 429 and 503 only. HTTP dates use
+  the response `Date` header when present.
+- IETF `RateLimit`: `r` remaining and `t` seconds to reset. Legacy
+  `RateLimit-Remaining` and `RateLimit-Reset` are supported too.
+- Common `x-ratelimit-*` and `x-rate-limit-*` fields. Reset values can be
+  epoch seconds, epoch milliseconds, relative seconds, or Go-style durations.
+
+The structured field interpretation follows the
+[IETF rate limit draft](https://datatracker.ietf.org/doc/html/draft-ietf-httpapi-ratelimit-headers-11),
+which can change before it becomes a standard.
+
+## No useful header
+
+A 429 falls back to exponential pauses of 1s, 2s, 4s, and so on, capped at
+30s. A non-429 resets that sequence. `feedback: false` disables header reading
+but retains 429 backoff. `maxPause`, default 15 minutes, caps feedback and
+backoff pauses and emits a warning when a cap applies.
+
+## Request bodies
+
+A `Request` body is cloned for each attempt. An `init.body` that is a
+`ReadableStream` is sent once and is never retried. Unused retry response
+bodies are cancelled to free the connection. Abort signals cancel queued
+attempts and are passed through to fetch for running attempts.

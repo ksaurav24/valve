@@ -1,0 +1,16 @@
+services:
+  redis62:
+    image: redis:6.2
+    ports: ['16362:6379']
+  redis74:
+    image: redis:7.4
+    ports: ['6379:6379']
+  redis8:
+    image: redis:8
+    ports: ['16380:6379']
+  valkey72:
+    image: valkey/valkey:7.2
+    ports: ['16772:6379']
+  valkey8:
+    image: valkey/valkey:8
+    ports: ['16880:6379']

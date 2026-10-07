@@ -6,12 +6,13 @@ Use Node.js 24 and pnpm 11.28.4. Install pnpm with your preferred package manage
 then run `pnpm install`. Git hooks are installed automatically.
 
 Create a branch from `master` and open a pull request when the change is ready.
-Run `pnpm lint`, `pnpm typecheck`, and `pnpm build` before submitting it.
+Run `pnpm check` before submitting it. It includes tests, types, builds, source
+conventions, packaging, and measured bundle regression ceilings.
 Use `pnpm format` to format files.
 
 The repository is a pnpm monorepo. Library packages will live in `packages/*`
-and use the `@ksaurav24` scope. Only workspace tooling exists initially;
-recursive typecheck and build commands run package scripts once packages exist.
+and use the `@ksaurav24` scope. The 0.1.0 library lives in `packages/valve`, with an MDX site in `docs/` and
+runnable use cases in `examples/`.
 
 New TypeScript packages should extend the root `tsconfig.base.json` and provide
 `typecheck` and `build` scripts. ESLint covers JavaScript and TypeScript across
@@ -52,3 +53,17 @@ privately to ksaurav4093@gmail.com.
 
 By contributing, you agree that your contributions are licensed under the
 [Apache License 2.0](LICENSE).
+
+## Real stores and docs
+
+Use `compose.test.yml` to run Redis and Valkey locally. Set `REDIS_URL` for
+`pnpm test:integration`, `REDIS_CLUSTER_URL` for cluster checks, and
+`REDIS_SERVER_BIN` for an isolated stop/restart fixture. Use `pnpm examples`
+to run all six use cases after building the library.
+
+Run `pnpm docs:dev` for the MDX site. After `pnpm docs:build`, run
+`pnpm --filter @valve/docs test:browser` for browser checks. Install Chromium
+with `pnpm --filter @valve/docs exec playwright install chromium` first.
+
+See `packages/valve/bench/RESULTS.md` for measured targets that remain open.
+Keep `pvt/` untracked; source checks use the tracked TODO register for CI.

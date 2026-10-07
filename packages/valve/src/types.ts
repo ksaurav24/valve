@@ -1,0 +1,384 @@
+// Public queue, job, rule, and lifecycle types.
+import type { Store } from './store.js';
+import type { Feedback, ResponseLike } from './headers/types.js';
+import type { ValveErrorCode } from './errors.js';
+
+/**
+ * A length of time.
+ *
+ * A number means milliseconds. A string must end in one of the units
+ * `ms`, `s`, `m`, `h`. Decimals are allowed, for example `"1.5s"`.
+ * Negative values, `NaN`, `Infinity` and unknown units are rejected with
+ * `ValveError` code `INVALID_OPTIONS`.
+ *
+ * @example
+ * const a: Duration = 250;    // 250 ms
+ * const b: Duration = "10s";  // 10000 ms
+ * const c: Duration = "1h";   // 3600000 ms
+ */
+export type Duration =
+  number | `${number}ms` | `${number}s` | `${number}m` | `${number}h`;
+
+/**
+ * One rate limit that a valve enforces.
+ *
+ * A valve may enforce several rules, for example 10 per second and 5000
+ * per hour. A job starts only when every rule allows it.
+ *
+ * GCRA guarantee: total started cost in any window of length `interval`
+ * is at most `limit + burst - 1`. With the default `burst: 1` that is
+ * exactly `limit`, spread evenly.
+ *
+ * Fixed window guarantee: at most `limit` per aligned window. Two
+ * neighboring windows can together admit up to `2 * limit` in a span of
+ * `interval`.
+ *
+ * Two rules in one valve may not share the same `algorithm` and `interval`.
+ *
+ * @example
+ * // HubSpot private app on Professional: 190 requests per 10 seconds
+ * const rule: RateRule = { limit: 190, interval: "10s" };
+ *
+ * @example
+ * // Up to 20 back to back, averaging 10 per second
+ * const bursty: RateRule = { limit: 10, interval: "1s", burst: 20 };
+ */
+export interface RateRule {
+  /** Cost units allowed per `interval`. Positive integer. */
+  limit: number;
+  /** Window length. At least 1 ms. */
+  interval: Duration;
+  /**
+   * How many cost units may start back to back before spacing applies.
+   * Used by `"gcra"` only. Positive integer. Default `1`.
+   *
+   * A job whose `cost` is greater than `burst` can never start under
+   * GCRA, so `run` rejects it with `COST_EXCEEDS_LIMIT`.
+   */
+  // TODO(decision): default burst. Default used: 1 (strict "at most limit" guarantee, evenly spaced). Alternative: limit (instant bursts, up to 2 * limit - 1 per window).
+  burst?: number;
+  /** Algorithm. Default `"gcra"`. */
+  algorithm?: 'gcra' | 'fixed-window';
+}
+
+/** What a valve does when its store throws or times out.
+ * @example const policy: StoreErrorPolicy = 'wait';
+ */
+export type StoreErrorPolicy =
+  /** Keep jobs queued and retry the store with backoff until each job's `maxWait`. Safe default. */
+  | 'wait'
+  /** Run jobs without the store's rate rules while it is down. Local concurrency still applies. */
+  | 'open'
+  /** Reject the affected jobs with `STORE_UNAVAILABLE`. */
+  | 'throw';
+
+/**
+ * Options for {@link createValve}.
+ *
+ * At least one of `rate` or `concurrency` is required.
+ * @example const options: ValveOptions = { id: 'api', concurrency: 2 };
+ */
+export interface ValveOptions {
+  /**
+   * Name of the shared budget. Valves with the same `id` and the same
+   * store share one budget. Include the provider and the credential, for
+   * example `"hubspot:portal-123"` or `"github:app-42"`.
+   *
+   * 1 to 200 characters. Must not contain `{` or `}`.
+   */
+  id: string;
+  /** One rule or a list of rules. */
+  rate?: RateRule | readonly RateRule[];
+  /**
+   * Max jobs running at once in this process. Positive integer or
+   * `Infinity`. Default `Infinity`.
+   */
+  // TODO(1.0.0): also accept ConcurrencyOptions for global concurrency (section 14.1).
+  concurrency?: number;
+  /**
+   * Where the shared budget lives. Default: a new private memory store,
+   * which shares nothing with other processes.
+   */
+  store?: Store;
+  /**
+   * Max jobs waiting in this process, not counting running jobs.
+   * Default `Infinity`. When full, `run` rejects with `QUEUE_FULL`.
+   */
+  maxQueue?: number;
+  /**
+   * Default max time a job may wait in the queue before it is rejected
+   * with `MAX_WAIT_EXCEEDED`. Default: no limit. Does not limit how long
+   * the job runs once started.
+   */
+  maxWait?: Duration;
+  /**
+   * Reads provider responses passed to `observe`, `wrapFetch`, or the
+   * `observe` run option. Default {@link defaultFeedback}. `false` turns
+   * header reading off (429 backoff still applies).
+   */
+  feedback?: Feedback | false;
+  /**
+   * Upper bound for any single pause caused by feedback or backoff.
+   * Protects against bad or misread headers. Default `"15m"`.
+   */
+  maxPause?: Duration;
+  /**
+   * Backoff used when a 429 arrives with no usable header. Doubles per
+   * consecutive 429, resets after a non 429 response.
+   * Default `{ base: "1s", max: "30s" }`.
+   */
+  backoff?: { base?: Duration; max?: Duration };
+  /** What to do when the store fails. Default `"wait"`. */
+  onStoreError?: StoreErrorPolicy;
+  /**
+   * Advanced. Max jobs asked of the store in one call. Higher values mean
+   * fewer round trips under load but coarser fairness between processes.
+   * Positive integer. Default `32`.
+   */
+  batch?: number;
+}
+
+/** Options for a single job.
+ * @example const options: RunOptions = { cost: 1, priority: 10 };
+ */
+export interface RunOptions<T = unknown> {
+  /** Units this job uses from every rule. Positive integer. Default `1`. */
+  cost?: number;
+  /** Higher runs first. Integer. Default `0`. Ties run in call order. */
+  priority?: number;
+  /** Overrides the valve's `maxWait` for this job. */
+  maxWait?: Duration;
+  /**
+   * Cancels the job while it waits. If it is already running, the signal
+   * is passed to the job through {@link JobContext} and valve does not
+   * interrupt it.
+   */
+  signal?: AbortSignal;
+  /**
+   * Maps the job's result to a response that valve should read for
+   * feedback. Use it with clients like axios or got.
+   *
+   * @example
+   * await api.run(() => axios.get(url), { observe: (r) => r });
+   */
+  observe?: (result: T) => ResponseLike | undefined;
+}
+
+/** Passed to every job function.
+ * @example api.run(({ signal }: JobContext) => fetch(url, { signal }));
+ */
+export interface JobContext {
+  /** The `signal` given in {@link RunOptions}, if any. */
+  readonly signal: AbortSignal | undefined;
+}
+
+/** Options for {@link Valve.wrapFetch}.
+ * @example const options: WrapFetchOptions = { retries: 2 };
+ */
+export interface WrapFetchOptions<F extends FetchLike = typeof fetch> {
+  /**
+   * How many times to retry after a 429, or after a 503 that carries
+   * `Retry-After`. Each retry waits for the shared pause and re-enters the
+   * queue at its original position. Integer, `0` or more. Default `2`.
+   * Requests with a stream body are never retried.
+   */
+  retries?: number;
+  /** Cost per request. A number or a function of the fetch arguments. Default `1`. */
+  cost?: number | ((...args: Parameters<F>) => number);
+  /** Priority per request. A number or a function of the fetch arguments. Default `0`. */
+  priority?: number | ((...args: Parameters<F>) => number);
+  /** Max queue wait per request. Defaults to the valve's `maxWait`. */
+  maxWait?: Duration;
+}
+
+/** Any function shaped like `fetch` that resolves to a response.
+ * @example const client: FetchLike = async () => ({ status: 200, headers: {} });
+ */
+export type FetchLike = (...args: never[]) => Promise<ResponseLike>;
+
+/** A snapshot of a valve in this process.
+ * @example const snapshot: ValveStats = api.stats();
+ */
+export interface ValveStats {
+  /** Jobs waiting in this process. */
+  readonly queued: number;
+  /** Jobs running in this process. */
+  readonly running: number;
+  /** Local estimate of when the current pause ends, as epoch ms, or `null`. */
+  readonly pausedUntil: number | null;
+  /** Counters since the valve was created. */
+  readonly totals: {
+    readonly started: number;
+    readonly succeeded: number;
+    readonly failed: number;
+    readonly rejected: number;
+    readonly retried: number;
+    readonly storeErrors: number;
+  };
+}
+
+/** Why a pause began.
+ * @example const reason: PauseReason = 'feedback';
+ */
+export type PauseReason =
+  /** `valve.pause()` was called in this process. */
+  | 'manual'
+  /** A response header asked for it. */
+  | 'feedback'
+  /** A 429 with no usable header. */
+  | 'backoff'
+  /** The store reported a pause set by another process. */
+  | 'store';
+
+/** Events emitted by a valve. All payloads are plain readonly objects.
+ * @example api.on('pause', (event: ValveEventMap['pause']) => console.log(event.durationMs));
+ */
+export interface ValveEventMap {
+  pause: { readonly durationMs: number; readonly reason: PauseReason };
+  resume: { readonly reason: 'manual' | 'expired' };
+  reject: { readonly code: ValveErrorCode };
+  'store-error': { readonly error: unknown; readonly policy: StoreErrorPolicy };
+  idle: Record<string, never>;
+  warning: { readonly message: string };
+}
+
+/**
+ * A rate limited queue in front of calls to one budget.
+ * Create one with {@link createValve}.
+ * @example const api: Valve = createValve({ id: 'api', concurrency: 2 });
+ */
+export interface Valve extends AsyncDisposable {
+  /** The `id` given at creation. */
+  readonly id: string;
+
+  /**
+   * Queues `fn` and runs it when every rule and the concurrency limit
+   * allow. Resolves or rejects with whatever `fn` resolves or rejects with.
+   *
+   * `fn` is never called synchronously inside `run`.
+   *
+   * @throws never synchronously. The returned promise rejects with
+   * `ValveError` codes `COST_EXCEEDS_LIMIT`, `QUEUE_FULL`,
+   * `MAX_WAIT_EXCEEDED`, `ABORTED`, `CLOSED`, `STORE_UNAVAILABLE`,
+   * or with the error thrown by `fn`.
+   *
+   * @example
+   * const user = await github.run(() => octokit.users.getByUsername({ username }));
+   *
+   * @example
+   * // Interactive work first
+   * await api.run(() => syncContact(id), { priority: 10 });
+   */
+  run<R>(
+    fn: (ctx: JobContext) => R,
+    options?: RunOptions<Awaited<R>>,
+  ): Promise<Awaited<R>>;
+
+  /**
+   * Returns a function with the same parameters as `fn` whose calls go
+   * through this valve.
+   *
+   * @example
+   * const getContact = hubspot.wrap((id: string) => client.crm.contacts.basicApi.getById(id));
+   * const contact = await getContact("123");
+   */
+  wrap<A extends unknown[], R>(
+    fn: (...args: A) => R,
+    options?: Omit<RunOptions<Awaited<R>>, 'signal'>,
+  ): (...args: A) => Promise<Awaited<R>>;
+
+  /**
+   * Returns a fetch that goes through this valve, feeds every response
+   * to feedback, and retries 429s after the shared pause.
+   *
+   * @param fetchImpl Defaults to `globalThis.fetch`.
+   *
+   * @example
+   * const fetchGitHub = github.wrapFetch();
+   * const res = await fetchGitHub("https://api.github.com/user");
+   *
+   * @example
+   * import { fetch as undiciFetch } from "undici";
+   * const limitedFetch = api.wrapFetch(undiciFetch, { retries: 3 });
+   */
+  wrapFetch<F extends FetchLike = typeof fetch>(
+    fetchImpl?: F,
+    options?: WrapFetchOptions<F>,
+  ): F;
+
+  /**
+   * Reads a provider response with this valve's feedback. If it asks for
+   * a pause, every process sharing the valve pauses. Safe to call with
+   * any response, including successes.
+   *
+   * @example
+   * const res = await got(url, { throwHttpErrors: false });
+   * api.observe({ status: res.statusCode, headers: res.headers });
+   */
+  observe(response: ResponseLike): void;
+
+  /**
+   * Pauses this valve in every process sharing it. A pause only ever
+   * extends an existing pause, never shortens it.
+   *
+   * @throws `INVALID_OPTIONS` for a bad duration.
+   * @example
+   * await api.pause("30s");
+   */
+  pause(duration: Duration): Promise<void>;
+
+  /**
+   * Ends the current pause in every process sharing this valve.
+   * In 0.1.0 other processes notice on their next store call.
+   *
+   * @example
+   * await api.resume();
+   */
+  // TODO(1.0.0): wake other processes immediately through pub/sub (section 14.3).
+  resume(): Promise<void>;
+
+  /**
+   * A snapshot for this process. Allocates a new object per call.
+   *
+   * @example
+   * const { queued, running } = api.stats();
+   */
+  stats(): ValveStats;
+
+  /**
+   * Adds an event listener. Returns a function that removes it.
+   * Listener errors are caught and reported as `warning` events.
+   *
+   * @example
+   * const off = api.on("pause", (e) => log.warn({ ...e }, "hubspot paused"));
+   */
+  on<E extends keyof ValveEventMap>(
+    event: E,
+    listener: (payload: ValveEventMap[E]) => void,
+  ): () => void;
+
+  /**
+   * Resolves when nothing is queued or running in this process.
+   *
+   * @example
+   * for (const id of ids) void api.run(() => sync(id));
+   * await api.idle();
+   */
+  idle(): Promise<void>;
+
+  /**
+   * Stops accepting jobs. New `run` calls reject with `CLOSED`.
+   *
+   * With `drain: false` (default) queued jobs reject with `CLOSED` and the
+   * promise resolves when running jobs finish. With `drain: true` queued
+   * jobs still run first. Never closes the user's store client.
+   * Calling `close` twice returns the same promise.
+   *
+   * @example
+   * process.on("SIGTERM", () => api.close({ drain: true }));
+   *
+   * @example
+   * await using api = createValve({ id: "x", rate: { limit: 5, interval: "1s" } });
+   */
+  close(options?: { drain?: boolean }): Promise<void>;
+}

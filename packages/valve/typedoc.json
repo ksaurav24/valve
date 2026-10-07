@@ -1,0 +1,12 @@
+{
+  "entryPoints": ["src/index.ts", "src/headers/index.ts", "src/redis/index.ts"],
+  "out": "../../docs/public/api",
+  "treatWarningsAsErrors": true,
+  "excludePrivate": true,
+  "excludeInternal": true,
+  "validation": {
+    "notExported": true,
+    "invalidLink": false
+  },
+  "skipErrorChecking": false
+}
