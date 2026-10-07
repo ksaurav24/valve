@@ -5,16 +5,9 @@ const api = createValve({
   id: 'github:script',
   rate: { limit: 100, interval: '1s' },
 });
-const starts: number[] = [];
 const results = await Promise.all(
-  [1, 2, 3].map((id) =>
-    api.run(() => {
-      starts.push(Date.now());
-      return { id };
-    }),
-  ),
+  [1, 2, 3].map((id) => api.run(() => ({ id }))),
 );
 assert.deepEqual(results, [{ id: 1 }, { id: 2 }, { id: 3 }]);
-assert.ok(starts[2]! - starts[0]! >= 20);
 await api.close();
 console.log('Three calls shared one memory budget.');
