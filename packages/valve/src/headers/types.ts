@@ -23,7 +23,7 @@ export interface FeedbackSignal {
   pauseMs?: number;
   /** Units the provider says remain in its current window. */
   remaining?: number;
-  /** Ms until the provider's window resets. */
+  /** Provider window in ms. IETF t is an effective-window hint, not guaranteed replenishment. */
   resetMs?: number;
 }
 

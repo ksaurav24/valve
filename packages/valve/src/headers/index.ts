@@ -29,33 +29,43 @@ export function retryAfter(): Feedback {
       : undefined;
   };
 }
-/** Read structured RateLimit r/t fields and legacy remaining/reset fields.
+/** Read RateLimit available quota (r) and optional effective-window seconds (t).
+ * Verified against draft-ietf-httpapi-ratelimit-headers-11, sections 4.1.1 and 4.1.2.
+ * https://datatracker.ietf.org/doc/html/draft-ietf-httpapi-ratelimit-headers-11#section-4.1
+ * The effective window is a quota hint, not a guarantee of full replenishment.
+ * Also supports legacy remaining/reset fields.
  * @returns A feedback reader for exhausted quota windows.
  * @example createValve({ id: 'api', concurrency: 2, feedback: ietfRateLimit() });
  */
-// TODO(verify): structured field parameter names r and t against the latest draft-ietf-httpapi-ratelimit-headers.
 export function ietfRateLimit(): Feedback {
   return (response) => {
     const field = header(response.headers, 'ratelimit');
     let signal: FeedbackSignal | undefined;
     if (field) {
       for (const item of field.split(/,(?=(?:[^"\\]*"[^"\\]*")*[^"\\]*$)/)) {
-        const remaining = number(
-          /(?:^|;)\s*r\s*=\s*([^;\s]+)/i.exec(item)?.[1],
-        );
-        const seconds = number(/(?:^|;)\s*t\s*=\s*([^;\s]+)/i.exec(item)?.[1]);
+        const remaining = number(/(?:^|;)\s*r\s*=\s*([^;\s]+)/.exec(item)?.[1]);
+        const window = /(?:^|;)\s*t(?:\s*=\s*([^;\s]*))?(?=;|\s|$)/.exec(item);
+        const seconds = number(window?.[1]);
         if (
           remaining === undefined ||
-          seconds === undefined ||
-          !Number.isFinite(seconds * 1000)
+          !Number.isInteger(remaining) ||
+          remaining > 999_999_999_999_999 ||
+          (window !== null &&
+            (seconds === undefined ||
+              !Number.isInteger(seconds) ||
+              seconds > 999_999_999_999_999))
         )
           continue;
+        const resetMs = seconds === undefined ? undefined : seconds * 1000;
         if (
           !signal ||
           (remaining === 0 &&
-            (signal.remaining !== 0 || seconds * 1000 > (signal.resetMs ?? 0)))
+            (signal.remaining !== 0 || (resetMs ?? 0) > (signal.resetMs ?? 0)))
         )
-          signal = { remaining, resetMs: seconds * 1000 };
+          signal = {
+            remaining,
+            ...(resetMs === undefined ? {} : { resetMs }),
+          };
       }
     }
     if (signal) return signal;

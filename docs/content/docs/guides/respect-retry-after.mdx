@@ -31,14 +31,18 @@ response bodies.
 
 - `Retry-After`: seconds or an HTTP date, on 429 and 503 only. HTTP dates use
   the response `Date` header when present.
-- IETF `RateLimit`: `r` remaining and `t` seconds to reset. Legacy
-  `RateLimit-Remaining` and `RateLimit-Reset` are supported too.
+- IETF `RateLimit`: required `r` available quota and optional `t` effective
+  window in seconds. Both values must be non-negative integers. An omitted `t`
+  reports quota without a pause duration. Legacy `RateLimit-Remaining` and
+  `RateLimit-Reset` are supported too.
 - Common `x-ratelimit-*` and `x-rate-limit-*` fields. Reset values can be
   epoch seconds, epoch milliseconds, relative seconds, or Go-style durations.
 
 The structured field interpretation follows the
 [IETF rate limit draft](https://datatracker.ietf.org/doc/html/draft-ietf-httpapi-ratelimit-headers-11),
-which can change before it becomes a standard.
+revision 11, sections 4.1.1 and 4.1.2, verified on October 7, 2026. This draft
+can change before it becomes a standard. The effective window is a hint; it
+does not guarantee that the quota will be fully restored afterward.
 
 ## No useful header
 

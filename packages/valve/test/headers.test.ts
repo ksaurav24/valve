@@ -80,6 +80,54 @@ describe('feedback', () => {
     expect(f(response({ ratelimit: 'invalid;r=no;t=-1' }))).toBeUndefined();
     expect(f(response({}))).toBeUndefined();
   });
+  it('reads draft-11 service limits without an effective window', () => {
+    const f = ietfRateLimit();
+    expect(
+      f(response({ ratelimit: '"default";r=999;pk=:dHJpYWwxMjEzMjM=:' }, 200)),
+    ).toEqual({ remaining: 999 });
+    expect(f(response({ ratelimit: '"default";r=0' }))).toEqual({
+      remaining: 0,
+    });
+    expect(f(response({ ratelimit: '"default";r=50;t=30' }, 200))).toEqual({
+      remaining: 50,
+      resetMs: 30000,
+    });
+    expect(f(response({ ratelimit: '"default";r=0;t=0' }))).toEqual({
+      remaining: 0,
+      resetMs: 0,
+    });
+    expect(
+      f(response({ ratelimit: '"available";r=50;t=30, "exhausted";r=0' })),
+    ).toEqual({ remaining: 0 });
+    expect(
+      f(response({ ratelimit: '"unknown";r=0, "timed";r=0;t=5' })),
+    ).toEqual({ remaining: 0, resetMs: 5000 });
+    expect(
+      f(response({ ratelimit: '"timed";r=0;t=5, "unknown";r=0' })),
+    ).toEqual({ remaining: 0, resetMs: 5000 });
+    expect(
+      f(
+        response({
+          ratelimit: '"default";r=999999999999999;t=999999999999999',
+        }),
+      ),
+    ).toEqual({ remaining: 999999999999999, resetMs: 999999999999999000 });
+  });
+  it.each([
+    '"default";r=0.5;t=10',
+    '"default";r=0;t=1.5',
+    '"default";r=-1;t=10',
+    '"default";r=0;t=-1',
+    '"default";r=0;t=no',
+    '"default";r=0;t=',
+    '"default";r=0;t',
+    '"default";r=1000000000000000;t=10',
+    '"default";r=0;t=1000000000000000',
+    '"default";t=10',
+    '"default";R=0;t=10',
+  ])('ignores invalid draft-11 numeric parameters: %s', (ratelimit) => {
+    expect(ietfRateLimit()(response({ ratelimit }))).toBeUndefined();
+  });
   it.each([
     ['seconds', '2', 2000],
     ['ms', '250', 250],
