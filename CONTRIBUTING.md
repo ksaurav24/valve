@@ -61,7 +61,9 @@ Use `compose.test.yml` to run Redis and Valkey locally. Set `REDIS_URL` for
 `REDIS_SERVER_BIN` for an isolated stop/restart fixture. Use `pnpm examples`
 to run all six use cases after building the library.
 
-Run `pnpm docs:dev` for the MDX site. After `pnpm docs:build`, run
+Run `pnpm docs:dev` for the Next.js and Fumadocs MDX site at
+`http://127.0.0.1:4321`. `pnpm docs:build` exports static pages and a local
+search index into `docs/out/`. After `pnpm docs:build`, run
 `pnpm --filter @valve/docs test:browser` for browser checks. Install Chromium
 with `pnpm --filter @valve/docs exec playwright install chromium` first.
 

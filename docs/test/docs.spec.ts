@@ -31,7 +31,7 @@ test('guides and generated reference resolve', async ({ page, request }) => {
     '/reference/api/',
     '/reference/testing/',
     '/reference/implementation-status/',
-    '/api/',
+    '/api/index.html',
   ]) {
     const response = await request.get(route);
     expect(response.status(), route).toBe(200);
@@ -50,8 +50,8 @@ test('built search finds guarantees', async ({ page }) => {
     .getByRole('button', { name: /Search/ })
     .first()
     .click();
-  await page
-    .getByRole('textbox', { name: 'Search', exact: true })
-    .fill('guarantees');
-  await expect(page.locator('.pagefind-ui__result-link').first()).toBeVisible();
+  await page.getByRole('combobox').fill('guarantees');
+  await expect(
+    page.getByRole('option').filter({ hasText: 'Guarantees' }).first(),
+  ).toBeVisible();
 });

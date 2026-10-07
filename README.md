@@ -65,7 +65,7 @@ Concurrency and queue order are local to a valve instance. A pause blocks
 subsequent grants; already-issued grants can still start. A cancelled job or
 timed-out store call can waste its grant. Queued work does not survive process
 failure, and `onStoreError: 'open'` gives up shared rate guarantees while the
-store is unavailable. Read the [full guarantees](docs/src/content/docs/guarantees.mdx).
+store is unavailable. Read the [full guarantees](docs/content/docs/guarantees.mdx).
 
 ## Documentation and development
 
@@ -75,14 +75,14 @@ pnpm check
 pnpm docs:dev
 ```
 
-The MDX documentation site lives in `docs/`. Build it with `pnpm docs:build`.
+The Next.js and Fumadocs MDX documentation site lives in `docs/`. Build it with `pnpm docs:build`.
 
-- [Quickstart](docs/src/content/docs/quickstart.mdx)
-- [Share a quota](docs/src/content/docs/guides/share-a-quota.mdx)
-- [Respect Retry-After](docs/src/content/docs/guides/respect-retry-after.mdx)
-- [Priorities and shutdown](docs/src/content/docs/guides/priorities-and-shutdown.mdx)
-- [API reference](docs/src/content/docs/reference/api.mdx)
-- [Tests and benchmarks](docs/src/content/docs/reference/testing.mdx)
+- [Quickstart](docs/content/docs/quickstart.mdx)
+- [Share a quota](docs/content/docs/guides/share-a-quota.mdx)
+- [Respect Retry-After](docs/content/docs/guides/respect-retry-after.mdx)
+- [Priorities and shutdown](docs/content/docs/guides/priorities-and-shutdown.mdx)
+- [API reference](docs/content/docs/reference/api.mdx)
+- [Tests and benchmarks](docs/content/docs/reference/testing.mdx)
 - [Contributing](CONTRIBUTING.md)
 
 Run `pnpm test` for unit and property tests, `pnpm test:coverage` for coverage,

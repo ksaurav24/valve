@@ -1,9 +1,10 @@
 ---
-title: One rate limit for every worker that calls an API.
+title: Overview
 description: Queue outbound calls under one budget shared by your workers, with provider-aware backoff.
 ---
 
-import SharedBudget from '../../components/SharedBudget.astro';
+import { SharedBudget } from '@/components/shared-budget';
+import { OverviewLinks } from '@/components/overview-links';
 
 valve puts a shared budget in front of your outbound API calls. Every process
 using the same valve id and Redis store draws from that budget. When a provider
@@ -30,10 +31,7 @@ The default GCRA rule spreads starts evenly, with `burst: 1`. A fixed-window
 rule spends at most its limit in each aligned window. Combine rules when the
 provider has both short and long quotas.
 
-- [Run your first valve](/quickstart/).
-- [Share a quota across workers](/guides/share-a-quota/).
-- [Read the exact guarantees](/guarantees/).
-- [Look up the API](/reference/api/).
+<OverviewLinks />
 
 ## What 0.1.0 includes
 
