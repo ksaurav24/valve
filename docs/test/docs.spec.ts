@@ -28,6 +28,7 @@ test('guides and generated reference resolve', async ({ page, request }) => {
     '/guides/share-a-quota/',
     '/guides/respect-retry-after/',
     '/guides/priorities-and-shutdown/',
+    '/guides/global-concurrency/',
     '/reference/api/',
     '/reference/testing/',
     '/reference/implementation-status/',
@@ -41,7 +42,7 @@ test('guides and generated reference resolve', async ({ page, request }) => {
     'Guarantees',
   );
   await expect(
-    page.getByRole('heading', { name: 'Grants and cancellation', exact: true }),
+    page.getByRole('heading', { name: /^Grants and cancellation/, level: 2 }),
   ).toBeVisible();
 });
 test('built search finds guarantees', async ({ page }) => {
