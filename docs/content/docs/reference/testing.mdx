@@ -1,0 +1,36 @@
+---
+title: Tests and development
+description: Run unit, property, type, integration, package, and documentation checks.
+---
+
+```sh
+pnpm install
+pnpm check
+pnpm docs:dev
+```
+
+`pnpm check` runs lint, typecheck, coverage, type inference, builds, source
+conventions, package validation, and bundle budgets. Private files in `pvt/`
+are ignored by Git, lint, formatting, builds, and packaging.
+
+## Real Redis and Valkey
+
+```sh
+docker compose -f compose.test.yml up -d
+REDIS_URL=redis://127.0.0.1:6379 pnpm test:integration
+```
+
+CI runs the suite against Redis 6.2, 7.4, and 8, and Valkey 7.2 and 8. Tests
+cover Lua parity, both client families, script-cache recovery, shared pauses,
+timeouts, and eight-process bounds. Cluster checks use `REDIS_CLUSTER_URL`.
+
+## Benchmarks
+
+```sh
+pnpm bench
+```
+
+See `packages/valve/bench/RESULTS.md` for recorded measurements and limitations.
+Performance claims are measured separately from correctness. The package has
+zero runtime and peer dependencies. Documentation and test dependencies are
+workspace development tools.

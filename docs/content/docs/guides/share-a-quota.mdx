@@ -1,0 +1,58 @@
+---
+title: Share a quota across workers
+description: Give every process the same Redis store, valve id, and rate rules.
+---
+
+Use one id per provider credential. Every worker shares the budget when it
+uses the same Redis server, prefix, id, and rules. Queues stay local.
+
+```ts
+import Redis from 'ioredis';
+import { createValve } from '@ksaurav24/valve';
+import { redisStore } from '@ksaurav24/valve/redis';
+
+const redis = new Redis(process.env.REDIS_URL);
+const api = createValve({
+  id: 'hubspot:portal-123',
+  rate: { limit: 190, interval: '10s' },
+  concurrency: 10,
+  store: redisStore({ client: redis }),
+});
+const limitedFetch = api.wrapFetch();
+await limitedFetch('https://api.example.com/contacts');
+await api.close({ drain: true });
+await redis.quit();
+```
+
+The rule is illustrative. Set it from your provider's current quota for your
+account. The `concurrency: 10` applies to this instance, not the fleet.
+
+## node-redis
+
+```ts
+import { createClient } from 'redis';
+const client = await createClient({ url: process.env.REDIS_URL }).connect();
+const store = redisStore({ client });
+```
+
+Both client shapes are typed structurally. Custom clients can pass an
+`adapter` with `evalsha(sha, keys, args)` and `eval(script, keys, args)`.
+Errors containing `NOSCRIPT` must pass through unchanged.
+
+## Redis Cluster
+
+Each key uses the hash tag `{id}`, so all rules and the pause share one slot.
+The integration suite checks both client families against a three-master
+cluster. Never include braces in your id or prefix.
+
+## Verify locally
+
+Start a Redis or Valkey server, build the workspace, and run:
+
+```sh
+REDIS_URL=redis://127.0.0.1:6379 pnpm --filter @valve/example-shared start
+```
+
+The example creates six independent valve instances against one Redis quota.
+The integration suite also uses eight child processes to check the global
+bound on the server clock.

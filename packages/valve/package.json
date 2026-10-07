@@ -1,0 +1,90 @@
+{
+  "name": "@ksaurav24/valve",
+  "version": "0.1.0",
+  "description": "One rate limit for every worker that calls an API.",
+  "type": "module",
+  "sideEffects": false,
+  "license": "Apache-2.0",
+  "author": "Saurav K. <ksaurav4093@gmail.com>",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/ksaurav24/valve.git",
+    "directory": "packages/valve"
+  },
+  "engines": {
+    "node": ">=20"
+  },
+  "exports": {
+    ".": {
+      "import": {
+        "types": "./dist/index.d.ts",
+        "default": "./dist/index.js"
+      },
+      "require": {
+        "types": "./dist/index.d.cts",
+        "default": "./dist/index.cjs"
+      }
+    },
+    "./redis": {
+      "import": {
+        "types": "./dist/redis/index.d.ts",
+        "default": "./dist/redis/index.js"
+      },
+      "require": {
+        "types": "./dist/redis/index.d.cts",
+        "default": "./dist/redis/index.cjs"
+      }
+    },
+    "./headers": {
+      "import": {
+        "types": "./dist/headers/index.d.ts",
+        "default": "./dist/headers/index.js"
+      },
+      "require": {
+        "types": "./dist/headers/index.d.cts",
+        "default": "./dist/headers/index.cjs"
+      }
+    },
+    "./package.json": "./package.json"
+  },
+  "files": [
+    "dist",
+    "README.md",
+    "LICENSE",
+    "NOTICE"
+  ],
+  "publishConfig": {
+    "access": "public"
+  },
+  "scripts": {
+    "build": "node ../../scripts/lua-sha.mjs && tsdown",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run",
+    "test:coverage": "vitest run --coverage",
+    "test:integration": "vitest run --config vitest.integration.config.ts",
+    "test:types": "vitest run --typecheck.only",
+    "check:package": "publint && node ../../scripts/check-package.mjs",
+    "check:size": "node ../../scripts/check-size.mjs",
+    "docs:api": "typedoc --options typedoc.json"
+  },
+  "devDependencies": {
+    "@arethetypeswrong/cli": "0.18.5",
+    "@vitest/coverage-v8": "5.0.3",
+    "bottleneck": "2.19.5",
+    "esbuild": "0.28.2",
+    "fast-check": "4.10.2",
+    "ioredis": "6.0.0",
+    "ioredis5": "npm:ioredis@^5.11.1",
+    "mitata": "1.0.34",
+    "p-limit": "7.3.3",
+    "p-queue": "9.3.3",
+    "publint": "0.3.25",
+    "redis": "6.3.0",
+    "redis4": "npm:redis@^4.7.1",
+    "redis5": "npm:redis@^5.12.1",
+    "tsdown": "0.23.0",
+    "tsx": "4.23.15",
+    "typedoc": "0.28.20",
+    "vitest": "5.0.3"
+  }
+}

@@ -1,0 +1,88 @@
+---
+title: API reference
+description: Public entry points, options, methods, and defaults for valve 0.1.0.
+---
+
+## Entry points
+
+| Import                     | Exports                                                                                        |
+| -------------------------- | ---------------------------------------------------------------------------------------------- |
+| `@ksaurav24/valve`         | `createValve`, `memoryStore`, `ValveError`, `isValveError`, `defaultFeedback`, and core types. |
+| `@ksaurav24/valve/redis`   | `redisStore` and structural client and adapter types.                                          |
+| `@ksaurav24/valve/headers` | `retryAfter`, `ietfRateLimit`, `xRateLimit`, `combine`, `defaultFeedback`, and feedback types. |
+
+## createValve(options)
+
+| Option         | Default                      | Meaning                                                       |
+| -------------- | ---------------------------- | ------------------------------------------------------------- |
+| `id`           | Required                     | 1 to 200 characters, without braces.                          |
+| `rate`         | None                         | One rule or nonempty array of rules.                          |
+| `concurrency`  | `Infinity`                   | A number, or `{ limit, scope, leaseTtl? }` for shared leases. |
+| `store`        | New memory store             | Where the shared budget lives.                                |
+| `maxQueue`     | `Infinity`                   | Positive limit on waiting jobs.                               |
+| `maxWait`      | Unlimited                    | Queue deadline as milliseconds or duration string.            |
+| `feedback`     | `defaultFeedback`            | A feedback reader, or `false` to disable header reading.      |
+| `maxPause`     | `'15m'`                      | Cap on one feedback or backoff pause.                         |
+| `backoff`      | `{ base: '1s', max: '30s' }` | Fallback for 429s without a useful header.                    |
+| `onStoreError` | `'wait'`                     | `wait`, `throw`, or `open`.                                   |
+| `batch`        | `32`                         | Positive maximum jobs requested in one store call.            |
+
+At least a rate rule or finite concurrency is required. Durations accept
+nonnegative milliseconds, or decimal strings ending in `ms`, `s`, `m`, or `h`.
+Rule intervals must be at least 1ms. Limits, bursts, costs, batch size, and queue
+limits must be positive safe integers. Rule algorithm defaults to `gcra` and
+burst defaults to 1. Duplicate algorithm/interval pairs are rejected.
+
+## Methods
+
+| Method                            | Returns                | Behavior                                                                            |
+| --------------------------------- | ---------------------- | ----------------------------------------------------------------------------------- |
+| `run(fn, options?)`               | `Promise<Awaited<R>>`  | Queue a function with optional cost, priority, maxWait, signal, and observe mapper. |
+| `wrap(fn, options?)`              | Wrapped async function | Preserve arguments and infer awaited return values.                                 |
+| `wrapFetch(fetchImpl?, options?)` | Same fetch type        | Observe responses, retry rate limit responses, and preserve request arguments.      |
+| `observe(response)`               | `void`                 | Read feedback and write a shared pause in the background.                           |
+| `pause(duration)`                 | `Promise<void>`        | Extend a shared pause. Manual pauses are not capped by maxPause.                    |
+| `resume()`                        | `Promise<void>`        | Delete the shared pause and notify subscribed processes.                            |
+| `stats()`                         | `ValveStats`           | Fresh snapshot of local queue, running jobs, pause estimate, and totals.            |
+| `on(event, listener)`             | Unsubscribe function   | Subscribe to pause, resume, reject, store-error, idle, or warning.                  |
+| `idle()`                          | `Promise<void>`        | Wait for the instance to become idle.                                               |
+| `close({ drain? }?)`              | `Promise<void>`        | Stop accepting work and wait for completion.                                        |
+
+`run` never throws synchronously. Job errors pass through unchanged.
+
+## wrapFetch options
+
+`retries` defaults to 2. `cost` and `priority` accept numbers or functions of
+the fetch arguments. `maxWait` overrides the valve queue deadline for each
+attempt. The input or init abort signal is used for each attempt.
+
+## Redis options
+
+Pass exactly one of `client` or `adapter`. `prefix` defaults to `valve` and
+must not contain braces. `timeout` defaults to 2s. Scripts load lazily through
+`EVALSHA` and recover from `NOSCRIPT` through `EVAL`. All time math uses Redis
+`TIME`. Optional `subscriber` is a separate connected ioredis or node-redis
+connection. With node-redis, call `connect()` on the duplicated subscriber
+before passing it in. `store.close()` unsubscribes its listeners but never
+disconnects either user-owned client.
+
+Global concurrency defaults to a 30s lease TTL (minimum 30ms). Custom stores
+must provide `release` and `renew`; `renew` returns false for lost slots and
+must never resurrect expired ownership. `subscribe` is optional. Numeric
+concurrency preserves the existing per-instance behavior.
+
+## Errors
+
+`ValveError` exposes `code`, `valveId`, and optional `cause`. Use
+`isValveError(error, code?)` to narrow an unknown value.
+
+Codes: `INVALID_OPTIONS`, `COST_EXCEEDS_LIMIT`, `QUEUE_FULL`,
+`MAX_WAIT_EXCEEDED`, `ABORTED`, `CLOSED`, `STORE_UNAVAILABLE`, and `LEASE_LOST`.
+
+## Generated reference
+
+Run `pnpm --filter @ksaurav24/valve docs:api` to generate TypeDoc reference
+files under `docs/public/api/`. The declaration files shipped with the
+package contain the complete typed API and examples.
+
+[Open the generated TypeDoc reference](/api/index.html). The docs build generates it before building the MDX site.

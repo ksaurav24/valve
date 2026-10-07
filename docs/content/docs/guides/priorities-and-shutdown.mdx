@@ -1,0 +1,50 @@
+---
+title: Priorities, cancellation, and shutdown
+description: Bound queue growth, prioritize interactive calls, and drain a service safely.
+---
+
+```ts
+const api = createValve({
+  id: 'partner:42',
+  rate: { limit: 10, interval: '1s' },
+  concurrency: 4,
+  maxQueue: 1000,
+  maxWait: '5s',
+});
+await api.run(() => syncCustomer('42'), { priority: 10 });
+```
+
+Higher integer priorities start first. Equal priorities retain call order.
+`maxQueue` counts waiting jobs, including jobs in an acquire call, and excludes
+running jobs. `maxWait` limits queue wait only; it does not time out the job
+once it starts.
+
+## Cancellation
+
+```ts
+const controller = new AbortController();
+const job = api.run(({ signal }) => doWork(signal), {
+  signal: controller.signal,
+});
+controller.abort('request ended');
+```
+
+An aborted queued job rejects with `ABORTED` and preserves `signal.reason` as
+its cause. A running job receives the signal and decides how to respond.
+
+## Graceful shutdown
+
+```ts
+process.on('SIGTERM', () => {
+  void api.close({ drain: true }).then(() => redis.quit());
+});
+```
+
+`close({ drain: true })` runs queued jobs and waits for running jobs. The
+default `close()` rejects queued jobs and waits for running ones. New jobs
+reject with `CLOSED`; repeated calls return the same close promise. A valve
+never closes a store client you supplied.
+
+`await api.idle()` waits until nothing is waiting or running. In runtimes
+supporting explicit resource management, `await using api = createValve(...)`
+uses the same close behavior.

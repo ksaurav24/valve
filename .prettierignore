@@ -4,3 +4,13 @@ dist/
 build/
 coverage/
 LICENSE
+pvt/
+docs/public/api/
+test-results/
+playwright-report/
+
+.next/
+.source/
+out/
+docs/next-env.d.ts
+.codegraph/

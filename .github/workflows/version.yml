@@ -47,3 +47,5 @@ jobs:
         run: |
           branch=$(gh pr view "$PR_NUMBER" --json headRefName --jq .headRefName)
           gh workflow run ci.yml --ref "$branch"
+          gh workflow run test.yml --ref "$branch"
+          gh workflow run runtime.yml --ref "$branch"
