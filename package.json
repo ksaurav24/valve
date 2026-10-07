@@ -17,7 +17,7 @@
   "scripts": {
     "lint": "eslint . && prettier --check .",
     "format": "prettier --write .",
-    "typecheck": "tsc --project tsconfig.tooling.json && pnpm --recursive --if-present typecheck",
+    "typecheck": "tsc --project tsconfig.tooling.json && pnpm --filter @ksaurav24/valve build && pnpm --recursive --if-present typecheck",
     "build": "pnpm --recursive --if-present build",
     "changeset": "changeset",
     "version-packages": "changeset version && pnpm install --lockfile-only && pnpm format",
