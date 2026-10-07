@@ -1,0 +1,53 @@
+---
+title: Share a concurrency limit
+description: Bound concurrent lease ownership across workers and wake queues through Redis pub/sub.
+---
+
+Use a shared store and the same valve ID in every worker. Numeric concurrency
+limits apply within one process. The object form selects shared lease ownership.
+
+```ts
+import { Redis } from 'ioredis';
+import { createValve } from '@ksaurav24/valve';
+import { redisStore } from '@ksaurav24/valve/redis';
+
+const client = new Redis(process.env.REDIS_URL!);
+const subscriber = client.duplicate();
+const store = redisStore({ client, subscriber });
+const valve = createValve({
+  id: 'partner-api',
+  store,
+  concurrency: { limit: 8, scope: 'global', leaseTtl: '30s' },
+});
+
+await valve.run(({ signal }) => fetch('https://example.com/api', { signal }));
+await valve.close();
+await store.close();
+await subscriber.quit();
+await client.quit();
+```
+
+Configure the same limit and lease TTL in all workers sharing an ID. Acquisition
+and rate budget consumption happen atomically. Running jobs renew their leases
+roughly every third of the TTL; completion releases them. A terminated worker's
+leases expire. A lease cannot be renewed after expiry.
+
+When a renewal fails or times out at the lease deadline, the job's signal aborts
+and its promise rejects with `LEASE_LOST` after the callback settles. Callbacks
+must honor the signal. An event loop stall, partition, or callback ignoring
+cancellation can let external work continue beyond lease expiry. Use fencing in
+the external system when strict ownership of external effects is required.
+Global concurrency rejects the `open` fail-open policy.
+
+## Wake queues when shared state changes
+
+The subscriber must be a dedicated connection. Pause, resume, and lease release
+publish notifications; subscribed valves clear their wait timer and recheck the
+store. Redis remains authoritative. Without a subscriber, changes are observed
+on the next store call; global lease waits poll at most every 50ms plus jitter.
+Notifications do not provide a delivery guarantee during disconnects.
+
+`valve.close()` detaches its listener. `store.close()` removes its subscriptions.
+Neither closes connections you supplied. Close valves before closing their store
+and client connections. A shared memory store supports these operations within
+one process as well.

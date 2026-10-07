@@ -1,4 +1,7 @@
-# Initial measurements
+# Historical initial measurements
+
+For final repeated comparisons of all current workloads, see
+[COMPARISON.md](./COMPARISON.md). These initial results predate shared leases.
 
 Measured on 2026-10-07, Linux x64, Node 26.10.0, pnpm 11.28.4. The machine was
 also running the server matrix and documentation checks. These are local

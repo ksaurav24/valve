@@ -13,19 +13,19 @@ description: Public entry points, options, methods, and defaults for valve 0.1.0
 
 ## createValve(options)
 
-| Option         | Default                      | Meaning                                                  |
-| -------------- | ---------------------------- | -------------------------------------------------------- |
-| `id`           | Required                     | 1 to 200 characters, without braces.                     |
-| `rate`         | None                         | One rule or nonempty array of rules.                     |
-| `concurrency`  | `Infinity`                   | Positive whole number of running jobs in this instance.  |
-| `store`        | New memory store             | Where the shared budget lives.                           |
-| `maxQueue`     | `Infinity`                   | Positive limit on waiting jobs.                          |
-| `maxWait`      | Unlimited                    | Queue deadline as milliseconds or duration string.       |
-| `feedback`     | `defaultFeedback`            | A feedback reader, or `false` to disable header reading. |
-| `maxPause`     | `'15m'`                      | Cap on one feedback or backoff pause.                    |
-| `backoff`      | `{ base: '1s', max: '30s' }` | Fallback for 429s without a useful header.               |
-| `onStoreError` | `'wait'`                     | `wait`, `throw`, or `open`.                              |
-| `batch`        | `32`                         | Positive maximum jobs requested in one store call.       |
+| Option         | Default                      | Meaning                                                       |
+| -------------- | ---------------------------- | ------------------------------------------------------------- |
+| `id`           | Required                     | 1 to 200 characters, without braces.                          |
+| `rate`         | None                         | One rule or nonempty array of rules.                          |
+| `concurrency`  | `Infinity`                   | A number, or `{ limit, scope, leaseTtl? }` for shared leases. |
+| `store`        | New memory store             | Where the shared budget lives.                                |
+| `maxQueue`     | `Infinity`                   | Positive limit on waiting jobs.                               |
+| `maxWait`      | Unlimited                    | Queue deadline as milliseconds or duration string.            |
+| `feedback`     | `defaultFeedback`            | A feedback reader, or `false` to disable header reading.      |
+| `maxPause`     | `'15m'`                      | Cap on one feedback or backoff pause.                         |
+| `backoff`      | `{ base: '1s', max: '30s' }` | Fallback for 429s without a useful header.                    |
+| `onStoreError` | `'wait'`                     | `wait`, `throw`, or `open`.                                   |
+| `batch`        | `32`                         | Positive maximum jobs requested in one store call.            |
 
 At least a rate rule or finite concurrency is required. Durations accept
 nonnegative milliseconds, or decimal strings ending in `ms`, `s`, `m`, or `h`.
@@ -42,7 +42,7 @@ burst defaults to 1. Duplicate algorithm/interval pairs are rejected.
 | `wrapFetch(fetchImpl?, options?)` | Same fetch type        | Observe responses, retry rate limit responses, and preserve request arguments.      |
 | `observe(response)`               | `void`                 | Read feedback and write a shared pause in the background.                           |
 | `pause(duration)`                 | `Promise<void>`        | Extend a shared pause. Manual pauses are not capped by maxPause.                    |
-| `resume()`                        | `Promise<void>`        | Delete the shared pause. Other processes see it at their next acquire.              |
+| `resume()`                        | `Promise<void>`        | Delete the shared pause and notify subscribed processes.                            |
 | `stats()`                         | `ValveStats`           | Fresh snapshot of local queue, running jobs, pause estimate, and totals.            |
 | `on(event, listener)`             | Unsubscribe function   | Subscribe to pause, resume, reject, store-error, idle, or warning.                  |
 | `idle()`                          | `Promise<void>`        | Wait for the instance to become idle.                                               |
@@ -61,7 +61,15 @@ attempt. The input or init abort signal is used for each attempt.
 Pass exactly one of `client` or `adapter`. `prefix` defaults to `valve` and
 must not contain braces. `timeout` defaults to 2s. Scripts load lazily through
 `EVALSHA` and recover from `NOSCRIPT` through `EVAL`. All time math uses Redis
-`TIME`. `store.close()` does not disconnect your client.
+`TIME`. Optional `subscriber` is a separate connected ioredis or node-redis
+connection. With node-redis, call `connect()` on the duplicated subscriber
+before passing it in. `store.close()` unsubscribes its listeners but never
+disconnects either user-owned client.
+
+Global concurrency defaults to a 30s lease TTL (minimum 30ms). Custom stores
+must provide `release` and `renew`; `renew` returns false for lost slots and
+must never resurrect expired ownership. `subscribe` is optional. Numeric
+concurrency preserves the existing per-instance behavior.
 
 ## Errors
 
@@ -69,7 +77,7 @@ must not contain braces. `timeout` defaults to 2s. Scripts load lazily through
 `isValveError(error, code?)` to narrow an unknown value.
 
 Codes: `INVALID_OPTIONS`, `COST_EXCEEDS_LIMIT`, `QUEUE_FULL`,
-`MAX_WAIT_EXCEEDED`, `ABORTED`, `CLOSED`, and `STORE_UNAVAILABLE`.
+`MAX_WAIT_EXCEEDED`, `ABORTED`, `CLOSED`, `STORE_UNAVAILABLE`, and `LEASE_LOST`.
 
 ## Generated reference
 

@@ -25,7 +25,11 @@ existing pause. `resume()` deletes it.
 
 Each process caches a known pause to avoid repeated store calls. Another
 process's resume is seen on its next store call, which may be at the end of
-that cached pause. There is no pub/sub wakeup in 0.1.0.
+that cached pause. Pass a dedicated `subscriber` to `redisStore` to wake
+waiting processes through pub/sub after pause, resume, and slot release.
+Memory-store instances notify their listeners directly. Notifications are
+hints: the store still checks every admission atomically. Missed Redis
+notifications fall back to normal acquisition and pause-expiry checks.
 
 `observe()` writes a pause in the background and returns immediately. A
 failed write emits `store-error` and is not retried. Use `await pause(...)`
@@ -45,15 +49,32 @@ Fetch retries retain their original sequence. A batch already submitted to
 the store can receive grants before a newly arrived higher-priority job.
 Across processes, there is no ordering or fairness guarantee.
 
-Concurrency counts jobs, not cost units. It is local to a valve instance in
-0.1.0. Multiple instances in one process have separate concurrency limits.
+Concurrency counts jobs, not cost units. A number or `{ limit, scope: 'local' }`
+limits one valve instance. `{ limit, scope: 'global', leaseTtl: '30s' }` uses
+shared leases in the store, acquired atomically with the rate rules.
+Use matching limits and TTLs for every valve sharing an id.
+
+A lease is renewed every `leaseTtl / 3` while its job runs and released when
+the job settles. A crashed worker's slots expire. If renewal fails or a lease
+expires, the job's context signal aborts and its result rejects with
+`LEASE_LOST`. `wrapFetch` forwards this signal to the HTTP client.
+
+Leases bound live ownership, not uninterruptible external work. A process
+paused longer than its TTL can resume after its slot was reassigned. Jobs
+must honor the abort signal; use external fencing if your system needs a
+strict bound even during process stalls or network partitions. Memory-store
+global scope shares only instances using that same store in one process.
+
+Without a subscriber, global-slot waiters poll at most every 50ms, plus
+scheduler jitter, so a released slot can be reused before its former TTL.
 
 ## Store failure and process failure
 
 The default `onStoreError: 'wait'` keeps jobs queued and retries with backoff,
 while respecting `maxWait`. `throw` rejects affected jobs. `open` starts jobs
 without enforcing shared rate rules while the store is down, so the rate
-bounds above do not hold during that period.
+bounds above do not hold during that period. Global concurrency rejects
+`onStoreError: 'open'` to avoid bypassing lease ownership.
 
 Queued jobs are held in memory. Process death loses queued work. A store
 restart that loses budget state permits a fresh budget; persistent store

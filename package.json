@@ -33,7 +33,9 @@
     "check:size": "pnpm --filter @ksaurav24/valve check:size",
     "check": "pnpm lint && pnpm typecheck && pnpm test:coverage && pnpm test:types && pnpm build && pnpm check:source && pnpm check:package && pnpm check:size",
     "bench": "pnpm --filter @ksaurav24/valve exec tsx bench/local.ts",
-    "examples": "pnpm --recursive --workspace-concurrency=1 --filter \"@valve/example-*\" start"
+    "examples": "pnpm --recursive --workspace-concurrency=1 --filter \"@valve/example-*\" start",
+    "bench:compare": "pnpm --filter @ksaurav24/valve exec tsx bench/compare.ts",
+    "codegraph:sync": "codegraph sync"
   },
   "lint-staged": {
     "*.{js,cjs,mjs,ts,tsx}": [

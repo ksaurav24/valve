@@ -2,6 +2,7 @@
 import { duration } from '../duration.js';
 import { invalid } from '../errors.js';
 import type { AcquireRequest, Store } from '../store.js';
+import { subscriptions } from './subscriptions.js';
 import { adapterFor } from './clients.js';
 import {
   ACQUIRE,
@@ -10,10 +11,16 @@ import {
   PAUSE_SHA,
   RESUME,
   RESUME_SHA,
+  RELEASE,
+  RELEASE_SHA,
+  RENEW,
+  RENEW_SHA,
 } from './scripts.js';
 import type { RedisStoreOptions } from './types.js';
 export type {
   IoredisLike,
+  IoredisSubscriber,
+  NodeRedisSubscriber,
   NodeRedisLike,
   RedisEvalAdapter,
   RedisStoreOptions,
@@ -34,6 +41,16 @@ export function redisStore(options: RedisStoreOptions): Store {
       prefix,
       'Use a prefix without Redis hash tags',
     );
+  if (options.subscriber && (options.subscriber as unknown) === options.client)
+    invalid(
+      undefined,
+      'subscriber must use a separate connection',
+      options.subscriber,
+      'Pass a duplicate subscription client',
+    );
+  const notices = options.subscriber
+    ? subscriptions(options.subscriber, prefix)
+    : undefined;
   const timeout = duration(options.timeout ?? '2s', undefined, 'redis timeout');
   const prepared = new WeakMap<AcquireRequest['rules'], string[]>();
   async function execute(
@@ -82,8 +99,17 @@ export function redisStore(options: RedisStoreOptions): Store {
       const keys = [
         `${base}:pause`,
         ...request.rules.map((rule) => `${base}:r:${rule.key}`),
+        ...(request.lease ? [`${base}:leases`] : []),
       ];
       const args = [
+        ...(request.lease
+          ? [
+              'leases',
+              String(request.lease.limit),
+              String(request.lease.ttlMs),
+              request.lease.owner,
+            ]
+          : []),
         ...ruleArgs,
         String(request.costs.length),
         ...request.costs.map(String),
@@ -91,13 +117,25 @@ export function redisStore(options: RedisStoreOptions): Store {
       const raw = await execute(ACQUIRE, ACQUIRE_SHA, keys, args);
       if (
         !Array.isArray(raw) ||
-        raw.length !== 3 ||
-        raw.some(
-          (value) => !Number.isSafeInteger(Number(value)) || Number(value) < 0,
-        )
+        (raw.length !== 3 && raw.length !== 4) ||
+        raw
+          .slice(0, 3)
+          .some(
+            (value) =>
+              !Number.isSafeInteger(Number(value)) || Number(value) < 0,
+          )
       )
         throw new Error('valve: redis returned an invalid acquire result.');
+      if (
+        request.lease &&
+        Number(raw[0]) > 0 &&
+        (!Array.isArray(raw[3]) ||
+          raw[3].length !== Number(raw[0]) ||
+          raw[3].some((token: unknown) => typeof token !== 'string'))
+      )
+        throw new Error('valve: redis returned invalid lease tokens.');
       return {
+        ...(request.lease ? { leases: (raw[3] ?? []) as string[] } : {}),
         granted: Number(raw[0]),
         retryAfterMs: Number(raw[1]),
         pausedMs: Number(raw[2]),
@@ -107,13 +145,37 @@ export function redisStore(options: RedisStoreOptions): Store {
       await execute(
         PAUSE,
         PAUSE_SHA,
-        [`${prefix}:{${id}}:pause`],
+        [`${prefix}:{${id}}:pause`, `${prefix}:{${id}}:events`],
         [String(ms)],
       );
     },
     resume: async (id) => {
-      await execute(RESUME, RESUME_SHA, [`${prefix}:{${id}}:pause`], []);
+      await execute(
+        RESUME,
+        RESUME_SHA,
+        [`${prefix}:{${id}}:pause`, `${prefix}:{${id}}:events`],
+        [],
+      );
     },
-    close: () => Promise.resolve(),
+    release: async (id, leases) => {
+      if (leases.length)
+        await execute(
+          RELEASE,
+          RELEASE_SHA,
+          [`${prefix}:{${id}}:leases`, `${prefix}:{${id}}:events`],
+          [...leases],
+        );
+    },
+    renew: async (id, leases, ttlMs) =>
+      Number(
+        await execute(
+          RENEW,
+          RENEW_SHA,
+          [`${prefix}:{${id}}:leases`],
+          [String(ttlMs), ...leases],
+        ),
+      ) === 1,
+    ...(notices ? { subscribe: notices.subscribe } : {}),
+    close: () => notices?.close() ?? Promise.resolve(),
   };
 }

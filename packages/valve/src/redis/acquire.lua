@@ -5,8 +5,23 @@ local now = tonumber(t[1]) * 1000 + tonumber(t[2]) / 1000
 local pttl = redis.call('PTTL', KEYS[1])
 if pttl > 0 then return {0, pttl, pttl} end
 local nr = #KEYS - 1
-local rules = {}
 local idx = 1
+local leaseLimit = nil
+local leaseTtl = nil
+local owner = nil
+local slotKey = nil
+local slots = 0
+if ARGV[1] == 'leases' then
+  leaseLimit = tonumber(ARGV[2])
+  leaseTtl = tonumber(ARGV[3])
+  owner = ARGV[4]
+  slotKey = KEYS[#KEYS]
+  nr = nr - 1
+  idx = 5
+  redis.call('ZREMRANGEBYSCORE', slotKey, '-inf', now)
+  slots = redis.call('ZCARD', slotKey)
+end
+local rules = {}
 for i = 1, nr do
   local r = { algo = tonumber(ARGV[idx]), interval = tonumber(ARGV[idx+1]), limit = tonumber(ARGV[idx+2]), burst = tonumber(ARGV[idx+3]), a = 0, b = 0 }
   idx = idx + 4
@@ -27,6 +42,11 @@ for cidx = 1, nc do
   local cost = tonumber(ARGV[idx])
   idx = idx + 1
   retry = 0
+  if leaseLimit and slots + granted >= leaseLimit then
+    local earliest = redis.call('ZRANGE', slotKey, 0, 0, 'WITHSCORES')
+    retry = math.max(1, math.ceil(tonumber(earliest[2]) - now))
+    break
+  end
   for i = 1, nr do
     local r = rules[i]
     if r.algo == 0 then
@@ -62,5 +82,16 @@ if granted > 0 then
       redis.call('PEXPIRE', KEYS[i+1], math.ceil(r.interval * 2))
     end
   end
+end
+if leaseLimit then
+  local tokens = {}
+  for i = 1, granted do
+    local token = owner .. ':' .. (i-1)
+    redis.call('ZADD', slotKey, now + leaseTtl, token)
+    tokens[i] = token
+  end
+  local last = redis.call('ZRANGE', slotKey, -1, -1, 'WITHSCORES')
+  if #last > 0 then redis.call('PEXPIRE', slotKey, math.max(1, math.ceil(tonumber(last[2]) - now))) end
+  return {granted, math.max(0, retry), 0, tokens}
 end
 return {granted, math.max(0, retry), 0}

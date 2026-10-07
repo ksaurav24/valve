@@ -69,3 +69,14 @@ with `pnpm --filter @valve/docs exec playwright install chromium` first.
 
 See `packages/valve/bench/RESULTS.md` for measured targets that remain open.
 Keep `pvt/` untracked; source checks use the tracked TODO register for CI.
+
+## Code navigation and performance
+
+Install CodeGraph separately, then run `codegraph init --yes` once and
+`pnpm codegraph:sync` after changes. The local `.codegraph/` index is ignored;
+private `pvt/` material must remain ignored and untracked.
+
+Run `pnpm bench:compare` for repeated comparisons with Bottleneck, p-limit and
+p-queue. Set `REDIS_URL` and `VALKEY_URL` to include shared-store cases. Raw
+results and workload limitations live in `packages/valve/bench/COMPARISON.md`.
+Run benchmarks without builds or tests competing for CPU.

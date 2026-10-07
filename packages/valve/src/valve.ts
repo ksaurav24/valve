@@ -6,6 +6,7 @@ import type { ValveErrorCode } from './errors.js';
 import { defaultFeedback } from './headers/index.js';
 import { header } from './headers/parse.js';
 import type { ResponseLike } from './headers/types.js';
+import { leaseManager } from './leases.js';
 import { memoryStore } from './memory-store.js';
 import { JobQueue } from './queue.js';
 import { normalize } from './rules.js';
@@ -33,10 +34,12 @@ interface Job {
   abort: (() => void) | undefined;
   deadline: number;
   waitMs: number;
+  lease?: string;
+  leaseSignal?: AbortSignal;
   location: 'queue' | 'acquire' | null;
 }
 
-/** Create a named outbound queue with shared rate rules and local concurrency.
+/** Create a named outbound queue with shared rate rules and local or leased concurrency.
  * @param options Budget, store, queue, and feedback configuration.
  * @returns A valve that queues functions and wraps HTTP clients.
  * @throws {ValveError} INVALID_OPTIONS for invalid configuration.
@@ -78,6 +81,17 @@ export function createValve(options: ValveOptions): Valve {
   let closingStore = false;
   let active = false;
   const costs: number[] = [];
+  const owner = config.global ? globalThis.crypto.randomUUID() : '';
+  let leaseSequence = 0;
+  let unsubscribe: (() => void) | undefined;
+  let subscriptionReady = true;
+  let noticeVersion = 0;
+  const leases = config.global
+    ? leaseManager(store, id, config.leaseTtl, reportStore, () => {
+        clearWake();
+        schedule();
+      })
+    : undefined;
 
   function clearWake() {
     if (wake !== undefined) clearTimeout(wake);
@@ -124,9 +138,10 @@ export function createValve(options: ValveOptions): Valve {
     for (const resolve of resolvers) resolve();
     if (closed && closeResolve && !closingStore) {
       closingStore = true;
-      if (options.store) closeResolve();
-      else
-        void store.close().then(closeResolve, (error) => {
+      unsubscribe?.();
+      void (leases?.close() ?? Promise.resolve())
+        .then(() => (options.store ? undefined : store.close()))
+        .then(closeResolve, (error) => {
           reportStore(error);
           closeResolve?.();
         });
@@ -167,6 +182,14 @@ export function createValve(options: ValveOptions): Valve {
   function settle(job: Job, ok: boolean, result: unknown) {
     job.state = 'settled';
     running--;
+    if (job.lease) {
+      const error = leases!.error(job.lease);
+      if (error) {
+        ok = false;
+        result = error;
+      }
+      leases!.release(job.lease);
+    }
     totals[ok ? 'succeeded' : 'failed']++;
     if (ok) job.resolve(result);
     else job.reject(result);
@@ -174,13 +197,17 @@ export function createValve(options: ValveOptions): Valve {
     schedule();
   }
   function start(job: Job) {
-    if (job.state !== 'queued') return;
+    if (job.state !== 'queued') {
+      if (job.lease) leases!.release(job.lease);
+      return;
+    }
     if (job.deadline <= Date.now()) {
       rejectJob(
         job,
         'MAX_WAIT_EXCEEDED',
         `job waited longer than maxWait ${job.waitMs}ms.`,
       );
+      if (job.lease) leases!.release(job.lease);
       return;
     }
     waiting.delete(job);
@@ -191,9 +218,14 @@ export function createValve(options: ValveOptions): Valve {
     totals.started++;
     // Jobs always execute in a microtask, including the memory fast path.
     queueMicrotask(() => {
+      const leaseError = job.lease ? leases!.error(job.lease) : undefined;
+      if (leaseError) {
+        settle(job, false, leaseError);
+        return;
+      }
       let result: unknown;
       try {
-        result = job.fn({ signal: job.options.signal });
+        result = job.fn({ signal: job.leaseSignal ?? job.options.signal });
       } catch (error) {
         settle(job, false, error);
         return;
@@ -221,9 +253,32 @@ export function createValve(options: ValveOptions): Valve {
     }
     settle(job, true, result);
   }
-  function handle(heads: Job[], result: AcquireResult) {
+  function handle(
+    heads: Job[],
+    result: AcquireResult,
+    acquiredAt = Date.now(),
+    version = noticeVersion,
+  ) {
     const now = Date.now();
+    if (
+      config.global &&
+      result.granted > 0 &&
+      (result.leases?.length !== result.granted ||
+        new Set(result.leases).size !== result.granted)
+    ) {
+      storeError(
+        heads,
+        new Error('Store returned invalid global lease tokens'),
+      );
+      return;
+    }
     storeFailures = 0;
+    if (result.pausedMs > 0 && version !== noticeVersion) {
+      for (const job of heads) enqueueAgain(job);
+      clearWake();
+      schedule();
+      return;
+    }
     if (result.pausedMs > 0) {
       for (const job of heads) enqueueAgain(job);
       if (pausedUntil <= now)
@@ -234,11 +289,43 @@ export function createValve(options: ValveOptions): Valve {
       return;
     }
     for (let i = 0; i < heads.length; i++) {
-      if (i < result.granted) start(heads[i]!);
-      else enqueueAgain(heads[i]!);
+      const job = heads[i]!;
+      if (i < result.granted) {
+        if (leases) {
+          job.lease = result.leases![i]!;
+          if (now >= acquiredAt + config.leaseTtl) {
+            leases.release(job.lease);
+            rejectJob(
+              job,
+              'LEASE_LOST',
+              'global lease expired before the job could start.',
+            );
+            continue;
+          }
+          if (job.state === 'queued')
+            job.leaseSignal = leases.claim(
+              job.lease,
+              acquiredAt + config.leaseTtl,
+              job.options.signal,
+            );
+        }
+        start(job);
+      } else enqueueAgain(job);
     }
-    if (result.granted < heads.length)
-      arm(now + Math.max(1, result.retryAfterMs) + jitter(result.retryAfterMs));
+    if (result.granted < heads.length && version !== noticeVersion) {
+      clearWake();
+      schedule();
+    } else if (result.granted < heads.length)
+      arm(
+        now +
+          Math.max(
+            1,
+            config.global
+              ? Math.min(50, result.retryAfterMs)
+              : result.retryAfterMs,
+          ) +
+          jitter(result.retryAfterMs),
+      );
     else if (waiting.size) schedule();
     finishIdle();
   }
@@ -265,7 +352,7 @@ export function createValve(options: ValveOptions): Valve {
   }
   function pump() {
     scheduled = false;
-    if (inFlight) return;
+    if (inFlight || !subscriptionReady) return;
     const now = Date.now();
     if (!waiting.size) {
       finishIdle();
@@ -301,10 +388,25 @@ export function createValve(options: ValveOptions): Valve {
     // Concurrency-only valves still consult the pause in their shared store.
     costs.length = 0;
     for (const job of live) costs.push(job.cost);
-    const request = { id, rules, costs };
+    const request = {
+      id,
+      rules,
+      costs,
+      ...(config.global
+        ? {
+            lease: {
+              limit: config.concurrency,
+              ttlMs: config.leaseTtl,
+              owner: `${owner}:${leaseSequence++}`,
+            },
+          }
+        : {}),
+    };
+    const acquiredAt = Date.now();
+    const version = noticeVersion;
     if (store.acquireSync) {
       try {
-        handle(live, store.acquireSync(request));
+        handle(live, store.acquireSync(request), acquiredAt, version);
       } catch (error) {
         storeError(live, error);
       }
@@ -322,7 +424,7 @@ export function createValve(options: ValveOptions): Valve {
     result.then(
       (value) => {
         inFlight = false;
-        handle(live, value);
+        handle(live, value, acquiredAt, version);
       },
       (error) => {
         inFlight = false;
@@ -539,11 +641,16 @@ export function createValve(options: ValveOptions): Valve {
         if (request?.body && attempts > 0)
           (callArgs as unknown[])[0] = request.clone();
         const response = await submit(
-          () =>
-            Promise.resolve(impl(...(callArgs as never[]))).then((res) => {
-              observe(res);
-              return res;
-            }),
+          (ctx) => {
+            if (config.global)
+              (callArgs as unknown[])[1] = { ...init, signal: ctx.signal };
+            return Promise.resolve(impl(...(callArgs as never[]))).then(
+              (res) => {
+                observe(res);
+                return res;
+              },
+            );
+          },
           runOptions,
           originalSeq,
         );
@@ -582,6 +689,47 @@ export function createValve(options: ValveOptions): Valve {
     schedule();
     finishIdle();
     return closePromise;
+  }
+  if (store.subscribe) {
+    const listener: Parameters<NonNullable<typeof store.subscribe>>[1] = (
+      notice,
+    ) => {
+      if (closed && closingStore) return;
+      noticeVersion++;
+      if (notice.type === 'pause') {
+        const next = Date.now() + notice.durationMs;
+        const extended = next > pausedUntil;
+        pausedUntil = Math.max(pausedUntil, next);
+        if (extended)
+          events.emit('pause', {
+            durationMs: notice.durationMs,
+            reason: 'store',
+          });
+      } else if (notice.type === 'resume') {
+        pausedUntil = 0;
+        events.emit('resume', { reason: 'manual' });
+      }
+      clearWake();
+      schedule();
+    };
+    try {
+      const ready = store.subscribe(id, listener);
+      if (typeof ready === 'function') unsubscribe = ready;
+      else {
+        subscriptionReady = false;
+        void ready
+          .then((off) => {
+            if (closingStore) off();
+            else unsubscribe = off;
+          }, reportStore)
+          .finally(() => {
+            subscriptionReady = true;
+            schedule();
+          });
+      }
+    } catch (error) {
+      reportStore(error);
+    }
   }
   return {
     id,

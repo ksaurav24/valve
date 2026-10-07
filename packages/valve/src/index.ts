@@ -6,6 +6,7 @@ export { ValveError, isValveError } from './errors.js';
 export type { ValveErrorCode } from './errors.js';
 export type {
   Duration,
+  ConcurrencyOptions,
   RateRule,
   StoreErrorPolicy,
   ValveOptions,
@@ -20,6 +21,7 @@ export type {
 } from './types.js';
 export type {
   Store,
+  StoreNotification,
   AcquireRequest,
   AcquireResult,
   NormalizedRule,

@@ -4,7 +4,7 @@ import { createHash } from 'node:crypto';
 import { readFile, writeFile } from 'node:fs/promises';
 const base = new URL('../packages/valve/src/redis/', import.meta.url);
 let output = '// Generated Lua sources and build-time SHA1 digests.\n';
-for (const name of ['acquire', 'pause', 'resume']) {
+for (const name of ['acquire', 'pause', 'resume', 'release', 'renew']) {
   const source = await readFile(new URL(`${name}.lua`, base), 'utf8');
   output += `export const ${name.toUpperCase()} = ${JSON.stringify(source)};\nexport const ${name.toUpperCase()}_SHA = '${createHash('sha1').update(source).digest('hex')}';\n`;
 }

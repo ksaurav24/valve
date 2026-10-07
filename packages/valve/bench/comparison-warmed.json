@@ -1,0 +1,570 @@
+{
+  "date": "2026-10-07T10:02:03.310Z",
+  "node": "v26.10.0",
+  "platform": "linux",
+  "arch": "x64",
+  "cpu": "12th Gen Intel(R) Core(TM) i5-12450H",
+  "logicalCpus": 12,
+  "totalMemory": 16407216128,
+  "repeats": 5,
+  "versions": {
+    "bottleneck": "2.19.5",
+    "p-limit": "7.3.3",
+    "p-queue": "9.3.3",
+    "ioredis5": "5.11.1",
+    "redis5": "5.12.1"
+  },
+  "notes": [
+    "All jobs return promises; setup and warmup excluded.",
+    "Latency percentiles describe last measured round; elapsed reports every round.",
+    "Heap delta is GC-sensitive and is not peak memory.",
+    "Paced workloads impose an application rate cap; fixed window is measured without quota exhaustion.",
+    "Redis command families share one backend but use fresh budget ids per round."
+  ],
+  "rows": [
+    {
+      "scenario": "memory/concurrency",
+      "library": "valve",
+      "jobs": 10000,
+      "elapsedMs": [
+        19.44558699999999, 15.839343999999983, 9.935968000000003,
+        12.392301999999972, 7.107973999999956
+      ],
+      "throughput": 806952.5742674784,
+      "p50WaitMs": 3.7850009999999656,
+      "p99WaitMs": 4.599851000000001,
+      "p99ServiceMs": 0.0002610000000231594,
+      "maxRunning": 1,
+      "cpuMs": 30.559199999999997,
+      "heapDeltaBytes": 7948691.2
+    },
+    {
+      "scenario": "memory/gcra",
+      "library": "valve",
+      "jobs": 10000,
+      "elapsedMs": [
+        14.94135399999999, 8.640146999999956, 10.961603999999966,
+        11.745890999999972, 6.8773290000000316
+      ],
+      "throughput": 912275.2473086996,
+      "p50WaitMs": 3.637764000000004,
+      "p99WaitMs": 4.759439000000043,
+      "p99ServiceMs": 0.00038699999998925705,
+      "maxRunning": 1,
+      "cpuMs": 26.512600000000003,
+      "heapDeltaBytes": -2196070.4
+    },
+    {
+      "scenario": "memory/fixed-window",
+      "library": "valve",
+      "jobs": 10000,
+      "elapsedMs": [
+        11.345298000000014, 11.61146500000001, 5.920226000000014,
+        11.531724000000054, 5.415989000000081
+      ],
+      "throughput": 881422.4183445853,
+      "p50WaitMs": 2.8338189999999486,
+      "p99WaitMs": 3.423821999999973,
+      "p99ServiceMs": 0.00011099999994712562,
+      "maxRunning": 1,
+      "cpuMs": 19.6712,
+      "heapDeltaBytes": 3771278.4
+    },
+    {
+      "scenario": "memory/multi-rule",
+      "library": "valve",
+      "jobs": 10000,
+      "elapsedMs": [
+        13.022601000000009, 7.295991999999956, 11.597912999999949,
+        7.88164699999993, 11.079600000000028
+      ],
+      "throughput": 902559.6591934705,
+      "p50WaitMs": 3.8146699999999782,
+      "p99WaitMs": 7.2337159999999585,
+      "p99ServiceMs": 0.00029200000005857873,
+      "maxRunning": 1,
+      "cpuMs": 19.6672,
+      "heapDeltaBytes": 3699942.4
+    },
+    {
+      "scenario": "memory/weighted",
+      "library": "valve",
+      "jobs": 10000,
+      "elapsedMs": [
+        12.219470999999999, 7.711211000000048, 11.954281000000037,
+        7.519121999999925, 11.736588000000097
+      ],
+      "throughput": 852036.383998477,
+      "p50WaitMs": 4.272996000000035,
+      "p99WaitMs": 8.170132999999964,
+      "p99ServiceMs": 0.0003490000000283544,
+      "maxRunning": 1,
+      "cpuMs": 20.3024,
+      "heapDeltaBytes": 4127187.2
+    },
+    {
+      "scenario": "memory/priority",
+      "library": "valve",
+      "jobs": 10000,
+      "elapsedMs": [
+        24.555736000000024, 12.301904000000036, 15.07719099999997,
+        9.55329699999993, 16.69745599999999
+      ],
+      "throughput": 663253.519836687,
+      "p50WaitMs": 12.19232999999997,
+      "p99WaitMs": 16.001884999999902,
+      "p99ServiceMs": 0.0004279999999425854,
+      "maxRunning": 1,
+      "cpuMs": 36.705799999999996,
+      "heapDeltaBytes": -17189907.2
+    },
+    {
+      "scenario": "memory/concurrency",
+      "library": "p-limit",
+      "jobs": 10000,
+      "elapsedMs": [
+        15.113928999999985, 14.019168000000036, 12.715430999999967,
+        17.352633999999966, 12.847279000000071
+      ],
+      "throughput": 713309.092237141,
+      "p50WaitMs": 9.548945000000003,
+      "p99WaitMs": 10.070481000000086,
+      "p99ServiceMs": 0.0003880000000435757,
+      "maxRunning": 1,
+      "cpuMs": 19.711000000000006,
+      "heapDeltaBytes": 982360
+    },
+    {
+      "scenario": "memory/concurrency",
+      "library": "p-queue",
+      "jobs": 10000,
+      "elapsedMs": [
+        14.59254999999996, 15.251328000000058, 12.691352999999935,
+        14.054846999999995, 11.345426999999972
+      ],
+      "throughput": 711498.3179824017,
+      "p50WaitMs": 7.431348999999955,
+      "p99WaitMs": 8.221897999999896,
+      "p99ServiceMs": 0.0002110000000357104,
+      "maxRunning": 1,
+      "cpuMs": 27.7514,
+      "heapDeltaBytes": -302865.6
+    },
+    {
+      "scenario": "memory/concurrency",
+      "library": "Bottleneck",
+      "jobs": 10000,
+      "elapsedMs": [
+        23188.570583999997, 23045.053074, 22978.944156000005,
+        23003.122858999996, 22998.030461000002
+      ],
+      "throughput": 434.72358345847334,
+      "p50WaitMs": 11490.514853,
+      "p99WaitMs": 22724.037974000006,
+      "p99ServiceMs": 0.0032190000056289136,
+      "maxRunning": 1,
+      "cpuMs": 2203.4597999999996,
+      "heapDeltaBytes": -10578603.2
+    },
+    {
+      "scenario": "async-5ms/concurrency",
+      "library": "valve",
+      "jobs": 512,
+      "elapsedMs": [
+        168.6249439999956, 164.83916200000385, 167.72044900000037,
+        168.81176199999754, 167.52767199999653
+      ],
+      "throughput": 3052.6987201184925,
+      "p50WaitMs": 83.3996380000026,
+      "p99WaitMs": 162.03532700000505,
+      "p99ServiceMs": 5.3874419999920065,
+      "maxRunning": 16,
+      "cpuMs": 5.0838,
+      "heapDeltaBytes": 2151937.6
+    },
+    {
+      "scenario": "async-5ms/concurrency",
+      "library": "p-limit",
+      "jobs": 512,
+      "elapsedMs": [
+        167.90755499999796, 165.4854469999991, 166.62698899999668,
+        166.20941600001242, 166.16318200000387
+      ],
+      "throughput": 3080.4512302718263,
+      "p50WaitMs": 83.17690500000026,
+      "p99WaitMs": 160.73647200000414,
+      "p99ServiceMs": 5.586377999992692,
+      "maxRunning": 16,
+      "cpuMs": 5.5188,
+      "heapDeltaBytes": -2852083.2
+    },
+    {
+      "scenario": "async-5ms/concurrency",
+      "library": "p-queue",
+      "jobs": 512,
+      "elapsedMs": [
+        165.93366200001037, 167.74476100000902, 166.79338899999857,
+        167.03743799999938, 165.68119800000568
+      ],
+      "throughput": 3069.6660285498747,
+      "p50WaitMs": 82.21202099999937,
+      "p99WaitMs": 160.1467539999867,
+      "p99ServiceMs": 5.536810999998124,
+      "maxRunning": 16,
+      "cpuMs": 4.130000000000001,
+      "heapDeltaBytes": 1794313.6
+    },
+    {
+      "scenario": "async-5ms/concurrency",
+      "library": "Bottleneck",
+      "jobs": 512,
+      "elapsedMs": [
+        1158.7036159999989, 1158.9978209999972, 1161.6496040000056,
+        1175.8337840000022, 1401.6313460000092
+      ],
+      "throughput": 440.75252833297355,
+      "p50WaitMs": 666.6485820000089,
+      "p99WaitMs": 1378.5037069999962,
+      "p99ServiceMs": 6.9106900000042515,
+      "maxRunning": 3,
+      "cpuMs": 101.81160000000001,
+      "heapDeltaBytes": -2904771.2
+    },
+    {
+      "scenario": "paced-100/s",
+      "library": "valve",
+      "jobs": 200,
+      "elapsedMs": [
+        2282.668088000006, 2269.270779000013, 2273.40586899998, 2271.75907,
+        2270.0590580000135
+      ],
+      "throughput": 88.0375047869843,
+      "p50WaitMs": 1134.1193400000047,
+      "p99WaitMs": 2258.724197000003,
+      "p99ServiceMs": 0.0029559999820776284,
+      "maxRunning": 1,
+      "cpuMs": 24.552,
+      "heapDeltaBytes": 1314094.4
+    },
+    {
+      "scenario": "paced-100/s",
+      "library": "Bottleneck",
+      "jobs": 200,
+      "elapsedMs": [
+        1994.1383659999992, 1994.8757570000016, 1995.4336719999847,
+        1995.9193080000114, 1995.1114890000026
+      ],
+      "throughput": 100.2450244523652,
+      "p50WaitMs": 1002.1504870000063,
+      "p99WaitMs": 1982.3823630000115,
+      "p99ServiceMs": 0.00358099999721162,
+      "maxRunning": 1,
+      "cpuMs": 79.76,
+      "heapDeltaBytes": 5482657.6
+    },
+    {
+      "scenario": "redis/ioredis/gcra",
+      "library": "valve",
+      "jobs": 2000,
+      "elapsedMs": [
+        13.370541999989655, 9.773016999999527, 15.438979999977164,
+        14.059634999983246, 21.05171200001496
+      ],
+      "throughput": 142251.2035342584,
+      "p50WaitMs": 15.075872000015806,
+      "p99WaitMs": 18.888120999996318,
+      "p99ServiceMs": 0.0005780000064987689,
+      "maxRunning": 1,
+      "cpuMs": 23.5384,
+      "heapDeltaBytes": -5185115.2,
+      "acquiresPerJob": 0.0315
+    },
+    {
+      "scenario": "redis/ioredis/fixed-window",
+      "library": "valve",
+      "jobs": 2000,
+      "elapsedMs": [
+        6.802567000006093, 7.575066999997944, 6.924580999999307,
+        6.601070000004256, 7.320989000028931
+      ],
+      "throughput": 288826.1398054554,
+      "p50WaitMs": 4.916262999991886,
+      "p99WaitMs": 6.308791999996174,
+      "p99ServiceMs": 0.0003000000142492354,
+      "maxRunning": 1,
+      "cpuMs": 8.919,
+      "heapDeltaBytes": 467811.2,
+      "acquiresPerJob": 0.0315
+    },
+    {
+      "scenario": "redis/ioredis/multi-rule",
+      "library": "valve",
+      "jobs": 2000,
+      "elapsedMs": [
+        7.749368999997387, 5.883481999975629, 7.17890400000033,
+        11.151856999989832, 5.213562999997521
+      ],
+      "throughput": 278594.05836878554,
+      "p50WaitMs": 2.8034179999958724,
+      "p99WaitMs": 4.721817000012379,
+      "p99ServiceMs": 0.00028300000121816993,
+      "maxRunning": 1,
+      "cpuMs": 9.6876,
+      "heapDeltaBytes": 1264336,
+      "acquiresPerJob": 0.0315
+    },
+    {
+      "scenario": "redis/ioredis/global-16",
+      "library": "valve",
+      "jobs": 1000,
+      "elapsedMs": [
+        12.900651000003563, 16.4236019999953, 10.662348999991082,
+        12.268531999987317, 14.679719000007026
+      ],
+      "throughput": 77515.46801783289,
+      "p50WaitMs": 6.55395599998883,
+      "p99WaitMs": 14.384971999999834,
+      "p99ServiceMs": 0.0003969999961555004,
+      "maxRunning": 1,
+      "cpuMs": 12.809999999999999,
+      "heapDeltaBytes": -1886611.2,
+      "acquiresPerJob": 0.125
+    },
+    {
+      "scenario": "redis/node-redis/gcra",
+      "library": "valve",
+      "jobs": 2000,
+      "elapsedMs": [
+        5.493503000005148, 9.095807000005152, 7.159290999989025,
+        5.831856000004336, 11.592323999997461
+      ],
+      "throughput": 279357.2715514799,
+      "p50WaitMs": 6.905329000001075,
+      "p99WaitMs": 11.088107000017771,
+      "p99ServiceMs": 0.0005599999858532101,
+      "maxRunning": 1,
+      "cpuMs": 10.796000000000001,
+      "heapDeltaBytes": 1081603.2,
+      "acquiresPerJob": 0.0315
+    },
+    {
+      "scenario": "redis/node-redis/fixed-window",
+      "library": "valve",
+      "jobs": 2000,
+      "elapsedMs": [
+        9.086249000014504, 5.459330999990925, 5.543137999979081,
+        9.103481999976793, 4.260013999999501
+      ],
+      "throughput": 360806.46016886964,
+      "p50WaitMs": 2.1189440000161994,
+      "p99WaitMs": 3.864754999987781,
+      "p99ServiceMs": 0.00018900001305155456,
+      "maxRunning": 1,
+      "cpuMs": 8.7242,
+      "heapDeltaBytes": 910694.4,
+      "acquiresPerJob": 0.0315
+    },
+    {
+      "scenario": "redis/node-redis/multi-rule",
+      "library": "valve",
+      "jobs": 2000,
+      "elapsedMs": [
+        4.93326699998579, 5.7059339999977965, 4.886618999997154,
+        10.139403000008315, 6.561903000023449
+      ],
+      "throughput": 350512.29123939615,
+      "p50WaitMs": 3.171552999992855,
+      "p99WaitMs": 5.981724999990547,
+      "p99ServiceMs": 0.00027600000612437725,
+      "maxRunning": 1,
+      "cpuMs": 5.7354,
+      "heapDeltaBytes": 785878.4,
+      "acquiresPerJob": 0.0315
+    },
+    {
+      "scenario": "redis/node-redis/global-16",
+      "library": "valve",
+      "jobs": 1000,
+      "elapsedMs": [
+        14.886471000005258, 21.330159999983152, 13.78007599999546,
+        13.302425000001676, 13.869994000007864
+      ],
+      "throughput": 72098.08454130788,
+      "p50WaitMs": 6.898170999978902,
+      "p99WaitMs": 13.58627400000114,
+      "p99ServiceMs": 0.00044999999227002263,
+      "maxRunning": 1,
+      "cpuMs": 10.0096,
+      "heapDeltaBytes": 2424579.2,
+      "acquiresPerJob": 0.125
+    },
+    {
+      "scenario": "redis/global-16",
+      "library": "Bottleneck",
+      "jobs": 1000,
+      "elapsedMs": [
+        227.5942619999987, 209.0704079999996, 216.53127800000948,
+        226.43695500001195, 216.0350810000091
+      ],
+      "throughput": 4618.270437585263,
+      "p50WaitMs": 88.25890699998126,
+      "p99WaitMs": 208.42618500001845,
+      "p99ServiceMs": 0.0017809999990276992,
+      "maxRunning": 1,
+      "cpuMs": 251.7512,
+      "heapDeltaBytes": 10904075.2
+    },
+    {
+      "scenario": "valkey/ioredis/gcra",
+      "library": "valve",
+      "jobs": 2000,
+      "elapsedMs": [
+        5.058497999998508, 5.167656000005081, 8.560124000010546,
+        7.014120999985607, 10.080220999981975
+      ],
+      "throughput": 285139.0787247759,
+      "p50WaitMs": 7.65979399997741,
+      "p99WaitMs": 9.099059000000125,
+      "p99ServiceMs": 0.00038300000596791506,
+      "maxRunning": 1,
+      "cpuMs": 6.6914,
+      "heapDeltaBytes": 1136382.4,
+      "acquiresPerJob": 0.0315
+    },
+    {
+      "scenario": "valkey/ioredis/fixed-window",
+      "library": "valve",
+      "jobs": 2000,
+      "elapsedMs": [
+        9.158748999994714, 6.282890000002226, 9.104567999980645,
+        5.869030000001658, 5.651568000001134
+      ],
+      "throughput": 318324.84732333233,
+      "p50WaitMs": 3.325888000021223,
+      "p99WaitMs": 5.203265999996802,
+      "p99ServiceMs": 0.0003890000225510448,
+      "maxRunning": 1,
+      "cpuMs": 7.565400000000001,
+      "heapDeltaBytes": 1018976,
+      "acquiresPerJob": 0.0315
+    },
+    {
+      "scenario": "valkey/ioredis/multi-rule",
+      "library": "valve",
+      "jobs": 2000,
+      "elapsedMs": [
+        5.018891999992775, 4.476596000022255, 12.454537999990862,
+        10.741648999974132, 8.002331000025151
+      ],
+      "throughput": 249927.17746787955,
+      "p50WaitMs": 4.529429000016535,
+      "p99WaitMs": 7.2334910000208765,
+      "p99ServiceMs": 0.0003209999995306134,
+      "maxRunning": 1,
+      "cpuMs": 7.792400000000001,
+      "heapDeltaBytes": 1105552,
+      "acquiresPerJob": 0.0315
+    },
+    {
+      "scenario": "valkey/ioredis/global-16",
+      "library": "valve",
+      "jobs": 1000,
+      "elapsedMs": [
+        14.064268999994965, 10.75428500000271, 11.439919000025839,
+        13.069688000017777, 14.010100999992574
+      ],
+      "throughput": 76512.92058376908,
+      "p50WaitMs": 6.017898999998579,
+      "p99WaitMs": 13.711286000005202,
+      "p99ServiceMs": 0.0005130000063218176,
+      "maxRunning": 1,
+      "cpuMs": 11.6418,
+      "heapDeltaBytes": -2468910.4,
+      "acquiresPerJob": 0.125
+    },
+    {
+      "scenario": "valkey/node-redis/gcra",
+      "library": "valve",
+      "jobs": 2000,
+      "elapsedMs": [
+        5.157783000002382, 4.409885999979451, 5.015899000019999,
+        4.341749000013806, 9.469015000009676
+      ],
+      "throughput": 398732.1116298445,
+      "p50WaitMs": 5.068650999979582,
+      "p99WaitMs": 8.93316899999627,
+      "p99ServiceMs": 0.000467999983811751,
+      "maxRunning": 1,
+      "cpuMs": 6.206,
+      "heapDeltaBytes": 719817.6,
+      "acquiresPerJob": 0.0315
+    },
+    {
+      "scenario": "valkey/node-redis/fixed-window",
+      "library": "valve",
+      "jobs": 2000,
+      "elapsedMs": [
+        5.227488000004087, 4.553461999981664, 4.677021999988938,
+        4.292806999990717, 9.712429999985034
+      ],
+      "throughput": 427622.53416912095,
+      "p50WaitMs": 5.988501999992877,
+      "p99WaitMs": 9.189540999999736,
+      "p99ServiceMs": 0.00041900001815520227,
+      "maxRunning": 1,
+      "cpuMs": 6.826599999999999,
+      "heapDeltaBytes": 751211.2,
+      "acquiresPerJob": 0.0315
+    },
+    {
+      "scenario": "valkey/node-redis/multi-rule",
+      "library": "valve",
+      "jobs": 2000,
+      "elapsedMs": [
+        4.7084930000128224, 6.988100000016857, 7.34569499999634,
+        9.539915999979712, 7.050630000012461
+      ],
+      "throughput": 283662.59468961856,
+      "p50WaitMs": 4.038606999994954,
+      "p99WaitMs": 6.421219000010751,
+      "p99ServiceMs": 0.0004979999794159085,
+      "maxRunning": 1,
+      "cpuMs": 5.1444,
+      "heapDeltaBytes": 739232,
+      "acquiresPerJob": 0.0315
+    },
+    {
+      "scenario": "valkey/node-redis/global-16",
+      "library": "valve",
+      "jobs": 1000,
+      "elapsedMs": [
+        14.034477000008337, 15.795054000016535, 12.992793999990681,
+        14.284997999988263, 17.38387900000089
+      ],
+      "throughput": 70003.5099760477,
+      "p50WaitMs": 7.92708200000925,
+      "p99WaitMs": 17.0697269999946,
+      "p99ServiceMs": 0.00043299997923895717,
+      "maxRunning": 1,
+      "cpuMs": 9.882200000000001,
+      "heapDeltaBytes": 1959011.2,
+      "acquiresPerJob": 0.125
+    },
+    {
+      "scenario": "valkey/global-16",
+      "library": "Bottleneck",
+      "jobs": 1000,
+      "elapsedMs": [
+        199.9058199999854, 204.9601890000049, 232.50773499999195,
+        210.26447899997584, 226.87682800000766
+      ],
+      "throughput": 4755.915049256203,
+      "p50WaitMs": 126.31200199999148,
+      "p99WaitMs": 220.15619599999627,
+      "p99ServiceMs": 0.0017890000017359853,
+      "maxRunning": 1,
+      "cpuMs": 223.5772,
+      "heapDeltaBytes": 11774366.4
+    }
+  ]
+}

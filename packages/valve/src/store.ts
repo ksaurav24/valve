@@ -23,6 +23,12 @@ export interface AcquireRequest {
   readonly rules: readonly NormalizedRule[];
   /** Costs of the jobs at the head of the queue, in order. Never empty. */
   readonly costs: readonly number[];
+  /** Global concurrency slots requested atomically with the rate budget. */
+  readonly lease?: {
+    readonly limit: number;
+    readonly ttlMs: number;
+    readonly owner: string;
+  };
 }
 
 /** The store's answer.
@@ -35,7 +41,16 @@ export interface AcquireResult {
   readonly retryAfterMs: number;
   /** Ms left on an active pause, or 0. When above 0, `granted` is 0. */
   readonly pausedMs: number;
+  /** One unique slot token per grant when lease was requested. */
+  readonly leases?: readonly string[];
 }
+
+/** A store change that should wake waiting valves.
+ * @example const notice: StoreNotification = { type: 'resume' };
+ */
+export type StoreNotification =
+  | { readonly type: 'pause'; readonly durationMs: number }
+  | { readonly type: 'resume' | 'release' };
 
 /**
  * Where a valve keeps its shared budget. Implement this to add a backend.
@@ -53,6 +68,19 @@ export interface Store {
   pause(id: string, durationMs: number): Promise<void>;
   /** Removes the pause. */
   resume(id: string): Promise<void>;
+  /** Release global concurrency slot tokens on job settlement. */
+  release?(id: string, leases: readonly string[]): Promise<void>;
+  /** Renew existing, unexpired slots. False means at least one slot was lost. Never resurrects expired slots. */
+  renew?(
+    id: string,
+    leases: readonly string[],
+    ttlMs: number,
+  ): Promise<boolean>;
+  /** Subscribe to shared pause, resume, and slot-release notices. Returns an unsubscribe function. */
+  subscribe?(
+    id: string,
+    listener: (notice: StoreNotification) => void,
+  ): (() => void) | Promise<() => void>;
   /** Frees resources owned by the store. Never closes user provided clients. */
   close(): Promise<void>;
 }

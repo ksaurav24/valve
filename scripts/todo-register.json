@@ -1,6 +1,1 @@
-[
-  "TODO(decision): default burst. Default used: 1 (strict \"at most limit\" guarantee, evenly spaced). Alternative: limit (instant bursts, up to 2 * limit - 1 per window).",
-  "TODO(1.0.0): also accept ConcurrencyOptions for global concurrency (section 14.1).",
-  "TODO(1.0.0): wake other processes immediately through pub/sub (section 14.3).",
-  "TODO(decision): how to inject time into Lua for parity tests. Default used: a test only variant of ACQUIRE built from the same source with TIME replaced by ARGV."
-]
+[]

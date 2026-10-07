@@ -7,7 +7,8 @@ export type ValveErrorCode =
   | 'MAX_WAIT_EXCEEDED'
   | 'ABORTED'
   | 'CLOSED'
-  | 'STORE_UNAVAILABLE';
+  | 'STORE_UNAVAILABLE'
+  | 'LEASE_LOST';
 /** An error belonging to valve, with job errors passed through unchanged.
  * @example if (isValveError(error, 'QUEUE_FULL')) shedLoad();
  */

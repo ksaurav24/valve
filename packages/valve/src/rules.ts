@@ -17,12 +17,64 @@ export function normalize(options: ValveOptions) {
       id,
       'Include the provider and credential',
     );
+  const concurrencyOptions =
+    typeof options.concurrency === 'object' ? options.concurrency : undefined;
+  if (options.concurrency === null)
+    invalid(
+      id,
+      'concurrency must not be null',
+      null,
+      'Use a number or concurrency options',
+    );
   const concurrency = integer(
-    options.concurrency ?? Infinity,
+    concurrencyOptions
+      ? concurrencyOptions.limit
+      : ((options.concurrency ?? Infinity) as number),
     id,
     'concurrency',
-    true,
+    !concurrencyOptions,
   );
+  const scope = concurrencyOptions?.scope ?? 'local';
+  if (scope !== 'local' && scope !== 'global')
+    invalid(id, 'concurrency.scope is unknown', scope, 'Use local or global');
+  const leaseTtl = duration(
+    concurrencyOptions?.leaseTtl ?? '30s',
+    id,
+    'concurrency.leaseTtl',
+  );
+  if (leaseTtl < 30)
+    invalid(
+      id,
+      'concurrency.leaseTtl must be at least 30ms',
+      leaseTtl,
+      'Use enough time to renew the lease',
+    );
+  if (scope === 'local' && concurrencyOptions?.leaseTtl !== undefined)
+    invalid(
+      id,
+      'leaseTtl requires global concurrency',
+      leaseTtl,
+      'Use scope global',
+    );
+  if (
+    scope === 'global' &&
+    options.store &&
+    (typeof options.store.release !== 'function' ||
+      typeof options.store.renew !== 'function')
+  )
+    invalid(
+      id,
+      'global concurrency requires release and renew',
+      options.store.kind,
+      'Use a lease-capable store',
+    );
+  if (scope === 'global' && options.onStoreError === 'open')
+    invalid(
+      id,
+      'global concurrency cannot fail open',
+      'open',
+      'Use wait or throw to preserve the shared limit',
+    );
   if (options.rate === undefined && concurrency === Infinity)
     invalid(
       id,
@@ -143,6 +195,8 @@ export function normalize(options: ValveOptions) {
     id,
     rules,
     concurrency,
+    global: scope === 'global',
+    leaseTtl,
     maxWait,
     maxPause,
     backoffBase,

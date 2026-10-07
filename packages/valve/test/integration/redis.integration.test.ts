@@ -8,6 +8,7 @@ import { createClient as createV4 } from 'redis4';
 import { createClient as createV5 } from 'redis5';
 import { createValve, memoryStore } from '../../src/index.js';
 import { redisStore } from '../../src/redis/index.js';
+import { withLuaClock } from '../lua-clock.js';
 import { ACQUIRE } from '../../src/redis/scripts.js';
 import { normalize } from '../../src/rules.js';
 import type { RedisStoreOptions } from '../../src/redis/index.js';
@@ -60,11 +61,7 @@ suite('real Redis/Valkey', () => {
     },
   );
   it('matches TypeScript and Lua across 250 generated multi-rule batches', async () => {
-    // TODO(decision): how to inject time into Lua for parity tests. Default used: a test only variant of ACQUIRE built from the same source with TIME replaced by ARGV.
-    const source = ACQUIRE.replace(
-      "local t = redis.call('TIME')\nlocal now = tonumber(t[1]) * 1000 + tonumber(t[2]) / 1000",
-      'local now = tonumber(ARGV[#ARGV])',
-    );
+    const source = withLuaClock(ACQUIRE);
     const cases = fc.sample(
       fc.record({
         limit: fc.integer({ min: 1, max: 20 }),

@@ -98,3 +98,26 @@ are planned for later versions. Publishing remains to be configured.
 
 Rate bounds are measured at atomic store admission. A delayed callback or network
 write can occur later, so actual HTTP arrival times may bunch together.
+
+## Shared concurrency and immediate resume
+
+```ts
+const subscriber = redis.duplicate(); // Separate ioredis subscription connection
+const store = redisStore({ client: redis, subscriber });
+const api = createValve({
+  id: 'partner:credential-42',
+  concurrency: { limit: 5, scope: 'global', leaseTtl: '30s' },
+  store,
+});
+await api.run(({ signal }) => fetch(url, { signal }));
+```
+
+The store renews active leases and recovers slots after a worker crashes. Jobs
+must honor the signal when ownership is lost. A process stalled past its TTL
+can outlive its lease; external fencing is needed for strict partition safety.
+Close the valves, then `store.close()`, then your own subscriber and command
+clients. For node-redis, connect the duplicated subscriber before use.
+
+Run `pnpm bench:compare` for repeated comparisons. Add `REDIS_URL` and
+`VALKEY_URL` to include distributed workloads. Raw samples and methodology
+are recorded in `packages/valve/bench/COMPARISON.md`.

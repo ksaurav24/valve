@@ -35,12 +35,12 @@ provider has both short and long quotas.
 
 ## What 0.1.0 includes
 
-Memory and Redis/Valkey stores, atomic checks across several rules, local
+Memory and Redis/Valkey stores, atomic checks across several rules, local and global leased
 concurrency, priorities, job cost, cancellation, queue deadlines, provider
 feedback, and fetch retries for rate limit responses.
 
-Concurrency is local. Queued jobs live in the process and do not survive a
-restart. Postgres, global concurrency, presets, and durable jobs are not part
+Numeric concurrency is local; global concurrency uses renewable leases. Queued jobs live in the process and do not survive a
+restart. Postgres, presets, and durable jobs are not part
 of this version.
 
 This repository is private while the implementation is prepared. Version

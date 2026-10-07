@@ -3,6 +3,7 @@ import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { Cluster } from 'ioredis5';
 import { createCluster } from 'redis5';
 import { redisStore } from '../../src/redis/index.js';
+import { createValve } from '../../src/index.js';
 import { normalize } from '../../src/rules.js';
 const url = process.env.REDIS_CLUSTER_URL;
 const suite = url ? describe : describe.skip;
@@ -50,5 +51,56 @@ suite('Redis Cluster', () => {
     ).toBeGreaterThan(0);
     await b.resume(id);
     expect((await a.acquire({ id, rules, costs: [1] })).granted).toBe(1);
+  });
+  it('shares global leases and pub/sub wakeups across client families', async () => {
+    const ioSubscriber = io.duplicate();
+    const nodeSubscriber = node.duplicate();
+    await nodeSubscriber.connect();
+    const a = redisStore({ client: io, subscriber: ioSubscriber });
+    const b = redisStore({ client: node, subscriber: nodeSubscriber });
+    const id = `cluster-global-${crypto.randomUUID()}`;
+    const first = createValve({
+      id,
+      store: a,
+      concurrency: { limit: 1, scope: 'global', leaseTtl: 300 },
+    });
+    const second = createValve({
+      id,
+      store: b,
+      concurrency: { limit: 1, scope: 'global', leaseTtl: 300 },
+    });
+    let running = 0;
+    let peak = 0;
+    const work = async () => {
+      peak = Math.max(peak, ++running);
+      await new Promise((resolve) => setTimeout(resolve, 110));
+      running--;
+    };
+    try {
+      await Promise.all([first.run(work), second.run(work), first.run(work)]);
+      expect(peak).toBe(1);
+      await first.pause(10000);
+      let finished = false;
+      const queued = second.run(() => {
+        finished = true;
+      });
+      await new Promise((resolve) => setTimeout(resolve, 30));
+      expect(finished).toBe(false);
+      await first.resume();
+      await Promise.race([
+        queued,
+        new Promise((_, reject) =>
+          setTimeout(() => reject(new Error('cluster pub/sub failed')), 1000),
+        ),
+      ]);
+      expect(finished).toBe(true);
+    } finally {
+      await first.close();
+      await second.close();
+      await a.close();
+      await b.close();
+      await ioSubscriber.quit();
+      await nodeSubscriber.quit();
+    }
   });
 });

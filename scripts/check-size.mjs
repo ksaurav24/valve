@@ -7,8 +7,8 @@ const require = createRequire(
 const { build } = require('esbuild');
 const base = new URL('../packages/valve/', import.meta.url);
 for (const [entry, budget] of [
-  ['index', 6656],
-  ['redis/index', 3072],
+  ['index', 8704],
+  ['redis/index', 4096],
   ['headers/index', 2048],
 ]) {
   const result = await build({

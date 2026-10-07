@@ -55,7 +55,6 @@ export interface RateRule {
    * A job whose `cost` is greater than `burst` can never start under
    * GCRA, so `run` rejects it with `COST_EXCEEDS_LIMIT`.
    */
-  // TODO(decision): default burst. Default used: 1 (strict "at most limit" guarantee, evenly spaced). Alternative: limit (instant bursts, up to 2 * limit - 1 per window).
   burst?: number;
   /** Algorithm. Default `"gcra"`. */
   algorithm?: 'gcra' | 'fixed-window';
@@ -71,6 +70,18 @@ export type StoreErrorPolicy =
   | 'open'
   /** Reject the affected jobs with `STORE_UNAVAILABLE`. */
   | 'throw';
+
+/** Shared or per-valve concurrency configuration.
+ * @example const concurrency: ConcurrencyOptions = { limit: 5, scope: 'global', leaseTtl: '30s' };
+ */
+export interface ConcurrencyOptions {
+  /** Positive integer maximum number of active jobs. */
+  limit: number;
+  /** Defaults to local. Global uses store leases shared by valve id. */
+  scope?: 'local' | 'global';
+  /** Global lease duration, renewed every third of this interval. Default 30s, minimum 30ms. */
+  leaseTtl?: Duration;
+}
 
 /**
  * Options for {@link createValve}.
@@ -90,11 +101,10 @@ export interface ValveOptions {
   /** One rule or a list of rules. */
   rate?: RateRule | readonly RateRule[];
   /**
-   * Max jobs running at once in this process. Positive integer or
-   * `Infinity`. Default `Infinity`.
+   * A number limits jobs per valve instance. Objects select local or global
+   * scope. Global requires a store with release and renew. Default Infinity.
    */
-  // TODO(1.0.0): also accept ConcurrencyOptions for global concurrency (section 14.1).
-  concurrency?: number;
+  concurrency?: number | ConcurrencyOptions;
   /**
    * Where the shared budget lives. Default: a new private memory store,
    * which shares nothing with other processes.
@@ -329,12 +339,12 @@ export interface Valve extends AsyncDisposable {
 
   /**
    * Ends the current pause in every process sharing this valve.
-   * In 0.1.0 other processes notice on their next store call.
+   * Stores with subscriptions notify other processes immediately. Redis
+   * needs a separate subscriber client; otherwise the next acquire notices.
    *
    * @example
    * await api.resume();
    */
-  // TODO(1.0.0): wake other processes immediately through pub/sub (section 14.3).
   resume(): Promise<void>;
 
   /**

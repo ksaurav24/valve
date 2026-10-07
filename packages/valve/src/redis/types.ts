@@ -49,12 +49,43 @@ export interface RedisEvalAdapter {
   ): Promise<unknown>;
 }
 
+/** Dedicated node-redis subscription connection, already connected.
+ * @example const subscriber: NodeRedisSubscriber = client.duplicate();
+ */
+export interface NodeRedisSubscriber {
+  subscribe(
+    channel: string,
+    listener: (message: string | Uint8Array) => void,
+  ): Promise<unknown>;
+  unsubscribe(
+    channel: string,
+    listener: (message: string | Uint8Array) => void,
+  ): Promise<unknown>;
+}
+/** Dedicated ioredis subscription connection, separate from command traffic.
+ * @example const subscriber: IoredisSubscriber = redis.duplicate();
+ */
+export interface IoredisSubscriber {
+  subscribe(channel: string): Promise<unknown>;
+  unsubscribe(channel: string): Promise<unknown>;
+  on(
+    event: 'message',
+    listener: (channel: string, message: string) => void,
+  ): unknown;
+  off(
+    event: 'message',
+    listener: (channel: string, message: string) => void,
+  ): unknown;
+}
+
 /** Options for {@link redisStore}. Give exactly one of `client` or `adapter`.
  * @example const options: RedisStoreOptions = { client: redis, timeout: '2s' };
  */
 export type RedisStoreOptions = {
   /** Key prefix. Default `"valve"`. Must not contain `{` or `}`. */
   prefix?: string;
+  /** Optional dedicated connection for immediate shared pause/resume/release notifications. Never disconnected by valve. */
+  subscriber?: NodeRedisSubscriber | IoredisSubscriber;
   /** Max time for one store call before it counts as a store error. Default `"2s"`. */
   timeout?: Duration;
 } & (
