@@ -61,6 +61,24 @@
       "baselineValveMs": 186.05,
       "result": "passed on unchanged source",
       "url": "https://github.com/ksaurav24/valve/actions/runs/37795529407/attempts/2"
+    },
+    {
+      "attempt": 1,
+      "currentValveMs": 263.42,
+      "baselineValveMs": 223.78,
+      "result": "Artifact-only commit failed the original single-run 15% gate on unchanged runtime source",
+      "url": "https://github.com/ksaurav24/valve/actions/runs/37801089794/attempts/1"
     }
-  ]
+  ],
+  "ciPairedProtocol": {
+    "pairs": 3,
+    "order": ["baseline/current", "current/baseline", "baseline/current"],
+    "coldRuns": true,
+    "samplesDiscarded": 0,
+    "throughputCeilingMultiplier": 1.15,
+    "minimumP99SpacingCeilingMs": 1,
+    "localSmokeJobs": 10000,
+    "localSmokeAccuracyJobs": 20,
+    "localSmokeGate": "passed"
+  }
 }

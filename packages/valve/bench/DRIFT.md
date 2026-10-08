@@ -203,6 +203,14 @@ versus baseline 222.76ms and failed its existing 15% ceiling. On the identical
 source commit, its rerun measured 162.12ms versus 186.05ms and passed. Both
 outcomes are recorded in [validation.json](./drift-results/validation.json);
 the single-run check is not evidence of a stable throughput improvement.
+An artifact-only commit subsequently measured current 263.42ms versus baseline
+223.78ms and failed the same gate again, with unchanged runtime source. CI now
+runs three alternating baseline/current **cold-run pairs** and gates the medians
+with the original comparator. Every cold sample is printed to CI logs and
+retained in the comparator's JSON inputs. The 15% throughput ceiling and 1ms
+minimum p99-spacing ceiling are unchanged. A reduced-size local execution
+verified orchestration, matched workload validation, median output, and the
+existing comparator.
 
 Minified/gzipped ESM entries, measured with Node 24.21.0 and esbuild 0.28.2,
 browser platform and ES2022 target:
