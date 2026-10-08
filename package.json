@@ -36,6 +36,7 @@
     "examples": "pnpm --recursive --workspace-concurrency=1 --filter \"@valve/example-*\" start",
     "bench:compare": "pnpm --filter @ksaurav24/valve exec tsx bench/compare.ts",
     "bench:paced": "pnpm --filter @ksaurav24/valve exec tsx bench/paced.ts",
+    "bench:drift": "node packages/valve/bench/drift.mjs",
     "codegraph:sync": "codegraph sync"
   },
   "lint-staged": {

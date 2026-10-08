@@ -21,11 +21,17 @@ bytes. CI ceilings are 8,704, 4,096, and 2,048 bytes respectively. See
 the benchmark reports for measured sizes and workload results.
 
 After removing positive jitter from rate eligibility waits with local concurrency,
-the latest 200-job comparison at 100/sec measures 98.52 jobs/sec
+the PR #10 baseline comparison of 200 jobs at 100/sec measures 98.52 jobs/sec
 and 39.951ms p99 ideal-sequence delay. The longer 2,000-job run
 measures 376.061ms p99 ideal-sequence delay. The original 5ms
 target remains unmet. Small scheduling delays accumulate under strict burst-1
 admission; Valve does not introduce catch-up starts.
+
+Asynchronous rate waits with local concurrency now account for elapsed acquisition
+time using a monotonic local clock. Every wakeup still requires store admission.
+The synchronous memory timing policy is unchanged, and the original 5ms target
+remains open. `packages/valve/bench/DRIFT.md` records the diagnosis, paired
+Node 20/22/24 measurements, clock definitions, and proposed target calibration.
 
 Global concurrency waits retain polling jitter because they may be waiting
 for slots. `packages/valve/bench/COMPARISON.md` records the full current

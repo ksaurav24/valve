@@ -258,6 +258,7 @@ export function createValve(options: ValveOptions): Valve {
     result: AcquireResult,
     acquiredAt = Date.now(),
     version = noticeVersion,
+    acquiredTime?: number,
   ) {
     const now = Date.now();
     if (
@@ -322,7 +323,12 @@ export function createValve(options: ValveOptions): Valve {
             1,
             config.global
               ? Math.min(50, result.retryAfterMs)
-              : result.retryAfterMs,
+              : // The next rate check can overlap time spent obtaining the answer.
+                // Admission remains authoritative if this estimate wakes early.
+                result.retryAfterMs -
+                  (acquiredTime === undefined
+                    ? 0
+                    : performance.now() - acquiredTime),
           ) +
           // Global waits may be blocked on contended slots; rate-only waits need no jitter.
           (config.global ? jitter(result.retryAfterMs) : 0),
@@ -414,6 +420,7 @@ export function createValve(options: ValveOptions): Valve {
       return;
     }
     inFlight = true;
+    const acquiredTime = config.global ? undefined : performance.now();
     let result: Promise<AcquireResult>;
     try {
       result = store.acquire(request);
@@ -425,7 +432,7 @@ export function createValve(options: ValveOptions): Valve {
     result.then(
       (value) => {
         inFlight = false;
-        handle(live, value, acquiredAt, version);
+        handle(live, value, acquiredAt, version, acquiredTime);
       },
       (error) => {
         inFlight = false;

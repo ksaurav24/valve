@@ -17,10 +17,12 @@ They do not describe job completion times or the provider's own accounting.
 Fixed windows can admit up to `2 * limit` units near an adjacent-window
 boundary. Use them when that matches the provider's quota.
 
-With local concurrency, rate eligibility waits use the store's returned delay
-without adding random jitter. This applies to memory and shared Redis/Valkey
-budgets. Every wakeup checks admission again; another worker may have spent the
-budget first. Global concurrency polling and store failure retries retain jitter.
+With local concurrency, rate eligibility waits add no random jitter. For an
+asynchronous store, the scheduler subtracts elapsed acquisition time from the
+returned delay, using a monotonic local clock. This estimates when to check again;
+it can wake early when request latency varies. Every wakeup checks admission
+again on the store's clock, and another worker may have spent the budget first.
+Global concurrency polling and store failure retries retain jitter.
 
 Timers can wake late. With GCRA burst 1, the next eligible admission follows the
 actual previous admission, so delays accumulate over a saturated queue. Valve
