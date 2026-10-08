@@ -15,7 +15,8 @@ for (const file of files) {
   if (
     file === 'pnpm-lock.yaml' ||
     file.endsWith('.svg') ||
-    file.endsWith('.png')
+    file.endsWith('.png') ||
+    file.endsWith('.gz')
   )
     continue;
   const source = readFileSync(file, 'utf8');

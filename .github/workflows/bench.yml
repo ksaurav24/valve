@@ -21,6 +21,7 @@ jobs:
           cache: pnpm
       - run: pnpm install --frozen-lockfile
       - run: pnpm bench
+        if: github.event_name != 'pull_request'
         env:
           VALVE_BENCH_OUT: /tmp/current.json
           VALVE_BENCH_SKIP_BOTTLENECK: '1'
@@ -31,9 +32,10 @@ jobs:
         run: |
           if git cat-file -e "$BASE_SHA:packages/valve/src/index.ts" 2>/dev/null; then
             git worktree add --detach /tmp/valve-baseline "$BASE_SHA"
-            VALVE_BENCH_LIBRARY=/tmp/valve-baseline/packages/valve/src/index.ts VALVE_BENCH_SKIP_BOTTLENECK=1 VALVE_BENCH_OUT=/tmp/base.json pnpm bench
+            node scripts/paired-benchmarks.mjs /tmp/valve-baseline/packages/valve/src/index.ts /tmp/base.json /tmp/current.json
             node scripts/compare-benchmarks.mjs /tmp/base.json /tmp/current.json
           else
+            VALVE_BENCH_SKIP_BOTTLENECK=1 VALVE_BENCH_OUT=/tmp/current.json pnpm bench
             echo 'First implementation establishes the benchmark baseline.'
           fi
   redis:

@@ -1,5 +1,9 @@
 # Current benchmarks
 
+The follow-up [paced drift report](./DRIFT.md) measures asynchronous rate-wakeup
+deadlines against the merged PR #10 baseline. The results below retain PR #10's
+full comparison and historical evidence.
+
 Full rerun after removing positive jitter from rate eligibility waits with local concurrency. Global concurrency polling and outage backoff retain jitter. The implementation and public API are otherwise unchanged.
 
 Measured 2026-10-07T14:51:33.144Z on 12th Gen Intel(R) Core(TM) i5-12450H, 12 logical CPUs, linux x64, v26.10.0. Redis 7.4.7 and Valkey 8.0.4 run on loopback. Dependencies: bottleneck 2.19.5, p-limit 7.3.3, p-queue 9.3.3, ioredis5 5.11.1, redis5 5.12.1.

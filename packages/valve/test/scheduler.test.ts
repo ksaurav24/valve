@@ -175,6 +175,107 @@ describe('queue and execution', () => {
     await Promise.all(tasks);
     expect(times).toEqual([0, 110, 120]);
   });
+  it('includes asynchronous store response time in rate eligibility waits', async () => {
+    const store = memoryStore();
+    const acquire = store.acquireSync!;
+    delete store.acquireSync;
+    store.acquire = async (request) => {
+      const result = acquire(request);
+      await new Promise((resolve) => setTimeout(resolve, 5));
+      return result;
+    };
+    const valve = make({
+      id: 'response',
+      rate: { limit: 100, interval: 1000 },
+      store,
+    });
+    const times: number[] = [];
+    const jobs = Array.from({ length: 3 }, () =>
+      valve.run(() => times.push(Date.now())),
+    );
+    await vi.runAllTimersAsync();
+    await Promise.all(jobs);
+    expect(times).toEqual([5, 15, 25]);
+  });
+  it.each([-1000, 1000])(
+    'measures acquisition time independently of a %ims local clock change',
+    async (jump) => {
+      vi.setSystemTime(10000);
+      // Model an authoritative store clock unaffected by the client's wall clock.
+      const store = memoryStore({ clock: () => performance.now() });
+      const acquire = store.acquireSync!;
+      delete store.acquireSync;
+      store.acquire = async (request) => {
+        const result = acquire(request);
+        await new Promise((resolve) => setTimeout(resolve, 5));
+        return result;
+      };
+      const valve = make({
+        id: 'clock',
+        rate: { limit: 100, interval: 1000 },
+        store,
+      });
+      const times: number[] = [];
+      const jobs = Array.from({ length: 3 }, () =>
+        valve.run(() => times.push(performance.now())),
+      );
+      await vi.advanceTimersByTimeAsync(2);
+      vi.setSystemTime(Date.now() + jump);
+      await vi.runAllTimersAsync();
+      await Promise.all(jobs);
+      expect(times).toEqual([5, 15, 25]);
+    },
+  );
+  it('rechecks admission after variable outbound latency without catching up', async () => {
+    const store = memoryStore();
+    const acquire = store.acquireSync!;
+    delete store.acquireSync;
+    const admissions: number[] = [];
+    let calls = 0;
+    store.acquire = async (request) => {
+      await new Promise((resolve) =>
+        setTimeout(resolve, calls++ === 0 ? 8 : 1),
+      );
+      const result = acquire(request);
+      if (result.granted) admissions.push(Date.now());
+      await new Promise((resolve) => setTimeout(resolve, 1));
+      return result;
+    };
+    const valve = make({
+      id: 'outbound',
+      rate: { limit: 100, interval: 1000 },
+      store,
+    });
+    const jobs = Array.from({ length: 3 }, () => valve.run(() => undefined));
+    await vi.runAllTimersAsync();
+    await Promise.all(jobs);
+    expect(admissions).toHaveLength(3);
+    expect(calls).toBeGreaterThan(3); // An early estimate was denied by the store.
+    for (let i = 1; i < admissions.length; i++)
+      expect(admissions[i]! - admissions[i - 1]!).toBeGreaterThanOrEqual(10);
+  });
+  it('does not catch up after a store response arrives past eligibility', async () => {
+    const store = memoryStore();
+    const acquire = store.acquireSync!;
+    delete store.acquireSync;
+    const admissions: number[] = [];
+    store.acquire = async (request) => {
+      const result = acquire(request);
+      if (result.granted) admissions.push(Date.now());
+      await new Promise((resolve) => setTimeout(resolve, 25));
+      return result;
+    };
+    const valve = make({
+      id: 'late-response',
+      rate: { limit: 100, interval: 1000 },
+      store,
+    });
+    const jobs = Array.from({ length: 3 }, () => valve.run(() => undefined));
+    await vi.runAllTimersAsync();
+    await Promise.all(jobs);
+    expect(admissions).toEqual([0, 26, 52]);
+    expect(vi.getTimerCount()).toBe(0);
+  });
   it('allows a fixed-window burst with weighted jobs', async () => {
     const valve = make({
       id: 'x',
