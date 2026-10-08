@@ -324,7 +324,8 @@ export function createValve(options: ValveOptions): Valve {
               ? Math.min(50, result.retryAfterMs)
               : result.retryAfterMs,
           ) +
-          jitter(result.retryAfterMs),
+          // Global waits may be blocked on contended slots; rate-only waits need no jitter.
+          (config.global ? jitter(result.retryAfterMs) : 0),
       );
     else if (waiting.size) schedule();
     finishIdle();

@@ -1,13 +1,14 @@
 // Enforce portable source, writing conventions, and zero package dependencies.
 import { execFileSync } from 'node:child_process';
-import { readFileSync } from 'node:fs';
+import { existsSync, readFileSync } from 'node:fs';
 const files = execFileSync(
   'git',
   ['ls-files', '--cached', '--others', '--exclude-standard', '-z'],
   { encoding: 'utf8' },
 )
   .split('\0')
-  .filter(Boolean);
+  // Git still lists tracked files deleted from the working tree.
+  .filter((file) => file && existsSync(file));
 const todos = JSON.parse(readFileSync('scripts/todo-register.json', 'utf8'));
 let failed = false;
 for (const file of files) {

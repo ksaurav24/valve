@@ -161,6 +161,56 @@ suite('real Redis/Valkey', () => {
       for (const child of children) if (child.exitCode === null) child.kill();
     }
   });
+  it('keeps burst-1 admissions spaced by 10ms across eight contending processes', async () => {
+    const id = `paced-${crypto.randomUUID()}`;
+    const script = fileURLToPath(new URL('./worker.mjs', import.meta.url));
+    const children = Array.from({ length: 8 }, () =>
+      fork(script, [url!, id, '25', 'paced'], {
+        stdio: ['ignore', 'pipe', 'pipe', 'ipc'],
+      }),
+    );
+    const exits = children.map(
+      (child) =>
+        new Promise<void>((resolve, reject) => {
+          let stderr = '';
+          child.stderr?.on('data', (chunk) => {
+            stderr += String(chunk);
+          });
+          child.on('error', reject);
+          child.on('exit', (code) =>
+            code === 0
+              ? resolve()
+              : reject(new Error(stderr || `child exited ${code}`)),
+          );
+        }),
+    );
+    for (const exit of exits) void exit.catch(() => undefined);
+    try {
+      await Promise.all(
+        children.map(
+          (child) =>
+            new Promise<void>((resolve, reject) => {
+              child.once('message', () => resolve());
+              child.once('error', reject);
+              child.once('exit', (code) =>
+                reject(new Error(`worker exited before start: ${code}`)),
+              );
+            }),
+        ),
+      );
+      for (const child of children) child.send({ start: true });
+      await Promise.all(exits);
+      const admissions = (
+        await io.lrange(`valve:{${id}}:pause:grants`, 0, -1)
+      ).map(Number);
+      expect(admissions).toHaveLength(200);
+      for (let i = 1; i < admissions.length; i++)
+        expect(admissions[i]! - admissions[i - 1]!).toBeGreaterThanOrEqual(10);
+    } finally {
+      for (const child of children) if (child.exitCode === null) child.kill();
+      await io.del(`valve:{${id}}:pause:grants`);
+    }
+  });
   it('one observed 429 pauses eight other processes for two seconds', async () => {
     const id = `pause-${process.pid}`;
     const script = fileURLToPath(new URL('./worker.mjs', import.meta.url));
