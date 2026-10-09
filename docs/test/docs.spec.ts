@@ -93,7 +93,7 @@ test('public pages connect readers to documentation and recorded releases', asyn
     page
       .getByRole('navigation', { name: 'Start reading' })
       .getByRole('link', { name: 'Quickstart', exact: true }),
-  ).toHaveAttribute('href', '/docs/quickstart');
+  ).toHaveAttribute('href', '/docs/quickstart/');
   await expect(page.locator('.site-brand svg')).toHaveCount(0);
   await expect(
     page.getByRole('button', { name: 'Simulate Retry-After' }),
@@ -140,7 +140,7 @@ test('former docs URLs preserve query strings and heading anchors', async ({
 
 test('theme choice persists between public pages and docs with reduced motion', async ({
   page,
-}) => {
+}, info) => {
   await page.emulateMedia({ colorScheme: 'light', reducedMotion: 'reduce' });
   await page.goto('/');
   await page.evaluate(() => localStorage.removeItem('theme'));
@@ -156,6 +156,11 @@ test('theme choice persists between public pages and docs with reduced motion', 
   );
   await page.goto('/docs/');
   await expect(page.locator('html')).toHaveClass(/dark/);
+  if (info.project.name === 'mobile') {
+    await page
+      .getByRole('button', { name: 'Open Sidebar', exact: true })
+      .click();
+  }
   await page
     .getByRole('button', { name: 'Toggle color theme', exact: true })
     .first()
