@@ -1,0 +1,105 @@
+---
+title: Feedback readers
+description: The functions that turn provider response headers into shared pauses, and how to write your own.
+---
+
+A feedback reader takes a response and returns what it learned. It must be
+pure and fast, and it must not read the body.
+
+```ts
+type Feedback = (response: ResponseLike) => FeedbackSignal | undefined;
+
+interface ResponseLike {
+  readonly status: number;
+  readonly headers: HeadersLike; // A Headers object or a plain record
+}
+
+interface FeedbackSignal {
+  pauseMs?: number; // Pause every process for this long.
+  remaining?: number; // Units left in the provider's window.
+  resetMs?: number; // Time until the window resets.
+}
+```
+
+## How a signal becomes a pause
+
+1. If `pauseMs` is greater than 0, valve pauses for `pauseMs`.
+2. Otherwise, if `remaining` is 0 or less, valve pauses for `resetMs`.
+3. Otherwise, if the status is 429, valve applies exponential backoff.
+4. The pause is capped at `maxPause`.
+
+## Built-in readers
+
+Import them from `@ksaurav24/valve/headers`.
+
+| Reader                 | Reads                                                                                        |
+| ---------------------- | -------------------------------------------------------------------------------------------- |
+| `retryAfter()`         | `Retry-After` as seconds or an HTTP date, on 429 and 503 only.                               |
+| `ietfRateLimit()`      | IETF `RateLimit: r=…;t=…`, plus legacy `RateLimit-Remaining` and `RateLimit-Reset`.          |
+| `xRateLimit(options?)` | `x-ratelimit-remaining` and `x-ratelimit-reset`, or the `x-rate-limit-*` spelling.           |
+| `combine(...readers)`  | Runs readers in order. Keeps the longest `pauseMs`, and the first `remaining` and `resetMs`. |
+| `defaultFeedback`      | `combine(retryAfter(), ietfRateLimit(), xRateLimit())`.                                      |
+
+### xRateLimit options
+
+| Option      | Default                                                | Description                  |
+| ----------- | ------------------------------------------------------ | ---------------------------- |
+| `remaining` | `x-ratelimit-remaining`, then `x-rate-limit-remaining` | Header name for remaining.   |
+| `reset`     | `x-ratelimit-reset`, then `x-rate-limit-reset`         | Header name for reset.       |
+| `resetUnit` | `'auto'`                                               | How to read the reset value. |
+
+`resetUnit` is one of `'auto'`, `'seconds'`, `'epoch-seconds'`, `'epoch-ms'`,
+`'ms'`, or `'duration'`. With `'auto'`, numbers above 10¹² are epoch
+milliseconds, numbers above 10⁹ are epoch seconds, smaller numbers are relative
+seconds, and non-numbers are parsed as Go-style durations such as `1m30s`.
+
+Epoch values are compared with the response `Date` header when present, and
+with the local clock otherwise.
+
+## Customize feedback
+
+Read a provider's own headers alongside the defaults:
+
+```ts
+import { combine, defaultFeedback, xRateLimit } from '@ksaurav24/valve/headers';
+
+const feedback = combine(
+  defaultFeedback,
+  xRateLimit({
+    remaining: 'x-app-calls-left',
+    reset: 'x-app-reset-ms',
+    resetUnit: 'ms',
+  }),
+);
+
+createValve({ id: 'partner', rate, feedback });
+```
+
+Write a reader for a non-standard signal:
+
+```ts
+import type { Feedback } from '@ksaurav24/valve';
+import { combine, defaultFeedback } from '@ksaurav24/valve/headers';
+
+// The provider returns 420 with a "Wait-Seconds" header when throttling.
+const waitSeconds: Feedback = (response) => {
+  if (response.status !== 420) return undefined;
+  const value = new Headers(response.headers as HeadersInit).get(
+    'wait-seconds',
+  );
+  const seconds = Number(value);
+  return value !== null && Number.isFinite(seconds)
+    ? { pauseMs: seconds * 1000 }
+    : undefined;
+};
+
+createValve({
+  id: 'partner',
+  rate,
+  feedback: combine(defaultFeedback, waitSeconds),
+});
+```
+
+Errors thrown by a reader are caught and reported as `warning` events.
+
+Set `feedback: false` to disable header reading. 429 backoff still applies.

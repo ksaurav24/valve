@@ -1,5 +1,13 @@
 {
   "title": "Reference",
-  "defaultOpen": true,
-  "pages": ["api", "testing", "implementation-status"]
+  "pages": [
+    "api",
+    "redis-store",
+    "feedback",
+    "errors",
+    "events",
+    "custom-stores",
+    "implementation-status",
+    "testing"
+  ]
 }

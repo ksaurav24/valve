@@ -18,11 +18,7 @@ export default async function Page({ params }: PageProps) {
   const Content = page.data.body;
   return (
     <DocsPage toc={page.data.toc} tableOfContent={{ style: 'clerk' }}>
-      <DocsTitle>
-        {slug?.length
-          ? page.data.title
-          : 'One rate limit for every worker that calls an API.'}
-      </DocsTitle>
+      <DocsTitle>{page.data.title}</DocsTitle>
       <DocsDescription>{page.data.description}</DocsDescription>
       <DocsBody>
         <Content components={getMDXComponents()} />

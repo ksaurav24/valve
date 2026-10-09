@@ -1,0 +1,49 @@
+---
+title: Errors
+description: ValveError, isValveError, and every error code.
+---
+
+## ValveError
+
+```ts
+class ValveError extends Error {
+  readonly name: 'ValveError';
+  readonly code: ValveErrorCode;
+  readonly valveId: string | undefined;
+  readonly cause?: unknown;
+}
+```
+
+valve rejects with `ValveError` only for its own failures. Errors thrown by
+your job pass through unchanged.
+
+## isValveError
+
+```ts
+function isValveError(
+  error: unknown,
+  code?: ValveErrorCode,
+): error is ValveError;
+```
+
+Returns `true` when `error` is a `ValveError`, and, if `code` is given, has that
+code.
+
+```ts
+if (isValveError(error, 'QUEUE_FULL')) return res.status(503).end();
+```
+
+## Codes
+
+| Code                 | Raised by                                                | Meaning                                                                       |
+| -------------------- | -------------------------------------------------------- | ----------------------------------------------------------------------------- |
+| `INVALID_OPTIONS`    | `createValve`, `redisStore`, `run`, `pause`, `wrapFetch` | An option or argument is invalid. The message names it and suggests a fix.    |
+| `COST_EXCEEDS_LIMIT` | `run`, `wrap`, `wrapFetch`                               | The job's cost exceeds a rule's `burst` (GCRA) or `limit` (fixed window).     |
+| `QUEUE_FULL`         | `run`, `wrap`, `wrapFetch`                               | `maxQueue` jobs are already waiting.                                          |
+| `MAX_WAIT_EXCEEDED`  | `run`, `wrap`, `wrapFetch`                               | The job waited longer than `maxWait`.                                         |
+| `ABORTED`            | `run`, `wrapFetch`                                       | The signal aborted before the job started. `cause` is `signal.reason`.        |
+| `CLOSED`             | `run`, `wrap`, `wrapFetch`                               | The valve was closed before the job started.                                  |
+| `STORE_UNAVAILABLE`  | `run`, `wrap`, `wrapFetch`                               | The store failed and `onStoreError` is `'throw'`. `cause` is the store error. |
+| `LEASE_LOST`         | `run`, `wrap`, `wrapFetch`                               | A global concurrency lease expired or could not be renewed.                   |
+
+For how to respond to each code, see [Handle errors](/docs/guides/error-handling/).

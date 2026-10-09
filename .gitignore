@@ -14,6 +14,7 @@ playwright-report/
 
 .next/
 .source/
+.generated/
 out/
 docs/next-env.d.ts
 .codegraph/

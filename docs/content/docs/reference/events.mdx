@@ -1,0 +1,34 @@
+---
+title: Events
+description: Every event a valve emits, with its payload.
+---
+
+```ts
+const off = valve.on('pause', (event) => {
+  /* ... */
+});
+off(); // Remove the listener.
+```
+
+Events are local to the process. Listeners run synchronously. A listener that
+throws is reported as a `warning` event and does not affect the valve.
+
+| Event         | Payload                                        | Emitted when                                                                                 |
+| ------------- | ---------------------------------------------- | -------------------------------------------------------------------------------------------- |
+| `pause`       | `{ durationMs: number; reason: PauseReason }`  | This process starts or learns of a pause.                                                    |
+| `resume`      | `{ reason: 'manual' \| 'expired' }`            | A pause ends, through `resume()` or by expiring.                                             |
+| `reject`      | `{ code: ValveErrorCode }`                     | valve rejects a job with a `ValveError`.                                                     |
+| `store-error` | `{ error: unknown; policy: StoreErrorPolicy }` | A store call fails or times out.                                                             |
+| `idle`        | `{}`                                           | The last queued or running job settles.                                                      |
+| `warning`     | `{ message: string }`                          | A listener, feedback reader, or `observe` mapper threw, or a pause was capped by `maxPause`. |
+
+## PauseReason
+
+| Value        | Meaning                                            |
+| ------------ | -------------------------------------------------- |
+| `'manual'`   | `valve.pause()` was called in this process.        |
+| `'feedback'` | A provider response header asked for a pause.      |
+| `'backoff'`  | A 429 arrived with no usable header.               |
+| `'store'`    | The store reported a pause set by another process. |
+
+For examples, see [Monitor a valve](/docs/guides/observability/).

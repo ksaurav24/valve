@@ -1,0 +1,86 @@
+---
+title: Request handlers
+description: Call a rate limited provider from a web server, prioritize users, and fail fast when the quota is busy.
+---
+
+When a user is waiting on a response, an unbounded queue is worse than an
+error. This example uses Express 5, but the pattern fits any framework:
+
+- user requests get a higher priority than background work;
+- a short `maxWait` turns a saturated quota into a quick `503`;
+- the job is cancelled when the client disconnects.
+
+```ts title="server.ts"
+import express from 'express';
+import { createValve, isValveError } from '@ksaurav24/valve';
+import { redisStore } from '@ksaurav24/valve/redis';
+
+const maps = createValve({
+  id: 'maps:key-3',
+  rate: { limit: 50, interval: '1s' },
+  store: redisStore({ client: redis }),
+  maxQueue: 500,
+});
+
+const mapsFetch = maps.wrapFetch(fetch, { priority: 10, maxWait: '2s' });
+
+const app = express();
+
+app.get('/geocode', async (req, res) => {
+  const controller = new AbortController();
+  res.on('close', () => controller.abort());
+
+  try {
+    const upstream = await mapsFetch(
+      `https://maps.example.com/v1/geocode?q=${encodeURIComponent(String(req.query.q))}`,
+      { signal: controller.signal },
+    );
+    res.status(upstream.status).json(await upstream.json());
+  } catch (error) {
+    if (
+      isValveError(error, 'QUEUE_FULL') ||
+      isValveError(error, 'MAX_WAIT_EXCEEDED')
+    ) {
+      res
+        .set('Retry-After', '2')
+        .status(503)
+        .json({ error: 'Geocoding is busy, try again shortly.' });
+      return;
+    }
+    if (isValveError(error, 'ABORTED')) return; // The client left.
+    throw error;
+  }
+});
+
+const server = app.listen(3000);
+
+process.on('SIGTERM', () => {
+  server.close();
+  void maps.close({ drain: true });
+});
+```
+
+## Background work on the same quota
+
+A nightly job in another process can share the same id. Priorities only order
+jobs within one process, so priority alone cannot keep the nightly job from
+using the whole quota. Use the same rule, but cap the background process with a
+low local concurrency so it can only use part of the budget at a time:
+
+```ts title="nightly.ts"
+const maps = createValve({
+  id: 'maps:key-3',
+  rate: { limit: 50, interval: '1s' },
+  concurrency: 2,
+  store: redisStore({ client: redis }),
+});
+
+await maps.run(() => refreshCachedAddresses());
+```
+
+## Choosing maxWait
+
+Set `maxWait` from the time your caller can afford to wait, not from the rate.
+At 50 requests per second with `burst: 1`, a queue of 100 jobs takes about
+2 seconds to clear, so `maxWait: '2s'` caps both the wait and the queue that
+builds up behind it.

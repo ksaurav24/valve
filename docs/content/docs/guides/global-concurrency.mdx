@@ -1,10 +1,18 @@
 ---
 title: Share a concurrency limit
-description: Bound concurrent lease ownership across workers and wake queues through Redis pub/sub.
+description: Cap running jobs across every worker with renewable leases, and wake queues through Redis pub/sub.
 ---
 
-Use a shared store and the same valve ID in every worker. Numeric concurrency
-limits apply within one process. The object form selects shared lease ownership.
+Some providers limit concurrent requests, not just request rate. A numeric
+`concurrency` only limits one process. The object form with
+`scope: 'global'` limits every process that shares the valve id.
+
+## Before you begin
+
+Set up a shared Redis store as described in
+[Share a quota across workers](/docs/guides/share-a-quota/).
+
+## Configure a global limit
 
 ```ts
 import { Redis } from 'ioredis';
@@ -14,40 +22,77 @@ import { redisStore } from '@ksaurav24/valve/redis';
 const client = new Redis(process.env.REDIS_URL!);
 const subscriber = client.duplicate();
 const store = redisStore({ client, subscriber });
-const valve = createValve({
-  id: 'partner-api',
-  store,
+
+const reports = createValve({
+  id: 'reports-api:key-7',
+  rate: { limit: 20, interval: '1s' },
   concurrency: { limit: 8, scope: 'global', leaseTtl: '30s' },
+  store,
 });
 
-await valve.run(({ signal }) => fetch('https://example.com/api', { signal }));
-await valve.close();
+await reports.run(({ signal }) =>
+  fetch('https://reports.example.com/v1/export', { signal }),
+);
+```
+
+Use the same `limit` and `leaseTtl` in every worker that shares the id.
+
+## How leases work
+
+1. A job acquires a lease in the same atomic step that spends its rate budget.
+2. While the job runs, valve renews the lease every `leaseTtl / 3`.
+3. When the job settles, valve releases the lease.
+4. If a worker crashes, its leases expire after `leaseTtl`.
+
+`leaseTtl` defaults to `'30s'`, with a minimum of 30ms.
+
+## Honor the abort signal
+
+If renewal fails or a lease expires, valve aborts the job's `signal`. After the
+callback settles, the job rejects with `LEASE_LOST`. Pass the signal to your
+HTTP client so the request stops when ownership is lost. `wrapFetch` does this
+for you.
+
+<Callout type="warn" title="Leases bound ownership, not side effects">
+  An event loop stall, a network partition, or a callback that ignores the
+  signal can let work continue after its lease expired and was reassigned. If
+  you need a strict bound on external effects, use fencing tokens in the
+  external system.
+</Callout>
+
+Global concurrency rejects `onStoreError: 'open'`, because running without
+the store would bypass lease ownership.
+
+## Wake queues with a subscriber
+
+Without a subscriber, a process notices shared changes on its next store call,
+and waiters for a global slot poll at most every 50ms. With a subscriber,
+pause, resume, and slot release publish a notification and waiting valves
+recheck the store at once.
+
+- The subscriber must be a **separate** connection. Passing the command client
+  is rejected.
+- With node-redis, call `connect()` on the duplicate before passing it in.
+- Notifications are hints. Redis remains the source of truth, and missed
+  messages fall back to normal polling.
+
+```ts
+// node-redis
+const subscriber = await client.duplicate().connect();
+const store = redisStore({ client, subscriber });
+```
+
+## Shut down in order
+
+`valve.close()` detaches the valve's listener. `store.close()` removes the
+store's subscriptions. Neither closes the connections you supplied.
+
+```ts
+await reports.close({ drain: true });
 await store.close();
 await subscriber.quit();
 await client.quit();
 ```
 
-Configure the same limit and lease TTL in all workers sharing an ID. Acquisition
-and rate budget consumption happen atomically. Running jobs renew their leases
-roughly every third of the TTL; completion releases them. A terminated worker's
-leases expire. A lease cannot be renewed after expiry.
-
-When a renewal fails or times out at the lease deadline, the job's signal aborts
-and its promise rejects with `LEASE_LOST` after the callback settles. Callbacks
-must honor the signal. An event loop stall, partition, or callback ignoring
-cancellation can let external work continue beyond lease expiry. Use fencing in
-the external system when strict ownership of external effects is required.
-Global concurrency rejects the `open` fail-open policy.
-
-## Wake queues when shared state changes
-
-The subscriber must be a dedicated connection. Pause, resume, and lease release
-publish notifications; subscribed valves clear their wait timer and recheck the
-store. Redis remains authoritative. Without a subscriber, changes are observed
-on the next store call; global lease waits poll at most every 50ms plus jitter.
-Notifications do not provide a delivery guarantee during disconnects.
-
-`valve.close()` detaches its listener. `store.close()` removes its subscriptions.
-Neither closes connections you supplied. Close valves before closing their store
-and client connections. A shared memory store supports these operations within
-one process as well.
+A shared `memoryStore()` instance supports global concurrency and
+notifications too, for valves in the same process.

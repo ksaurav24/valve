@@ -1,47 +1,79 @@
 ---
-title: Overview
-description: Queue outbound calls under one budget shared by your workers, with provider-aware backoff.
+title: Introduction
+description: valve puts one rate limit in front of an API and shares it with every worker that calls that API.
 ---
 
-import { SharedBudget } from '@/components/shared-budget';
-import { OverviewLinks } from '@/components/overview-links';
-
-valve puts a shared budget in front of your outbound API calls. Every process
-using the same valve id and Redis store draws from that budget. When a provider
-asks you to slow down, every worker sharing it pauses.
-
-<SharedBudget />
+Most providers enforce a quota per credential, not per process. When ten
+workers each run their own limiter, they spend the same quota ten times over
+and the provider starts returning `429 Too Many Requests`. valve keeps the
+budget in Redis or Valkey, so every process that uses the same valve id draws
+from one shared limit. When the provider asks for a pause, every worker pauses.
 
 ```ts
 import { createValve } from '@ksaurav24/valve';
 import { redisStore } from '@ksaurav24/valve/redis';
 
-const api = createValve({
-  id: 'partner:credential-42',
-  rate: { limit: 100, interval: '1s' },
+const hubspot = createValve({
+  id: 'hubspot:portal-123',
+  rate: { limit: 190, interval: '10s' },
   store: redisStore({ client: redis }),
 });
-const limitedFetch = api.wrapFetch();
-const response = await limitedFetch('https://api.example.com/contacts');
+
+const limitedFetch = hubspot.wrapFetch();
+const response = await limitedFetch(
+  'https://api.hubapi.com/crm/v3/objects/contacts',
+);
 ```
 
-## Start with the guarantee you need
+## What valve does
 
-The default GCRA rule spreads starts evenly, with `burst: 1`. A fixed-window
-rule spends at most its limit in each aligned window. Combine rules when the
-provider has both short and long quotas.
+- **Shares a budget across processes.** Atomic Lua scripts check and spend
+  every rule in one round trip, on the store's clock.
+- **Queues work locally.** Jobs wait in-process with priorities, cost,
+  concurrency limits, queue bounds, deadlines, and abort signals.
+- **Listens to the provider.** valve reads `Retry-After`, IETF `RateLimit`,
+  and common `x-ratelimit-*` headers, then pauses every worker sharing the
+  budget.
+- **Retries rate limit responses.** `wrapFetch` retries a 429 after the shared
+  pause ends, without losing its place in the queue.
+- **Stays small.** Zero runtime dependencies. ESM and CommonJS builds with
+  full TypeScript declarations. Bring your own `ioredis` or `node-redis`
+  client.
 
-<OverviewLinks />
+## When to use it
 
-## What 0.1.0 includes
+| You need to                                              | Use                                                   |
+| -------------------------------------------------------- | ----------------------------------------------------- |
+| Respect a provider quota shared by several processes     | valve with the Redis store                            |
+| Space calls from a single script or service              | valve with the default memory store                   |
+| Limit parallel work inside one process, with no quota    | `p-limit` or `p-queue`                                |
+| Accept or reject **inbound** requests to your own server | An inbound rate limiter                               |
+| Keep jobs across process restarts                        | A durable job queue, with valve around outbound calls |
 
-Memory and Redis/Valkey stores, atomic checks across several rules, local and global leased
-concurrency, priorities, job cost, cancellation, queue deadlines, provider
-feedback, and fetch retries for rate limit responses.
+valve limits when calls **start**. It does not persist queued jobs, retry
+arbitrary failures, or act as a circuit breaker.
 
-Numeric concurrency is local; global concurrency uses renewable leases. Queued jobs live in the process and do not survive a
-restart. Postgres, presets, and durable jobs are not part
-of this version.
+## Next steps
 
-This repository is private while the implementation is prepared. Version
-0.1.0 has not been published to npm.
+<Cards>
+  <Card
+    href="/docs/installation/"
+    title="Installation"
+    description="Requirements, package entry points, and Redis clients."
+  />
+  <Card
+    href="/docs/quickstart/"
+    title="Quickstart"
+    description="Rate limit your first calls in a few minutes."
+  />
+  <Card
+    href="/docs/concepts/"
+    title="How valve works"
+    description="Ids, stores, rules, the local queue, and admission."
+  />
+  <Card
+    href="/docs/migration/from-bottleneck/"
+    title="Migrate from Bottleneck"
+    description="Map Bottleneck options and methods to valve."
+  />
+</Cards>

@@ -1,58 +1,121 @@
 ---
 title: Share a quota across workers
-description: Give every process the same Redis store, valve id, and rate rules.
+description: Store the budget in Redis so every process draws from one provider limit.
 ---
 
-Use one id per provider credential. Every worker shares the budget when it
-uses the same Redis server, prefix, id, and rules. Queues stay local.
+This guide moves a valve's budget into Redis or Valkey, so every worker that
+calls a provider with the same credential shares one limit.
 
-```ts
-import Redis from 'ioredis';
-import { createValve } from '@ksaurav24/valve';
+## Before you begin
+
+- A Redis 6.2+ or Valkey 7.2+ server reachable from every worker.
+- An `ioredis` or `node-redis` client. See [Installation](/docs/installation/#connect-a-redis-client).
+- The provider's documented quota for your credential.
+
+## Configure the valve
+
+<Steps>
+<Step>
+
+### Create one store per process
+
+Pass your connected client to `redisStore`. Reuse the store for every valve in
+the process.
+
+```ts title="valves.ts"
+import { Redis } from 'ioredis';
 import { redisStore } from '@ksaurav24/valve/redis';
 
-const redis = new Redis(process.env.REDIS_URL);
-const api = createValve({
+export const redis = new Redis(process.env.REDIS_URL!);
+export const store = redisStore({ client: redis });
+```
+
+</Step>
+<Step>
+
+### Create the valve with the provider's quota
+
+Use one id per credential. Every worker must use the same id, the same rules,
+and the same Redis server and `prefix`.
+
+```ts title="valves.ts"
+import { createValve } from '@ksaurav24/valve';
+
+export const hubspot = createValve({
   id: 'hubspot:portal-123',
   rate: { limit: 190, interval: '10s' },
   concurrency: 10,
-  store: redisStore({ client: redis }),
+  store,
 });
-const limitedFetch = api.wrapFetch();
-await limitedFetch('https://api.example.com/contacts');
-await api.close({ drain: true });
-await redis.quit();
 ```
 
-The rule is illustrative. Set it from your provider's current quota for your
-account. The `concurrency: 10` applies to this instance, not the fleet.
+The rule above is illustrative. Set it from your provider's current quota for
+your account. `concurrency: 10` applies to this process only. For a
+fleet-wide limit, see [Share a concurrency limit](/docs/guides/global-concurrency/).
 
-## node-redis
+</Step>
+<Step>
+
+### Route calls through it
+
+```ts title="sync.ts"
+import { hubspot } from './valves';
+
+const hubspotFetch = hubspot.wrapFetch();
+const res = await hubspotFetch(
+  'https://api.hubapi.com/crm/v3/objects/contacts',
+);
+```
+
+</Step>
+<Step>
+
+### Shut down in order
+
+Close valves first, then your Redis client. valve never closes a client you
+supplied.
 
 ```ts
-import { createClient } from 'redis';
-const client = await createClient({ url: process.env.REDIS_URL }).connect();
-const store = redisStore({ client });
+process.on('SIGTERM', async () => {
+  await hubspot.close({ drain: true });
+  await redis.quit();
+});
 ```
 
-Both client shapes are typed structurally. Custom clients can pass an
-`adapter` with `evalsha(sha, keys, args)` and `eval(script, keys, args)`.
-Errors containing `NOSCRIPT` must pass through unchanged.
+</Step>
+</Steps>
+
+## Redis key layout
+
+Keys look like `PREFIX:{ID}:...`. The `{ID}` hash tag places every rule, the
+pause, and the leases for one valve in the same Redis Cluster slot, so one Lua
+script can update them atomically. For this reason, ids and prefixes must not
+contain braces.
+
+Use a different `prefix` to separate environments that share a Redis server:
+
+```ts
+redisStore({ client: redis, prefix: `valve:${process.env.NODE_ENV}` });
+```
 
 ## Redis Cluster
 
-Each key uses the hash tag `{id}`, so all rules and the pause share one slot.
-The integration suite checks both client families against a three-master
-cluster. Never include braces in your id or prefix.
+Pass an ioredis `Cluster` instance, or a node-redis cluster client, as
+`client`. No other configuration is needed. The integration suite runs both
+client families against a three-primary cluster.
 
-## Verify locally
+## Verify it locally
 
-Start a Redis or Valkey server, build the workspace, and run:
+Start Redis, build the workspace, and run the shared example. It creates six
+valve instances against one Redis budget.
 
 ```sh
+docker compose -f compose.test.yml up -d
+pnpm build
 REDIS_URL=redis://127.0.0.1:6379 pnpm --filter @valve/example-shared start
 ```
 
-The example creates six independent valve instances against one Redis quota.
-The integration suite also uses eight child processes to check the global
-bound on the server clock.
+## Next steps
+
+- [Respect Retry-After across workers](/docs/guides/respect-retry-after/)
+- [Redis store reference](/docs/reference/redis-store/)

@@ -1,0 +1,99 @@
+---
+title: How valve works
+description: The model behind valve, from the id and store to the local queue and atomic admission.
+---
+
+A valve has two halves. The **budget** lives in a store and is shared by id.
+The **queue** lives in your process and is never shared. Every job moves from
+the queue to the store and back before it runs.
+
+## Id
+
+The `id` names one budget. Choose one id per provider credential, because
+that is what providers meter:
+
+```ts
+createValve({ id: 'hubspot:portal-123', ... });
+createValve({ id: 'github:app-42', ... });
+createValve({ id: `stripe:${accountId}`, ... });
+```
+
+Ids are 1 to 200 characters and must not contain `{` or `}`. Redis keys use
+the id as a hash tag, so all keys for one valve land in the same cluster slot.
+
+## Store
+
+The store holds rule state, the shared pause, and global concurrency leases.
+It checks and updates them atomically on its own clock.
+
+| Store           | Shares a budget between                                 | Use it for                          |
+| --------------- | ------------------------------------------------------- | ----------------------------------- |
+| `memoryStore()` | Valves in one process that use the same store instance. | Scripts, tests, single services.    |
+| `redisStore()`  | Every process connected to the same Redis or Valkey.    | Worker fleets, autoscaled services. |
+
+When you omit `store`, each valve gets its own private memory store.
+
+Two valves share a budget only when they use the same store, the same id,
+and the same rule configuration. With Redis, "the same store" means the same
+server and the same key `prefix`.
+
+## Rules
+
+A rule describes one provider quota: `limit` cost units per `interval`. A
+valve can enforce several rules at once, such as 10 per second and 5,000 per
+hour. A job starts only when **every** rule has room for its cost.
+
+valve supports two algorithms:
+
+- **GCRA** (default) spreads starts evenly. `burst` controls how many units
+  may start back to back.
+- **Fixed window** allows `limit` units in each aligned window.
+
+[Choose an algorithm](/docs/choosing-an-algorithm/) explains when to use each.
+
+## Local queue
+
+Each valve instance keeps its own queue in memory. The queue orders jobs by
+priority, then by call order. It enforces `maxQueue`, `maxWait`, cancellation,
+and local concurrency. Queued jobs are lost if the process exits.
+
+Queues are not shared. Two processes with the same id share a budget, but
+neither knows what the other has queued, and there is no fairness between
+them.
+
+## Admission
+
+When the head of the queue may run, the valve asks the store for grants in
+one call (up to `batch` jobs, default 32). The store atomically:
+
+1. Checks the shared pause. If one is active, it grants nothing.
+2. Checks every rule against the cost of each job, in order.
+3. Grants the longest prefix that fits and spends its cost on every rule.
+4. Reports how long until the next job could fit.
+
+The valve starts the granted jobs and sleeps until the store says more budget
+will be available. A pub/sub subscriber, if configured, wakes it early when
+another process pauses, resumes, or releases a slot.
+
+## Pauses and feedback
+
+A pause blocks all new grants for an id, in every process. Pauses come from
+`valve.pause()`, from provider headers read by `observe` or `wrapFetch`, or
+from exponential backoff after a 429 with no useful header. A pause can only
+be extended, never shortened, except by `resume()`.
+
+## Concurrency
+
+Concurrency counts running jobs, not cost.
+
+- `concurrency: 4` limits one valve instance to 4 running jobs.
+- `concurrency: { limit: 4, scope: 'global' }` limits all processes sharing
+  the id to 4 running jobs, through renewable leases in the store.
+
+See [Share a concurrency limit](/docs/guides/global-concurrency/).
+
+## Next steps
+
+- [Guarantees](/docs/guarantees/): the exact bounds valve provides.
+- [Choose an algorithm](/docs/choosing-an-algorithm/): match a rule to your
+  provider's quota.

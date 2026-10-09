@@ -1,0 +1,65 @@
+---
+title: Troubleshooting
+description: Answers to common problems, from unexpected 429s to jobs that never start.
+---
+
+## I still get 429 responses
+
+- **Workers do not share a budget.** Check that every worker uses a Redis store
+  on the same server, with the same `prefix`, the same `id`, and the same rules.
+  Without `store`, each valve has its own private memory budget.
+- **The rule is looser than the real quota.** Provider quotas often depend on
+  your plan. Lower the limit, or use `burst: 1` if you raised it.
+- **Something else uses the credential.** valve only counts calls that go
+  through it. Leave headroom, and rely on [provider feedback](/docs/guides/respect-retry-after/).
+- **Requests arrive in clumps.** Bounds apply when the store grants a start.
+  Network delays can bunch requests together on the way to the provider.
+
+## Jobs never start
+
+- **The valve is paused.** Check `valve.stats().pausedUntil`. A large
+  `Retry-After` can pause for up to `maxPause` (15 minutes by default). Call
+  `valve.resume()` to end it.
+- **A daily fixed-window rule is exhausted.** Jobs wait until the next window.
+- **The store is down.** With the default `onStoreError: 'wait'`, jobs wait
+  until it recovers. Listen for `store-error`.
+- **Global slots are held.** With global concurrency, slots held by a crashed
+  worker free up after `leaseTtl`.
+
+Set `maxWait` so waiting jobs fail with `MAX_WAIT_EXCEEDED` instead of waiting
+indefinitely.
+
+## run rejects with COST_EXCEEDS_LIMIT
+
+Under GCRA, a job's `cost` must be at most the rule's `burst`, which defaults to
+
+1. Raise `burst` on that rule, or lower the cost.
+
+## Another process resumed, but this one is still paused
+
+Without a subscriber, a process only notices a `resume()` on its next store call,
+which may be when its cached pause ends. Pass a dedicated `subscriber` to
+`redisStore` for immediate wakeups. See [Share a concurrency limit](/docs/guides/global-concurrency/#wake-queues-with-a-subscriber).
+
+## The process does not exit
+
+valve holds timers while jobs are queued or paused. Call `close()` on every
+valve, then close your Redis connections, including the subscriber.
+
+## Can I use valve in the browser or edge runtimes?
+
+The core uses web standard APIs only, but valve is tested on Node.js alone. CI
+smoke-tests the built package on Node.js 20, 22, and 24. Shared budgets also
+need a Redis client, which usually requires a TCP connection.
+
+## How is valve different from p-queue or p-limit?
+
+`p-queue` and `p-limit` limit work within one process. valve adds a budget
+shared across processes, multiple rate rules, and provider feedback. If you only
+need in-process concurrency, they are simpler.
+
+## How is valve different from an inbound rate limiter?
+
+Inbound limiters protect **your** server by accepting or rejecting requests.
+valve protects **someone else's** API by queuing your outbound calls until they
+are allowed.

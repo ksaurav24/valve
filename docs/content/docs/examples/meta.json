@@ -1,0 +1,12 @@
+{
+  "title": "Examples",
+  "pages": [
+    "index",
+    "http-clients",
+    "batch-scripts",
+    "queue-workers",
+    "request-handlers",
+    "per-tenant-budgets",
+    "layered-quotas"
+  ]
+}

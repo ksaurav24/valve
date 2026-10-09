@@ -1,42 +1,88 @@
 ---
 title: Choose an algorithm
-description: Match smooth or fixed-window rules to your provider's documented quota.
+description: Match a GCRA or fixed-window rule to the quota your provider documents.
 ---
 
-## GCRA for smooth starts
+Read your provider's rate limit documentation first, then pick the rule that
+describes it. When in doubt, use the default GCRA rule with `burst: 1`. It
+never exceeds `limit` per interval, in any window.
 
-GCRA is the default. With `limit: 10`, `interval: '1s'`, and `burst: 1`, one
-unit can start every 100ms. A job with `cost: 2` cannot fit until `burst` is
-at least 2. Cost is spent against every rule.
+| Provider says                                   | Rule                                                           |
+| ----------------------------------------------- | -------------------------------------------------------------- |
+| "100 requests per second"                       | `{ limit: 100, interval: '1s' }`                               |
+| "100 per second, bursts up to 20 allowed"       | `{ limit: 100, interval: '1s', burst: 20 }`                    |
+| "10,000 per day, resets at midnight UTC"        | `{ limit: 10000, interval: '24h', algorithm: 'fixed-window' }` |
+| "1,000 per minute, counted per calendar minute" | `{ limit: 1000, interval: '1m', algorithm: 'fixed-window' }`   |
+| "10 per second and 100,000 per day"             | An array of two rules. See [Combine rules](#combine-rules).    |
+
+## GCRA
+
+GCRA (the generic cell rate algorithm) is the default. It spaces starts evenly
+at `interval / limit` per cost unit.
+
+```ts
+rate: { limit: 10, interval: '1s' }
+```
+
+This starts one unit every 100ms. In any window of one second, at most 10
+units start.
+
+### Allow bursts
+
+`burst` lets that many units start back to back after a quiet period.
 
 ```ts
 rate: { limit: 10, interval: '1s', burst: 5 }
 ```
 
-A burst of 5 allows five units together after idle time. The rolling bound
-becomes 14 units per second: `limit + burst - 1`. Burst increases the bound,
-so choose it deliberately.
+After idle time, 5 units can start together, then spacing resumes. The bound
+in any one-second window becomes `limit + burst - 1`, which is 14 here. Only
+raise `burst` when the provider tolerates it.
 
-## Fixed windows for aligned quotas
+### Cost must fit in the burst
+
+Under GCRA, a job with `cost: 3` needs `burst` of at least 3. Otherwise `run`
+rejects it with `COST_EXCEEDS_LIMIT`, since it could never start.
+
+## Fixed window
+
+A fixed-window rule allows `limit` units in each aligned window
+`[k × interval, (k + 1) × interval)` on the store's epoch clock.
 
 ```ts
 rate: { limit: 100, interval: '1m', algorithm: 'fixed-window' }
 ```
 
-This allows 100 units per minute aligned to the store's epoch clock. Near
-the boundary, the two windows can admit 200 units close together.
+Windows are aligned to the epoch, not to when your process started. A 24-hour
+window resets at midnight UTC.
 
-## Several quotas at once
+<Callout type="warn">
+  Near a boundary, the end of one window and the start of the next can admit up
+  to `2 × limit` units close together. Use fixed windows only when the provider
+  counts the same way.
+</Callout>
+
+## Combine rules
+
+Pass an array when a provider has several quotas. Each rule is enforced
+independently, and each job's cost is spent against every rule.
 
 ```ts
 rate: [
   { limit: 10, interval: '1s' },
-  { limit: 1000, interval: '1h', algorithm: 'fixed-window' },
+  { limit: 100_000, interval: '24h', algorithm: 'fixed-window' },
 ];
 ```
 
-The store grants a prefix of each batch only when every rule accepts its
-cost. One rule rejecting a job does not spend that job's units in the others.
-Rules use stable keys based on algorithm and interval. Avoid mixing different
-rule configurations across workers; changing a limit preserves existing state,
-but the shared bound is defined by the configuration each worker uses.
+The store checks all rules in one atomic step. If any rule rejects a job,
+none of its cost is spent.
+
+Two rules in one valve cannot share the same algorithm and interval.
+
+## Changing rules
+
+Rule state is keyed by algorithm and interval. Changing a `limit` keeps the
+existing state, so you can raise or lower it with a rolling deploy. During the
+rollout, workers with different limits enforce different bounds on the same
+state. Keep the configuration identical across workers once the deploy
+finishes.

@@ -1,0 +1,67 @@
+---
+title: Custom stores
+description: The Store interface, for backends other than memory and Redis.
+---
+
+A store keeps rule state, the shared pause, and global leases. valve ships a
+memory store and a Redis store. Implement `Store` to add another backend.
+
+```ts
+import type { Store } from '@ksaurav24/valve';
+```
+
+## Interface
+
+| Member                      | Required | Description                                                                          |
+| --------------------------- | -------- | ------------------------------------------------------------------------------------ |
+| `kind`                      | Yes      | Short name used in messages, such as `'memory'` or `'redis'`.                        |
+| `acquire(request)`          | Yes      | Atomically checks the pause and every rule, then grants a prefix of `costs`.         |
+| `acquireSync?(request)`     | No       | Synchronous version. Used on the hot path when present.                              |
+| `pause(id, durationMs)`     | Yes      | Extends the pause to at least `durationMs` from now. Never shortens it.              |
+| `resume(id)`                | Yes      | Removes the pause.                                                                   |
+| `release?(id, leases)`      | Global   | Releases global concurrency slots when jobs settle.                                  |
+| `renew?(id, leases, ttlMs)` | Global   | Renews unexpired slots. Returns `false` if any was lost. Never revives expired ones. |
+| `subscribe?(id, listener)`  | No       | Notifies of pause, resume, and release. Returns an unsubscribe function.             |
+| `close()`                   | Yes      | Frees resources owned by the store. Never closes user-provided clients.              |
+
+`release` and `renew` are required for `concurrency: { scope: 'global' }`.
+
+## acquire
+
+```ts
+interface AcquireRequest {
+  readonly id: string;
+  readonly rules: readonly NormalizedRule[]; // Empty for a concurrency-only valve.
+  readonly costs: readonly number[]; // Head of the queue, in order. Never empty.
+  readonly lease?: {
+    readonly limit: number;
+    readonly ttlMs: number;
+    readonly owner: string;
+  };
+}
+
+interface AcquireResult {
+  readonly granted: number; // Jobs granted, counted from the start of costs.
+  readonly retryAfterMs: number; // If not all were granted and not paused: ms until the next could be.
+  readonly pausedMs: number; // Ms left on an active pause. When above 0, granted is 0.
+  readonly leases?: readonly string[]; // One unique token per grant when lease was requested.
+}
+```
+
+Each `NormalizedRule` carries `algorithm`, `limit`, `intervalMs`, `burst`, and
+a stable `key` of the form `${algorithm}:${intervalMs}`.
+
+## Requirements
+
+- **Atomicity.** Checking the pause, checking every rule, spending cost, and
+  acquiring leases must happen as one indivisible step across all processes.
+- **One clock.** All time math must use the store's own clock, never the
+  caller's.
+- **Prefix grants.** Grant jobs strictly in order. Stop at the first job that
+  does not fit.
+- **No partial spends.** If a job does not fit one rule, spend nothing for it
+  in the others.
+
+The memory store's source, `packages/valve/src/memory-store.ts`, is a compact
+reference implementation. The Redis Lua scripts in `packages/valve/src/redis/`
+show the same logic for a remote backend.

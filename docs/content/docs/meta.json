@@ -1,12 +1,21 @@
 {
   "pages": [
-    "---Start here---",
+    "---Get started---",
     "index",
+    "installation",
     "quickstart",
-    "---Understand the budget---",
-    "guarantees",
+    "---Concepts---",
+    "concepts",
     "choosing-an-algorithm",
-    "guides",
-    "reference"
+    "guarantees",
+    "---Guides---",
+    "...guides",
+    "---Examples---",
+    "...examples",
+    "---Migrate---",
+    "...migration",
+    "---Reference---",
+    "...reference",
+    "faq"
   ]
 }

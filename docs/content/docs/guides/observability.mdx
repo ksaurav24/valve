@@ -1,0 +1,74 @@
+---
+title: Monitor a valve
+description: Log pauses, export queue metrics, and alert on store errors with events and stats.
+---
+
+valve reports what it does through events and a stats snapshot. Both are
+local to the process. Neither touches the store.
+
+## Log pauses and failures
+
+`on` returns a function that removes the listener.
+
+```ts
+const off = crm.on('pause', ({ durationMs, reason }) => {
+  logger.warn({ valve: crm.id, durationMs, reason }, 'valve paused');
+});
+
+crm.on('resume', ({ reason }) =>
+  logger.info({ valve: crm.id, reason }, 'valve resumed'),
+);
+crm.on('store-error', ({ error, policy }) =>
+  logger.error({ err: error, policy }, 'store failed'),
+);
+crm.on('reject', ({ code }) => metrics.increment('valve.rejected', { code }));
+crm.on('warning', ({ message }) => logger.warn(message));
+
+// Later:
+off();
+```
+
+The `pause` reason tells you where the pause came from:
+
+| Reason       | Source                                                 |
+| ------------ | ------------------------------------------------------ |
+| `'manual'`   | `valve.pause()` in this process.                       |
+| `'feedback'` | A provider header.                                     |
+| `'backoff'`  | A 429 with no usable header.                           |
+| `'store'`    | A pause written by another process, seen in the store. |
+
+See the [events reference](/docs/reference/events/) for every payload.
+
+## Export queue metrics
+
+`stats()` returns a fresh snapshot each call.
+
+```ts
+setInterval(() => {
+  const { queued, running, pausedUntil, totals } = crm.stats();
+  metrics.gauge('valve.queued', queued, { valve: crm.id });
+  metrics.gauge('valve.running', running, { valve: crm.id });
+  metrics.gauge('valve.paused', pausedUntil === null ? 0 : 1, {
+    valve: crm.id,
+  });
+  metrics.gauge('valve.retried_total', totals.retried, { valve: crm.id });
+}, 10_000).unref();
+```
+
+| Field         | Meaning                                                                                          |
+| ------------- | ------------------------------------------------------------------------------------------------ |
+| `queued`      | Jobs waiting in this process.                                                                    |
+| `running`     | Jobs running in this process.                                                                    |
+| `pausedUntil` | Local estimate of when the current pause ends (epoch ms), or `null`.                             |
+| `totals`      | Counters since creation: `started`, `succeeded`, `failed`, `rejected`, `retried`, `storeErrors`. |
+
+## What to alert on
+
+- **`queued` grows steadily.** Callers are producing work faster than the
+  quota allows. Raise the quota, shed load, or set `maxQueue`.
+- **Frequent `pause` events with reason `'feedback'` or `'backoff'`.** Your
+  rule is looser than the provider's real limit, or another client shares the
+  credential without valve.
+- **Any `store-error`.** With the default policy, jobs wait while the store is
+  down.
+- **`MAX_WAIT_EXCEEDED` rejections.** Callers waited longer than you allowed.

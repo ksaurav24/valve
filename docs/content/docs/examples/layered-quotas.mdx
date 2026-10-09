@@ -1,0 +1,54 @@
+---
+title: Layered quotas
+description: Enforce per-second and daily limits together, and charge expensive endpoints more.
+---
+
+Many providers publish more than one limit: a short-term rate to protect their
+servers and a daily or monthly allowance tied to your plan. Some also charge
+certain endpoints more than one unit.
+
+```ts title="search.ts"
+import { createValve } from '@ksaurav24/valve';
+import { redisStore } from '@ksaurav24/valve/redis';
+
+const search = createValve({
+  id: 'search-api:key-5',
+  rate: [
+    // Short-term: 20 units per second, with bursts of up to 10.
+    { limit: 20, interval: '1s', burst: 10 },
+    // Plan allowance: 50,000 units per UTC day.
+    { limit: 50_000, interval: '24h', algorithm: 'fixed-window' },
+  ],
+  store: redisStore({ client: redis }),
+});
+
+const COST = { lookup: 1, search: 5 } as const;
+
+export function lookup(id: string) {
+  return search.run(() => api.lookup(id), { cost: COST.lookup });
+}
+
+export function fullTextSearch(query: string) {
+  return search.run(() => api.search(query), { cost: COST.search });
+}
+```
+
+## How the rules interact
+
+- Every job spends its cost against **both** rules, atomically.
+- A search costs 5 units, so it needs `burst` of at least 5 on the GCRA rule.
+  With `burst: 10`, it fits.
+- When the daily allowance runs out, jobs wait in the queue until the next UTC
+  midnight. Set `maxWait` if callers should get an error instead.
+
+## Monthly allowances
+
+valve's intervals are fixed durations, and calendar months are not. For a
+monthly quota, approximate it with a daily rule, for example the monthly
+allowance divided by 31, or track usage in your own billing logic.
+
+## Stay under the provider's count
+
+Your valve only sees calls that go through it. If other systems use the same
+credential, lower your limits to leave room for them, and rely on
+[provider feedback](/docs/guides/respect-retry-after/) to catch the difference.

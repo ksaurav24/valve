@@ -1,0 +1,79 @@
+---
+title: Redis store
+description: redisStore options, supported clients, adapters, key layout, and lifecycle.
+---
+
+```ts
+import { redisStore } from '@ksaurav24/valve/redis';
+
+const store = redisStore({ client: redis });
+```
+
+Works with Redis 6.2 or later and Valkey 7.2 or later. CI runs the integration
+suite against Redis 6.2, 7.4, and 8, and Valkey 7.2 and 8.
+
+## Options
+
+Pass exactly one of `client` or `adapter`.
+
+| Option       | Type                         | Default   | Description                                                                |
+| ------------ | ---------------------------- | --------- | -------------------------------------------------------------------------- |
+| `client`     | ioredis or node-redis client | None      | A connected client. Cluster clients work too.                              |
+| `adapter`    | `RedisEvalAdapter`           | None      | For any other client. See [Bring your own client](#bring-your-own-client). |
+| `prefix`     | `string`                     | `'valve'` | Key prefix. Must not contain `{` or `}`.                                   |
+| `timeout`    | `Duration`                   | `'2s'`    | Maximum time for one store call before it counts as a store error.         |
+| `subscriber` | ioredis or node-redis client | None      | A **separate**, connected client used for pub/sub wakeups.                 |
+
+Invalid options throw `ValveError` with code `INVALID_OPTIONS`, including a
+`subscriber` that is the same object as `client`.
+
+## Supported clients
+
+| Client     | Versions | Notes                                                         |
+| ---------- | -------- | ------------------------------------------------------------- |
+| ioredis    | 5        | `Redis` and `Cluster` instances.                              |
+| node-redis | 4 and 5  | Call `connect()` before passing the client or the subscriber. |
+
+Clients are matched by shape, not imported. valve never opens, closes, or
+reconfigures them.
+
+## Bring your own client
+
+Implement two methods. Errors whose message contains `NOSCRIPT` must be
+rethrown unchanged, so valve can reload its scripts.
+
+```ts
+import type { RedisEvalAdapter } from '@ksaurav24/valve/redis';
+
+const adapter: RedisEvalAdapter = {
+  evalsha: (sha, keys, args) =>
+    client.evalsha(sha, keys.length, ...keys, ...args),
+  eval: (script, keys, args) =>
+    client.eval(script, keys.length, ...keys, ...args),
+};
+
+const store = redisStore({ adapter });
+```
+
+## How it talks to Redis
+
+- Each operation is a single Lua script, so checks and updates are atomic.
+- Scripts load lazily with `EVALSHA`. After a `NOSCRIPT` error, for example
+  after a server restart, valve falls back to `EVAL`.
+- All time math uses the server's `TIME` command, so client clock skew does
+  not matter.
+- Keys have the form `PREFIX:{ID}:...`. The hash tag keeps one valve's keys in
+  one cluster slot.
+- Rule keys expire on their own after twice their interval of inactivity.
+  Lease keys expire with their last lease.
+
+## Lifecycle
+
+```ts
+await valve.close(); // 1. Stop the valves.
+await store.close(); // 2. Remove the store's subscriptions.
+await subscriber.quit(); // 3. Close your connections.
+await redis.quit();
+```
+
+`store.close()` unsubscribes its listeners. It never disconnects either client.
