@@ -50,8 +50,10 @@ sizes are in [baseline.json](footprint-results/baseline.json) and
 
 CI ceilings remain 8,704 / 4,096 / 2,048 bytes. All pass. Original targets remain
 4,096 / 3,072 / 2,048: core and Redis are still unmet; headers passes. This is
-partial progress on #16, which should remain open for the remaining footprint
-work. The smaller Redis artifact does not establish a scheduler throughput gain.
+the measured disposition of #16: its compatibility, measurement, and existing
+ceiling requirements pass, while the original size targets remain unmet. Further
+core reduction may require a separate API compatibility proposal, as described
+above. The smaller Redis artifact does not establish a scheduler throughput gain.
 
 ## Cold import and initialization
 
