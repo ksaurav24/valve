@@ -2,18 +2,26 @@
 import { Redis } from 'ioredis5';
 import { createHash } from 'node:crypto';
 import { readFileSync } from 'node:fs';
-const ACQUIRE = readFileSync(
+import luamin from 'luamin';
+const rawAcquire = readFileSync(
   new URL('../../src/redis/acquire.lua', import.meta.url),
   'utf8',
 );
+const ACQUIRE = luamin.minify(rawAcquire);
 import { createValve } from '../../dist/index.js';
 import { redisStore } from '../../dist/redis/index.js';
 const [url, id, count, mode = 'bound'] = process.argv.slice(2);
 const client = new Redis(url);
-const instrumented = ACQUIRE.replace(
-  'return {granted, math.max(0, retry), 0}',
-  "for i=1,granted do redis.call('RPUSH', KEYS[1] .. ':grants', string.format('%.17g', now)) end\nreturn {granted, math.max(0, retry), 0}",
+const instrumented = luamin.minify(
+  rawAcquire.replace(
+    'return {granted, math.max(0, retry), 0}',
+    "for i=1,granted do redis.call('RPUSH', KEYS[1] .. ':grants', string.format('%.17g', now)) end\nreturn {granted, math.max(0, retry), 0}",
+  ),
 );
+if (instrumented === ACQUIRE)
+  throw new Error(
+    'Acquire return changed; update admission recording explicitly.',
+  );
 const instrumentedSha = createHash('sha1').update(instrumented).digest('hex');
 const adapter = {
   evalsha: (sha, keys, args) =>

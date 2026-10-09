@@ -4,6 +4,36 @@ The follow-up [paced drift report](./DRIFT.md) measures asynchronous rate-wakeup
 deadlines against the merged PR #10 baseline. The results below retain PR #10's
 full comparison and historical evidence.
 
+The [bundle footprint report](./FOOTPRINT.md) records the #16 follow-up's
+module breakdown, consumer sizes, cold startup measurements, and regression
+comparisons against master after #17.
+
+## Recommendation
+
+Choose Valve when outbound calls need shared quotas, provider feedback, or atomic
+weighted admission across several rules. For concurrency alone inside one
+process, start with p-limit or p-queue. The comparison below measures scheduler
+workloads, not production HTTP throughput.
+
+The footprint optimization reduces the published Redis entry from 3,521 to 3,151
+gzip bytes (10.5%) and a `retryAfter()` consumer from 1,089 to 445 bytes (59.1%).
+Core size is unchanged. It does not establish faster startup or lower CPU cost.
+Fresh-runner throughput changes ranged from -2.2% to +7.2%, within the existing
+15% regression gate; tail waits remained variable. The scheduling gate failed
+once and passed on a rerun with unchanged scheduler code and thresholds; the
+failed samples remain in PR #19. Do not treat these measurements as a general
+latency or throughput improvement.
+
+The trade-off is pinned build-time Lua minification and pure annotations that
+must remain valid as reader factories evolve. Runtime dependencies, exports,
+store behavior, and size ceilings are preserved. Core and Redis still exceed
+the original footprint targets. Shared contention, global concurrency, and
+priority performance remain tracked separately in #12 through #15. Read the
+[footprint report](./FOOTPRINT.md) for paired sizes, raw samples, and reproduction
+commands before choosing based on performance.
+
+## Historical comparison after PR #10
+
 Full rerun after removing positive jitter from rate eligibility waits with local concurrency. Global concurrency polling and outage backoff retain jitter. The implementation and public API are otherwise unchanged.
 
 Measured 2026-10-07T14:51:33.144Z on 12th Gen Intel(R) Core(TM) i5-12450H, 12 logical CPUs, linux x64, v26.10.0. Redis 7.4.7 and Valkey 8.0.4 run on loopback. Dependencies: bottleneck 2.19.5, p-limit 7.3.3, p-queue 9.3.3, ioredis5 5.11.1, redis5 5.12.1.
