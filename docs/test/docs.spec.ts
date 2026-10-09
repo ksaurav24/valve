@@ -1,6 +1,6 @@
 // Verify the MDX site, navigation, search, and layout.
 import { expect, test } from '@playwright/test';
-import release from '../.generated/release.json';
+import release from '../.generated/release.json' with { type: 'json' };
 test('introduction renders without horizontal overflow', async ({
   page,
 }, info) => {
