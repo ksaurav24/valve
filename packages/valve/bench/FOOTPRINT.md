@@ -105,6 +105,35 @@ in [lua-bytecode.json](footprint-results/lua-bytecode.json). This confirms
 unchanged server VM instructions; it does not replace runtime measurements or
 claim identical cold parsing costs.
 
+### Fresh GitHub runner
+
+The [CI run](https://github.com/ksaurav24/valve/actions/runs/37906399378)
+tested runtime commit `d46ce4d` on Node 24.21.0, an AMD EPYC 9V45 host, and
+Redis 7.4 / Valkey 8 service images. All eighteen longer controls pass the
+existing 15% throughput regression gate. Valve throughput changes range from
+-2.2% to +7.2%; the two unchanged competitors range from -3.1% to -1.5%.
+The desktop host's large throughput changes were not reproduced on this runner.
+These results support the footprint change without claiming a runtime speedup.
+
+The [CI summary](footprint-results/ci/summary.json) and all raw samples are
+archived in this repository. CPU and per-job logical store calls remain
+comparable; each shared-rate control reports 0.03125 calls per job in both
+variants. Final-round p99 waits remain variable: local concurrency reports
+31.85 / 47.48ms while unchanged p-queue reports 81.64 / 122.60ms. The throughput
+gate is not a latency guarantee, and the report retains these values rather than
+claiming uniform improvement. No behavior, package, size, or runtime check failed.
+
+CI raw controls:
+[0 baseline](footprint-results/ci/control-0-baseline.json.gz),
+[0 current](footprint-results/ci/control-0-current.json.gz),
+[1 baseline](footprint-results/ci/control-1-baseline.json.gz),
+[1 current](footprint-results/ci/control-1-current.json.gz),
+[2 baseline](footprint-results/ci/control-2-baseline.json.gz),
+[2 current](footprint-results/ci/control-2-current.json.gz).
+CI [baseline sizes](footprint-results/ci/baseline-size.json.gz),
+[current sizes](footprint-results/ci/current-size.json.gz), and
+[startup samples](footprint-results/ci/startup.json.gz) are retained as well.
+
 ### Full matrix
 
 Medians pool all elapsed samples (15 per variant in the full matrix, 30 in the

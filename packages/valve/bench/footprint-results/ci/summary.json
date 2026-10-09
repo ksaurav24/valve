@@ -1,0 +1,150 @@
+{
+  "node": "v24.21.0",
+  "protocol": "Three alternating pairs; ten rounds after warmup per variant; pooled medians; all samples retained; 15% regression gate",
+  "rows": [
+    {
+      "scenario": "memory/concurrency",
+      "library": "valve",
+      "jobs": 50000,
+      "baselineMs": 60.184263999999985,
+      "currentMs": 58.115831999999955,
+      "throughputChangePercent": 3.5591540700992352
+    },
+    {
+      "scenario": "memory/gcra",
+      "library": "valve",
+      "jobs": 50000,
+      "baselineMs": 52.44220799999994,
+      "currentMs": 51.44355500000006,
+      "throughputChangePercent": 1.9412596971571494
+    },
+    {
+      "scenario": "memory/fixed-window",
+      "library": "valve",
+      "jobs": 50000,
+      "baselineMs": 53.845657000000074,
+      "currentMs": 50.235861000000114,
+      "throughputChangePercent": 7.18569549350403
+    },
+    {
+      "scenario": "memory/multi-rule",
+      "library": "valve",
+      "jobs": 50000,
+      "baselineMs": 54.77468200000021,
+      "currentMs": 52.03665799999999,
+      "throughputChangePercent": 5.261721457977231
+    },
+    {
+      "scenario": "memory/concurrency",
+      "library": "p-limit",
+      "jobs": 50000,
+      "baselineMs": 97.04445299999998,
+      "currentMs": 100.14574000000039,
+      "throughputChangePercent": -3.09677376191978
+    },
+    {
+      "scenario": "memory/concurrency",
+      "library": "p-queue",
+      "jobs": 50000,
+      "baselineMs": 93.68145199999981,
+      "currentMs": 95.07584499999939,
+      "throughputChangePercent": -1.4666112091873518
+    },
+    {
+      "scenario": "redis/ioredis/gcra",
+      "library": "valve",
+      "jobs": 20000,
+      "baselineMs": 106.34393899999941,
+      "currentMs": 104.73901500000011,
+      "throughputChangePercent": 1.5323077078768677
+    },
+    {
+      "scenario": "redis/ioredis/fixed-window",
+      "library": "valve",
+      "jobs": 20000,
+      "baselineMs": 98.82009300000027,
+      "currentMs": 96.44349000000057,
+      "throughputChangePercent": 2.464244087392209
+    },
+    {
+      "scenario": "redis/ioredis/multi-rule",
+      "library": "valve",
+      "jobs": 20000,
+      "baselineMs": 100.23684099999991,
+      "currentMs": 100.63810599999942,
+      "throughputChangePercent": -0.3987207390404479
+    },
+    {
+      "scenario": "redis/node-redis/gcra",
+      "library": "valve",
+      "jobs": 20000,
+      "baselineMs": 99.2221470000004,
+      "currentMs": 100.19494699999996,
+      "throughputChangePercent": -0.9709072454517576
+    },
+    {
+      "scenario": "redis/node-redis/fixed-window",
+      "library": "valve",
+      "jobs": 20000,
+      "baselineMs": 99.38932000000023,
+      "currentMs": 99.6229340000009,
+      "throughputChangePercent": -0.23449821303261897
+    },
+    {
+      "scenario": "redis/node-redis/multi-rule",
+      "library": "valve",
+      "jobs": 20000,
+      "baselineMs": 99.03212199999871,
+      "currentMs": 101.2550650000012,
+      "throughputChangePercent": -2.195389435582762
+    },
+    {
+      "scenario": "valkey/ioredis/gcra",
+      "library": "valve",
+      "jobs": 20000,
+      "baselineMs": 95.11847200000011,
+      "currentMs": 92.96951199999967,
+      "throughputChangePercent": 2.311467441068693
+    },
+    {
+      "scenario": "valkey/ioredis/fixed-window",
+      "library": "valve",
+      "jobs": 20000,
+      "baselineMs": 93.2137330000005,
+      "currentMs": 92.69151600000077,
+      "throughputChangePercent": 0.5633924468337881
+    },
+    {
+      "scenario": "valkey/ioredis/multi-rule",
+      "library": "valve",
+      "jobs": 20000,
+      "baselineMs": 99.57300699999905,
+      "currentMs": 100.73548000000119,
+      "throughputChangePercent": -1.1539856662241776
+    },
+    {
+      "scenario": "valkey/node-redis/gcra",
+      "library": "valve",
+      "jobs": 20000,
+      "baselineMs": 96.52308799999992,
+      "currentMs": 96.84063799999967,
+      "throughputChangePercent": -0.3279098594948904
+    },
+    {
+      "scenario": "valkey/node-redis/fixed-window",
+      "library": "valve",
+      "jobs": 20000,
+      "baselineMs": 95.2558570000001,
+      "currentMs": 94.56795799999963,
+      "throughputChangePercent": 0.727412344042011
+    },
+    {
+      "scenario": "valkey/node-redis/multi-rule",
+      "library": "valve",
+      "jobs": 20000,
+      "baselineMs": 98.81038400000034,
+      "currentMs": 96.4291280000034,
+      "throughputChangePercent": 2.469436413442261
+    }
+  ]
+}
