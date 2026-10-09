@@ -124,7 +124,9 @@ test('public pages connect readers to documentation and recorded releases', asyn
     .getByRole('link', { name: 'Changelog', exact: true })
     .click();
   await expect(
-    page.getByRole('heading', { name: release.version, exact: true }),
+    page
+      .getByRole('heading', { level: 2 })
+      .getByRole('link', { name: release.version, exact: true }),
   ).toBeVisible();
 });
 
