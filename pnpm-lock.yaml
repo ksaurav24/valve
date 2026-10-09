@@ -35,6 +35,9 @@ importers:
       lint-staged:
         specifier: 17.6.0
         version: 17.6.0
+      luamin:
+        specifier: 1.0.4
+        version: 1.0.4
       prettier:
         specifier: 3.9.9
         version: 3.9.9
@@ -3132,6 +3135,14 @@ packages:
   lru-cache@11.5.3:
     resolution: {integrity: sha512-U4N8FgzmWxc8k1VH8Kr6lQg18U7Fjvby6wXHVRX/ZZ7IwWbRMgrRbP0Wrb5q5NVinryp4SQampHKdvtecItxUg==}
     engines: {node: 20 || >=22}
+
+  luamin@1.0.4:
+    resolution: {integrity: sha512-z1h0bclRD/QGsS/Dz4Skp9z0qPTmmm+IKcrCapGmdTczPWVdN9f9jk6WqkNrcifQr8+n9Pzsm9WkwpOH1JBUAQ==}
+    hasBin: true
+
+  luaparse@0.2.1:
+    resolution: {integrity: sha512-VKBcryd5nJte4ZNR29NOk8F/UkMipjeb4yoxcSS51z6QAzg9DXUC2WsfLniS0J1eh3pr/ZL3e9ha6V8fhoLbBQ==}
+    hasBin: true
 
   lucide-react@1.52.0:
     resolution: {integrity: sha512-TUgPtl5ZI9WgxOcbu4ckaC5B3l1qxPQrCMgb6OfUB9owx/OvSJfcf93SMgUWAxRw5/1XDfh9uI5F5iNGXCcGDQ==}
@@ -6818,6 +6829,12 @@ snapshots:
   longest-streak@3.1.0: {}
 
   lru-cache@11.5.3: {}
+
+  luamin@1.0.4:
+    dependencies:
+      luaparse: 0.2.1
+
+  luaparse@0.2.1: {}
 
   lucide-react@1.52.0(@types/react@19.3.0)(react@19.3.0):
     dependencies:

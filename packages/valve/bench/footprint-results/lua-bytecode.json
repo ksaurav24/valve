@@ -1,0 +1,50 @@
+{
+  "compiler": "Lua compiler linked with Redis 7.4.7 bundled Lua 5.1 library; debug information stripped",
+  "rows": [
+    {
+      "name": "acquire",
+      "rawBytes": 3035,
+      "minifiedBytes": 2007,
+      "bytecodeBytes": 2360,
+      "identical": true,
+      "rawBytecodeSha256": "c4e5778ed6b8446d8544c9d662bbd47278ad2b9c65964844161324b1c340f55e",
+      "minifiedBytecodeSha256": "c4e5778ed6b8446d8544c9d662bbd47278ad2b9c65964844161324b1c340f55e"
+    },
+    {
+      "name": "pause",
+      "rawBytes": 316,
+      "minifiedBytes": 195,
+      "bytecodeBytes": 458,
+      "identical": true,
+      "rawBytecodeSha256": "d4ce838de834c67205521577b2791988bd676c400e2ccdc0038391604d4b9f2b",
+      "minifiedBytecodeSha256": "d4ce838de834c67205521577b2791988bd676c400e2ccdc0038391604d4b9f2b"
+    },
+    {
+      "name": "resume",
+      "rawBytes": 127,
+      "minifiedBytes": 71,
+      "bytecodeBytes": 227,
+      "identical": true,
+      "rawBytecodeSha256": "d7dd9edc19fe65a56c236a7ab34d138c8af6c750f0579863372b3dd1dde90c55",
+      "minifiedBytecodeSha256": "d7dd9edc19fe65a56c236a7ab34d138c8af6c750f0579863372b3dd1dde90c55"
+    },
+    {
+      "name": "release",
+      "rawBytes": 170,
+      "minifiedBytes": 102,
+      "bytecodeBytes": 275,
+      "identical": true,
+      "rawBytecodeSha256": "c822adb5031ebe99615c5994ee4810b1c14a8159749f1c57b73cb9cfb97e435c",
+      "minifiedBytecodeSha256": "c822adb5031ebe99615c5994ee4810b1c14a8159749f1c57b73cb9cfb97e435c"
+    },
+    {
+      "name": "renew",
+      "rawBytes": 595,
+      "minifiedBytes": 442,
+      "bytecodeBytes": 746,
+      "identical": true,
+      "rawBytecodeSha256": "ad5ee69d9fa5e934f7188bb5918b618f0a952de0d2895504bb57370ee06680af",
+      "minifiedBytecodeSha256": "ad5ee69d9fa5e934f7188bb5918b618f0a952de0d2895504bb57370ee06680af"
+    }
+  ]
+}

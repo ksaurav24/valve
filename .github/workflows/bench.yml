@@ -8,6 +8,60 @@ on:
 permissions:
   contents: read
 jobs:
+  footprint-controls:
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    services:
+      redis:
+        image: redis:7.4
+        ports: ['6379:6379']
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 5s
+          --health-timeout 3s
+          --health-retries 10
+      valkey:
+        image: valkey/valkey:8
+        ports: ['6380:6379']
+        options: >-
+          --health-cmd "valkey-cli ping"
+          --health-interval 5s
+          --health-timeout 3s
+          --health-retries 10
+    steps:
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803
+        with:
+          fetch-depth: 0
+      - uses: pnpm/action-setup@0977fd99725f1db4007ccb2928dbb4e90d06cc86
+      - uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38
+        with:
+          node-version-file: .node-version
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm --filter @ksaurav24/valve build
+      - name: Prepare the PR baseline before timing
+        env:
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+        run: |
+          git worktree add --detach /tmp/valve-footprint-baseline "$BASE_SHA"
+          cd /tmp/valve-footprint-baseline
+          pnpm install --frozen-lockfile
+          pnpm --filter @ksaurav24/valve build
+      - name: Paired bundle, startup, and shared-store controls
+        env:
+          REDIS_URL: redis://127.0.0.1:6379
+          VALKEY_URL: redis://127.0.0.1:6380
+        run: |
+          mkdir -p /tmp/valve-footprint-results
+          node scripts/bundle-footprint.mjs /tmp/valve-footprint-baseline /tmp/valve-footprint-results/baseline-size.json
+          node scripts/bundle-footprint.mjs "$PWD" /tmp/valve-footprint-results/current-size.json
+          node scripts/footprint-startup.mjs /tmp/valve-footprint-baseline "$PWD" /tmp/valve-footprint-results/startup.json
+          node scripts/paired-footprint-controls.mjs /tmp/valve-footprint-baseline /tmp/valve-footprint-results
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        if: always()
+        with:
+          name: footprint-controls
+          path: /tmp/valve-footprint-results
   local:
     runs-on: ubuntu-latest
     steps:

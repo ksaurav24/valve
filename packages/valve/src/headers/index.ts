@@ -147,11 +147,12 @@ export function combine(...feedbacks: readonly Feedback[]): Feedback {
     return result;
   };
 }
+// Reader construction only creates closures; unused readers can be removed.
 /** Standard Retry-After, IETF, and x-ratelimit feedback.
  * @example createValve({ id: 'api', concurrency: 2, feedback: defaultFeedback });
  */
-export const defaultFeedback: Feedback = combine(
-  retryAfter(),
-  ietfRateLimit(),
-  xRateLimit(),
+export const defaultFeedback: Feedback = /* @__PURE__ */ combine(
+  /* @__PURE__ */ retryAfter(),
+  /* @__PURE__ */ ietfRateLimit(),
+  /* @__PURE__ */ xRateLimit(),
 );

@@ -1,0 +1,211 @@
+{
+  "root": "/home/xlr8/code/valve-perf-baseline",
+  "node": "v24.21.0",
+  "esbuild": "0.28.2",
+  "host": {
+    "cpu": "12th Gen Intel(R) Core(TM) i5-12450H",
+    "platform": "linux",
+    "arch": "x64"
+  },
+  "settings": "browser, esm, es2022, bundle, minify, gzip default level",
+  "rows": [
+    {
+      "input": "src",
+      "name": "entry/core",
+      "bytes": 21187,
+      "gzipBytes": 8361,
+      "modules": {
+        "src/errors.ts": 448,
+        "src/duration.ts": 494,
+        "src/emitter.ts": 264,
+        "src/headers/parse.ts": 685,
+        "src/headers/index.ts": 1950,
+        "src/leases.ts": 1551,
+        "src/algorithms.ts": 654,
+        "src/memory-store.ts": 1924,
+        "src/queue.ts": 1326,
+        "src/rules.ts": 3171,
+        "src/valve.ts": 8618,
+        "src/index.ts": 0
+      }
+    },
+    {
+      "input": "src",
+      "name": "entry/redis",
+      "bytes": 8854,
+      "gzipBytes": 3525,
+      "modules": {
+        "src/errors.ts": 291,
+        "src/duration.ts": 344,
+        "src/redis/subscriptions.ts": 846,
+        "src/redis/clients.ts": 715,
+        "src/redis/scripts.ts": 4497,
+        "src/redis/index.ts": 2136
+      }
+    },
+    {
+      "input": "src",
+      "name": "entry/headers",
+      "bytes": 2714,
+      "gzipBytes": 1130,
+      "modules": {
+        "src/headers/parse.ts": 683,
+        "src/headers/index.ts": 1937
+      }
+    },
+    {
+      "input": "src",
+      "name": "consumer/valve",
+      "bytes": 21064,
+      "gzipBytes": 8309,
+      "modules": {
+        "src/errors.ts": 386,
+        "src/duration.ts": 494,
+        "src/emitter.ts": 264,
+        "src/headers/parse.ts": 685,
+        "src/headers/index.ts": 1950,
+        "src/leases.ts": 1551,
+        "src/algorithms.ts": 654,
+        "src/memory-store.ts": 1924,
+        "src/queue.ts": 1326,
+        "src/rules.ts": 3171,
+        "src/valve.ts": 8613,
+        "src/index.ts": 0,
+        "consumer.js": 45
+      }
+    },
+    {
+      "input": "src",
+      "name": "consumer/memory",
+      "bytes": 2597,
+      "gzipBytes": 1114,
+      "modules": {
+        "src/algorithms.ts": 653,
+        "src/memory-store.ts": 1922,
+        "src/index.ts": 0,
+        "consumer.js": 21
+      }
+    },
+    {
+      "input": "src",
+      "name": "consumer/errors",
+      "bytes": 216,
+      "gzipBytes": 174,
+      "modules": {
+        "src/errors.ts": 189,
+        "src/index.ts": 0,
+        "consumer.js": 26
+      }
+    },
+    {
+      "input": "src",
+      "name": "consumer/redis",
+      "bytes": 8879,
+      "gzipBytes": 3537,
+      "modules": {
+        "src/errors.ts": 291,
+        "src/duration.ts": 344,
+        "src/redis/subscriptions.ts": 846,
+        "src/redis/clients.ts": 715,
+        "src/redis/scripts.ts": 4497,
+        "src/redis/index.ts": 2136,
+        "consumer.js": 49
+      }
+    },
+    {
+      "input": "src",
+      "name": "consumer/retryAfter",
+      "bytes": 2645,
+      "gzipBytes": 1089,
+      "modules": {
+        "src/headers/parse.ts": 683,
+        "src/headers/index.ts": 1937,
+        "consumer.js": 24
+      }
+    },
+    {
+      "input": "dist",
+      "name": "entry/core",
+      "bytes": 21163,
+      "gzipBytes": 8358,
+      "modules": {
+        "dist/duration-Bq0XlW0j.js": 942,
+        "dist/headers-BcSF9-IM.js": 2635,
+        "dist/index.js": 17483
+      }
+    },
+    {
+      "input": "dist",
+      "name": "entry/redis",
+      "bytes": 8850,
+      "gzipBytes": 3521,
+      "modules": {
+        "dist/duration-Bq0XlW0j.js": 631,
+        "dist/redis/index.js": 8194
+      }
+    },
+    {
+      "input": "dist",
+      "name": "entry/headers",
+      "bytes": 2714,
+      "gzipBytes": 1130,
+      "modules": {
+        "dist/headers-BcSF9-IM.js": 2620,
+        "dist/headers/index.js": 0
+      }
+    },
+    {
+      "input": "dist",
+      "name": "consumer/valve",
+      "bytes": 21040,
+      "gzipBytes": 8312,
+      "modules": {
+        "dist/duration-Bq0XlW0j.js": 876,
+        "dist/headers-BcSF9-IM.js": 2635,
+        "dist/index.js": 17483,
+        "consumer.js": 45
+      }
+    },
+    {
+      "input": "dist",
+      "name": "consumer/memory",
+      "bytes": 2597,
+      "gzipBytes": 1115,
+      "modules": {
+        "dist/index.js": 2575,
+        "consumer.js": 21
+      }
+    },
+    {
+      "input": "dist",
+      "name": "consumer/errors",
+      "bytes": 216,
+      "gzipBytes": 173,
+      "modules": {
+        "dist/duration-Bq0XlW0j.js": 189,
+        "consumer.js": 26
+      }
+    },
+    {
+      "input": "dist",
+      "name": "consumer/redis",
+      "bytes": 8875,
+      "gzipBytes": 3534,
+      "modules": {
+        "dist/duration-Bq0XlW0j.js": 631,
+        "dist/redis/index.js": 8194,
+        "consumer.js": 49
+      }
+    },
+    {
+      "input": "dist",
+      "name": "consumer/retryAfter",
+      "bytes": 2645,
+      "gzipBytes": 1089,
+      "modules": {
+        "dist/headers-BcSF9-IM.js": 2620,
+        "consumer.js": 24
+      }
+    }
+  ]
+}
