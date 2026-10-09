@@ -1,0 +1,311 @@
+---
+title: Migrate from Bottleneck
+description: Map Bottleneck limiters, options, job options, clustering, and events to valve.
+---
+
+valve and [Bottleneck](https://github.com/SGrondin/bottleneck) both queue jobs
+in-process and can share limits through Redis. The main differences:
+
+- valve describes limits as **rate rules** (`limit` per `interval`) instead of
+  `minTime` and reservoirs.
+- valve reads **provider rate limit headers** and pauses every worker.
+- valve uses **your** Redis client, and each worker passes its own
+  configuration. There is no settings record stored in Redis.
+- Crashed workers' **global concurrency slots** expire automatically through
+  leases, without per-job `expiration`.
+- valve has no callback API, no `Group` class, and no runtime
+  `updateSettings`.
+
+There is no compatibility layer. Migration is mechanical for most limiters and
+is described below.
+
+## Quick comparison
+
+```ts title="Before: Bottleneck"
+import Bottleneck from 'bottleneck';
+
+const limiter = new Bottleneck({
+  id: 'hubspot',
+  maxConcurrent: 5,
+  minTime: 100,
+  datastore: 'ioredis',
+  clientOptions: { host: '127.0.0.1', port: 6379 },
+});
+
+const contact = await limiter.schedule({ priority: 1 }, getContact, '123');
+```
+
+```ts title="After: valve"
+import { Redis } from 'ioredis';
+import { createValve } from '@ksaurav24/valve';
+import { redisStore } from '@ksaurav24/valve/redis';
+
+const redis = new Redis({ host: '127.0.0.1', port: 6379 });
+
+const hubspot = createValve({
+  id: 'hubspot',
+  rate: { limit: 1, interval: 100 },
+  concurrency: { limit: 5, scope: 'global' },
+  store: redisStore({ client: redis }),
+});
+
+const contact = await hubspot.run(() => getContact('123'), { priority: 4 });
+```
+
+Note the priority: Bottleneck runs **lower** numbers first, valve runs
+**higher** numbers first. See [Priorities](#priorities).
+
+## Migration steps
+
+<Steps>
+<Step>
+
+### Translate the limiter options
+
+Use the [option mapping](#limiter-options) to build a `rate` rule and a
+`concurrency` setting for each limiter.
+
+</Step>
+<Step>
+
+### Replace schedule, wrap, and submit
+
+Change every call site to `run` or `wrap`, converting priorities and weights.
+See [Methods](#methods).
+
+</Step>
+<Step>
+
+### Move Redis configuration into your code
+
+Create the Redis client yourself and pass it to `redisStore`. Make sure every
+worker uses the same id and the same rules.
+
+</Step>
+<Step>
+
+### Replace retry and event handlers
+
+Swap `failed` retry handlers for `wrapFetch` retries or your own retry logic,
+and move event listeners to the [valve events](#events).
+
+</Step>
+<Step>
+
+### Roll out and remove Bottleneck
+
+The two libraries keep separate state. While both run, each enforces its own
+limit, so the provider can see up to twice the traffic. Lower both limits for
+the rollout, or switch all workers at once.
+
+</Step>
+</Steps>
+
+## Limiter options
+
+| Bottleneck                                                                                         | valve                                                          |
+| -------------------------------------------------------------------------------------------------- | -------------------------------------------------------------- |
+| `id`                                                                                               | `id` (required, no `{` or `}`)                                 |
+| `maxConcurrent` (local)                                                                            | `concurrency: n`                                               |
+| `maxConcurrent` (clustered)                                                                        | `concurrency: { limit: n, scope: 'global' }`                   |
+| `minTime: ms`                                                                                      | `rate: { limit: 1, interval: ms }`                             |
+| `reservoir` + `reservoirRefreshAmount` + `reservoirRefreshInterval`                                | `rate: { limit: amount, interval, algorithm: 'fixed-window' }` |
+| `reservoir` + `reservoirIncreaseAmount` + `reservoirIncreaseInterval` + `reservoirIncreaseMaximum` | `rate: { limit: amount, interval, burst: maximum }`            |
+| `highWater` with `strategy: OVERFLOW`                                                              | `maxQueue`                                                     |
+| `highWater` with `LEAK`, `OVERFLOW_PRIORITY`, or `BLOCK`                                           | No equivalent. `maxQueue` rejects the **new** job.             |
+| `datastore`, `clientOptions`, `clusterNodes`                                                       | `store: redisStore({ client })` with a client you create       |
+| `clearDatastore`                                                                                   | No equivalent. Use a new `prefix` or id to start fresh.        |
+| `timeout` (Redis key TTL)                                                                          | Not needed. Keys expire on their own.                          |
+| `Promise`                                                                                          | Not supported. valve uses native promises.                     |
+
+### minTime
+
+`minTime` spaces job starts. A GCRA rule with `burst: 1` does the same, and is
+often easier to read as a rate:
+
+```ts
+// Bottleneck: { minTime: 250 }
+rate: { limit: 1, interval: 250 }
+// Same spacing, expressed per second:
+rate: { limit: 4, interval: '1s' }
+```
+
+### Refresh intervals
+
+A reservoir that resets to N every interval is a fixed window. One difference:
+Bottleneck's interval starts when the limiter is created, while valve's windows
+are aligned to the store's epoch clock, so every worker agrees on boundaries.
+
+```ts
+// Bottleneck: { reservoir: 100, reservoirRefreshAmount: 100, reservoirRefreshInterval: 60_000 }
+rate: { limit: 100, interval: '1m', algorithm: 'fixed-window' }
+```
+
+Bottleneck recommends adding `minTime` to avoid a flood when the reservoir
+refreshes. In valve, add a second rule:
+
+```ts
+rate: [
+  { limit: 100, interval: '1m', algorithm: 'fixed-window' },
+  { limit: 5, interval: '1s' },
+];
+```
+
+### Increase intervals
+
+A reservoir that grows by N per interval up to a maximum is a token bucket.
+GCRA with `burst` behaves the same way, refilling smoothly instead of in steps.
+
+```ts
+// Bottleneck: { reservoir: 40, reservoirIncreaseAmount: 2,
+//               reservoirIncreaseInterval: 1000, reservoirIncreaseMaximum: 40 }
+rate: { limit: 2, interval: '1s', burst: 40 }
+```
+
+## Methods
+
+| Bottleneck                               | valve                                                              |
+| ---------------------------------------- | ------------------------------------------------------------------ |
+| `schedule(fn, ...args)`                  | `run(() => fn(...args))`                                           |
+| `schedule(options, fn, ...args)`         | `run(() => fn(...args), options)`                                  |
+| `wrap(fn)`                               | `wrap(fn)`                                                         |
+| `wrapped.withOptions(options, ...args)`  | `run(() => fn(...args), options)`, or a second `wrap(fn, options)` |
+| `submit(fn, ...args, callback)`          | No callback API. Use `run`, or `util.callbackify`.                 |
+| `stop({ dropWaitingJobs: true })`        | `close()`                                                          |
+| `stop({ dropWaitingJobs: false })`       | `close({ drain: true })`                                           |
+| `counts()`, `queued()`, `running()`      | `stats()`                                                          |
+| `empty()`                                | `stats().queued === 0`                                             |
+| `on('idle')` or awaiting idle            | `idle()`, or `on('idle')`                                          |
+| `updateSettings(options)`                | No equivalent. Create a new valve and close the old one.           |
+| `incrementReservoir`, `currentReservoir` | No equivalent.                                                     |
+| `chain(limiter)`                         | Call through two valves: `a.run(() => b.run(fn))`.                 |
+| `jobStatus(id)`, `jobs(status)`          | No equivalent.                                                     |
+
+<Callout type="warn" title="run passes a context, not your arguments">
+  `run(fn)` calls `fn({ signal })`. Do not pass a function that expects its own
+  arguments directly. Write `run(() => fn(a, b))`, not `run(fn)`.
+</Callout>
+
+## Job options
+
+| Bottleneck       | valve                                                |
+| ---------------- | ---------------------------------------------------- |
+| `priority` (0-9) | `priority` (any integer, higher first)               |
+| `weight`         | `cost`                                               |
+| `expiration`     | No direct equivalent. See [Expiration](#expiration). |
+| `id`             | Not needed. Errors carry the valve's id.             |
+
+### Priorities
+
+Bottleneck's default is 5, and lower numbers run first. valve's default is 0,
+and higher numbers run first. To keep the same order and the same default:
+
+```ts
+const valvePriority = 5 - bottleneckPriority;
+```
+
+### Weight
+
+`weight` reduces the reservoir and counts toward `maxConcurrent`. In valve,
+`cost` is spent against every rate rule, but concurrency always counts one per
+job. Under GCRA, `cost` must not exceed `burst`.
+
+### Expiration
+
+Bottleneck uses `expiration` both to time out slow jobs and to recover running
+slots from crashed workers.
+
+- **Crash recovery** is automatic in valve. Global concurrency uses leases that
+  expire after `leaseTtl` if a worker dies.
+- **Timeouts** are your function's responsibility. Use the job's signal:
+
+```ts
+await api.run(({ signal }) => {
+  const timeout = AbortSignal.timeout(10_000);
+  return fetch(url, {
+    signal: signal ? AbortSignal.any([signal, timeout]) : timeout,
+  });
+});
+```
+
+`maxWait` is different: it bounds time in the queue, not time running.
+
+## Retries
+
+Bottleneck retries jobs when a `failed` listener returns a delay. valve has no
+general retry hook.
+
+- For rate limit responses, use `wrapFetch`. It retries 429s, and 503s with
+  `Retry-After`, after a shared pause.
+- For other failures, retry around `run` with your preferred library, or let
+  your job queue retry.
+
+```ts
+// Bottleneck
+limiter.on('failed', (error, info) => (info.retryCount < 2 ? 1000 : undefined));
+
+// valve: rate limit retries are built into wrapFetch
+const apiFetch = api.wrapFetch(fetch, { retries: 2 });
+```
+
+## Clustering
+
+| Bottleneck behavior                                       | valve behavior                                                           |
+| --------------------------------------------------------- | ------------------------------------------------------------------------ |
+| The first limiter stores its settings in Redis.           | Each worker passes its own rules. Keep them identical.                   |
+| `maxConcurrent` is cluster-wide.                          | `concurrency: n` is per process. Use `scope: 'global'` for cluster-wide. |
+| Set `expiration` so crashed workers release slots.        | Leases expire after `leaseTtl` automatically.                            |
+| Priorities, queue order, and `highWater` are per limiter. | Same. Queues are local.                                                  |
+| `idle` waits for jobs running anywhere in the cluster.    | `idle` is local to the process.                                          |
+| Bottleneck creates the Redis connection by default.       | You create, connect, and close the client.                               |
+| Timings use client clocks.                                | All rate math uses the Redis server's `TIME`.                            |
+
+## Groups
+
+`Bottleneck.Group` creates one limiter per key. In valve, keep a `Map` of
+valves that share one store. See [Per-tenant budgets](/docs/examples/per-tenant-budgets/).
+
+```ts
+// Bottleneck
+const group = new Bottleneck.Group({ maxConcurrent: 2, minTime: 250 });
+await group.key(`shop:${shopId}`).schedule(() => syncShop(shopId));
+
+// valve
+const valves = new Map<string, Valve>();
+function valveFor(key: string) {
+  let valve = valves.get(key);
+  if (!valve) {
+    valve = createValve({
+      id: key,
+      rate: { limit: 4, interval: '1s' },
+      concurrency: 2,
+      store,
+    });
+    valves.set(key, valve);
+  }
+  return valve;
+}
+await valveFor(`shop:${shopId}`).run(() => syncShop(shopId));
+```
+
+## Events
+
+| Bottleneck                | valve                                                                      |
+| ------------------------- | -------------------------------------------------------------------------- |
+| `error`                   | `store-error` for store failures, `warning` for listener errors            |
+| `failed`                  | Catch the rejection from `run`                                             |
+| `retry`                   | `stats().totals.retried`                                                   |
+| `idle`                    | `idle`                                                                     |
+| `empty`                   | No equivalent                                                              |
+| `dropped`                 | `reject` with code `QUEUE_FULL`                                            |
+| `depleted`                | No equivalent. `pause` fires when the provider reports no remaining quota. |
+| `debug`, lifecycle events | No equivalent                                                              |
+
+## What you gain
+
+- **Provider feedback.** `Retry-After`, IETF `RateLimit`, and `x-ratelimit-*`
+  headers pause every worker. See [Respect provider feedback](/docs/guides/respect-retry-after/).
+- **Multiple rules per limiter**, checked atomically.
+- **Cancellation and queue deadlines** with `AbortSignal` and `maxWait`.
+- **Typed errors** with stable codes.
+- **No dependencies**, and no Redis client bundled or created for you.

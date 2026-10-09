@@ -1,0 +1,74 @@
+---
+title: Handle errors
+description: Tell valve's own failures apart from your job's errors and respond to each one.
+---
+
+A job's promise rejects for one of two reasons:
+
+- **Your function failed.** valve passes the error through unchanged.
+- **valve could not run the job.** valve rejects with a `ValveError` that has
+  a `code`.
+
+`run` never throws synchronously. Invalid options passed to `createValve`
+throw at creation time with code `INVALID_OPTIONS`.
+
+## Narrow with isValveError
+
+```ts
+import { isValveError } from '@ksaurav24/valve';
+
+try {
+  await crm.run(() => fetchContact(id));
+} catch (error) {
+  if (isValveError(error, 'QUEUE_FULL')) return shedLoad();
+  if (isValveError(error, 'MAX_WAIT_EXCEEDED')) return respondBusy();
+  if (isValveError(error)) {
+    logger.warn({ code: error.code, valve: error.valveId }, error.message);
+  }
+  throw error; // Your job's own error, unchanged.
+}
+```
+
+`ValveError` exposes `code`, `valveId`, `message`, and, when there is an
+underlying error, `cause`.
+
+## What to do for each code
+
+| Code                 | Why it happened                                            | What to do                                                        |
+| -------------------- | ---------------------------------------------------------- | ----------------------------------------------------------------- |
+| `INVALID_OPTIONS`    | An option or argument failed validation.                   | Fix the configuration. The message names the option.              |
+| `COST_EXCEEDS_LIMIT` | The job's cost is larger than a rule's `burst` or `limit`. | Lower the cost or raise `burst`. The job could never start.       |
+| `QUEUE_FULL`         | `maxQueue` jobs are already waiting.                       | Shed load, return 429 or 503 to your caller, or raise `maxQueue`. |
+| `MAX_WAIT_EXCEEDED`  | The job waited longer than `maxWait`.                      | Fail fast to your caller, or retry later.                         |
+| `ABORTED`            | The job's signal aborted before it started.                | Usually nothing. `cause` holds `signal.reason`.                   |
+| `CLOSED`             | The valve was closed before the job started.               | Expected during shutdown.                                         |
+| `STORE_UNAVAILABLE`  | The store failed and `onStoreError` is `'throw'`.          | Retry later, or switch to the default `'wait'` policy.            |
+| `LEASE_LOST`         | A global concurrency lease could not be renewed.           | Treat the job's outcome as unknown. Make the work idempotent.     |
+
+## Store outages
+
+Choose how valve behaves when Redis is down or slow. A store call that exceeds
+the Redis store's `timeout` (default `'2s'`) counts as a failure.
+
+```ts
+createValve({ id: 'crm', rate, store, onStoreError: 'wait' });
+```
+
+- `'wait'` (default) keeps jobs queued and retries with backoff until each
+  job's `maxWait`. Pair it with `maxWait` so callers are not stuck forever.
+- `'throw'` rejects affected jobs with `STORE_UNAVAILABLE`.
+- `'open'` runs jobs without shared rate rules while the store is down. Local
+  concurrency still applies. Only use it when exceeding the provider's quota
+  is better than not calling it.
+
+Every store failure emits a `store-error` event, whatever the policy.
+
+## Errors in callbacks
+
+valve catches errors thrown by event listeners, feedback readers, and
+`observe` mappers. It reports them as `warning` events instead of failing the
+job. Subscribe to `warning` so these do not go unnoticed:
+
+```ts
+crm.on('warning', ({ message }) => logger.warn(message));
+```

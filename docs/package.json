@@ -3,30 +3,31 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "dev": "next dev --hostname 127.0.0.1 --port 4321",
-    "build": "pnpm --filter @ksaurav24/valve docs:api && next build --webpack",
+    "dev": "node scripts/sync-changelog.mjs && next dev --hostname 127.0.0.1 --port 4321",
+    "build": "node scripts/sync-changelog.mjs && pnpm --filter @ksaurav24/valve docs:api && next build --webpack",
     "preview": "python3 -m http.server 4321 --bind 127.0.0.1 --directory out",
-    "typecheck": "fumadocs-mdx && next typegen && tsc --noEmit",
-    "postinstall": "fumadocs-mdx",
+    "typecheck": "node scripts/sync-changelog.mjs && fumadocs-mdx && next typegen && tsc --noEmit",
+    "postinstall": "node scripts/sync-changelog.mjs && fumadocs-mdx",
     "test:browser": "playwright test"
   },
   "dependencies": {
-    "@fontsource-variable/manrope": "5.3.0",
-    "@fontsource-variable/jetbrains-mono": "5.3.0",
+    "@fontsource-variable/geist": "5.3.0",
+    "@fontsource-variable/geist-mono": "5.3.0",
     "fumadocs-core": "16.16.2",
     "fumadocs-mdx": "15.4.6",
     "fumadocs-ui": "16.16.2",
     "next": "16.4.0",
+    "next-themes": "0.4.6",
     "react": "19.3.0",
     "react-dom": "19.3.0"
   },
   "devDependencies": {
     "@playwright/test": "1.63.0",
     "@tailwindcss/postcss": "4.3.3",
-    "tailwindcss": "4.3.3",
     "@types/mdx": "^2.0.13",
     "@types/react": "^19.2.0",
     "@types/react-dom": "^19.2.0",
+    "tailwindcss": "4.3.3",
     "typescript": "^6.0.3"
   }
 }

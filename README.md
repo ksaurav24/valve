@@ -75,12 +75,16 @@ pnpm check
 pnpm docs:dev
 ```
 
-The Next.js and Fumadocs MDX documentation site lives in `docs/`. Build it with `pnpm docs:build`.
+The Next.js website lives in `docs/`: `/` introduces the project, `/docs` serves
+the Fumadocs MDX documentation, and `/changelog` renders the package
+changelog. Blog scaffolds are kept for future library and release posts. Build it with `pnpm docs:build`.
+See [website maintenance](docs/README.md) for content and routing conventions.
 
 - [Quickstart](docs/content/docs/quickstart.mdx)
 - [Share a quota](docs/content/docs/guides/share-a-quota.mdx)
 - [Respect Retry-After](docs/content/docs/guides/respect-retry-after.mdx)
 - [Priorities and shutdown](docs/content/docs/guides/priorities-and-shutdown.mdx)
+- [Migrate from Bottleneck](docs/content/docs/migration/from-bottleneck.mdx)
 - [API reference](docs/content/docs/reference/api.mdx)
 - [Tests and benchmarks](docs/content/docs/reference/testing.mdx)
 - [Contributing](CONTRIBUTING.md)

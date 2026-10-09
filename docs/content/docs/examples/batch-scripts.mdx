@@ -1,0 +1,93 @@
+---
+title: Batch scripts
+description: Process a large list of API calls within a quota, report progress, and collect failures.
+---
+
+A one-off script, such as a backfill or a migration, often calls one API
+thousands of times. Run it in a single process with the default memory store.
+
+```ts title="backfill.ts"
+import { createValve } from '@ksaurav24/valve';
+
+const github = createValve({
+  id: 'github:backfill',
+  rate: { limit: 80, interval: '1m' },
+  concurrency: 4,
+});
+
+const githubFetch = github.wrapFetch(fetch, { retries: 3 });
+
+github.on('pause', ({ durationMs, reason }) =>
+  console.warn(`Paused ${durationMs}ms (${reason})`),
+);
+
+const repos: string[] = await loadRepoNames();
+const failures: { repo: string; error: unknown }[] = [];
+let done = 0;
+
+const progress = setInterval(() => {
+  const { queued, running } = github.stats();
+  console.log(
+    `${done}/${repos.length} done, ${running} running, ${queued} queued`,
+  );
+}, 5_000);
+
+await Promise.all(
+  repos.map(async (repo) => {
+    try {
+      const res = await githubFetch(`https://api.github.com/repos/${repo}`, {
+        headers: { authorization: `Bearer ${process.env.GITHUB_TOKEN}` },
+      });
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      await saveRepo(await res.json());
+    } catch (error) {
+      failures.push({ repo, error });
+    } finally {
+      done++;
+    }
+  }),
+);
+
+clearInterval(progress);
+await github.close();
+
+console.log(`Finished with ${failures.length} failures.`);
+```
+
+## How it behaves
+
+- `Promise.all` submits every job at once. valve holds them in its queue and
+  starts at most 80 per minute, with no more than 4 running.
+- GitHub sends `x-ratelimit-remaining` and `x-ratelimit-reset` headers. If
+  `remaining` reaches 0, the valve pauses until the reset, even if your rule
+  was looser than the real limit.
+- A 429 is retried up to 3 times. A final 429 resolves normally and is caught
+  by the `res.ok` check.
+
+## Very large lists
+
+Submitting a million jobs at once keeps a million closures in memory. Feed the
+queue in chunks instead, and use `idle()` to wait for each chunk:
+
+```ts
+for (let i = 0; i < ids.length; i += 1_000) {
+  for (const id of ids.slice(i, i + 1_000)) {
+    github
+      .run(() => syncOne(id))
+      .catch((error) => failures.push({ id, error }));
+  }
+  await github.idle();
+}
+```
+
+## Stop early
+
+Close the valve to stop on Ctrl-C. Queued jobs reject with `CLOSED`; running
+jobs finish.
+
+```ts
+process.once('SIGINT', () => void github.close());
+```
+
+Filter those rejections out of your failure report with
+`isValveError(error, 'CLOSED')`.

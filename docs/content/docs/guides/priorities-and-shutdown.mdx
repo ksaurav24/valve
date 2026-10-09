@@ -1,50 +1,121 @@
 ---
-title: Priorities, cancellation, and shutdown
-description: Bound queue growth, prioritize interactive calls, and drain a service safely.
+title: Control the queue
+description: Set priorities and cost, bound queue growth, cancel jobs, and shut down without losing work.
 ---
 
+Every valve keeps a local queue. This guide covers the options that decide
+which job starts next, how long it may wait, and what happens on shutdown.
+
+## Priority
+
+Higher integers start first. The default is `0`. Equal priorities keep call
+order.
+
 ```ts
-const api = createValve({
-  id: 'partner:42',
+// A user is waiting on this one.
+await crm.run(() => fetchContact(id), { priority: 10 });
+
+// Background sync can wait.
+await crm.run(() => syncContact(id), { priority: -1 });
+```
+
+Priority only orders this process's queue. It does not affect other workers.
+
+## Cost
+
+`cost` is how many units a job spends from every rule. The default is `1`. Use
+it when some endpoints count more against the quota than others.
+
+```ts
+await search.run(() => bulkSearch(query), { cost: 5 });
+```
+
+Under GCRA, `cost` cannot exceed the rule's `burst`. Under a fixed window, it
+cannot exceed `limit`. Otherwise `run` rejects with `COST_EXCEEDS_LIMIT`.
+
+## Bound the queue
+
+```ts
+const crm = createValve({
+  id: 'crm:tenant-9',
   rate: { limit: 10, interval: '1s' },
-  concurrency: 4,
   maxQueue: 1000,
   maxWait: '5s',
 });
-await api.run(() => syncCustomer('42'), { priority: 10 });
 ```
 
-Higher integer priorities start first. Equal priorities retain call order.
-`maxQueue` counts waiting jobs, including jobs in an acquire call, and excludes
-running jobs. `maxWait` limits queue wait only; it does not time out the job
-once it starts.
+- `maxQueue` limits jobs waiting in this process, including jobs whose store
+  call is in flight. Running jobs do not count. When the queue is full, `run`
+  rejects with `QUEUE_FULL`.
+- `maxWait` limits how long a job may wait before starting. An expired job
+  rejects with `MAX_WAIT_EXCEEDED`. It does **not** limit how long the job
+  runs. Override it per job with `run(fn, { maxWait })`.
 
-## Cancellation
+Both turn an overloaded queue into fast, explicit errors that you can handle,
+instead of unbounded memory and latency.
+
+## Cancel a job
+
+Pass an `AbortSignal`. If the job is still queued, it rejects with `ABORTED`,
+and the error's `cause` is `signal.reason`. If it is already running, valve
+passes the signal to your function and lets it decide.
 
 ```ts
 const controller = new AbortController();
-const job = api.run(({ signal }) => doWork(signal), {
+
+const job = crm.run(({ signal }) => fetch(url, { signal }), {
   signal: controller.signal,
 });
-controller.abort('request ended');
+
+controller.abort(new Error('request ended'));
 ```
 
-An aborted queued job rejects with `ABORTED` and preserves `signal.reason` as
-its cause. A running job receives the signal and decides how to respond.
-
-## Graceful shutdown
+To bound total time, waiting plus running, use `AbortSignal.timeout`:
 
 ```ts
-process.on('SIGTERM', () => {
-  void api.close({ drain: true }).then(() => redis.quit());
+await crm.run(({ signal }) => fetch(url, { signal }), {
+  signal: AbortSignal.timeout(10_000),
 });
 ```
 
-`close({ drain: true })` runs queued jobs and waits for running jobs. The
-default `close()` rejects queued jobs and waits for running ones. New jobs
-reject with `CLOSED`; repeated calls return the same close promise. A valve
-never closes a store client you supplied.
+## Shut down
 
-`await api.idle()` waits until nothing is waiting or running. In runtimes
-supporting explicit resource management, `await using api = createValve(...)`
-uses the same close behavior.
+`close` stops new work. New `run` calls reject with `CLOSED`. Calling `close`
+twice returns the same promise.
+
+| Call                     | Queued jobs            | Running jobs |
+| ------------------------ | ---------------------- | ------------ |
+| `close()`                | Rejected with `CLOSED` | Awaited      |
+| `close({ drain: true })` | Run to completion      | Awaited      |
+
+```ts
+process.on('SIGTERM', async () => {
+  await crm.close({ drain: true });
+  await redis.quit();
+});
+```
+
+`close` never closes a store client you supplied. Close your clients after the
+valves.
+
+### Wait without closing
+
+`idle()` resolves when nothing is queued or running in this process. Use it to
+wait for a batch to finish while keeping the valve open.
+
+```ts
+for (const id of ids) crm.run(() => sync(id)).catch(console.error);
+await crm.idle();
+```
+
+### Explicit resource management
+
+Valves are `AsyncDisposable`. In runtimes that support `await using`, the
+valve closes when the scope exits.
+
+```ts
+await using crm = createValve({
+  id: 'crm:script',
+  rate: { limit: 5, interval: '1s' },
+});
+```

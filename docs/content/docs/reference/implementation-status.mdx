@@ -1,51 +1,108 @@
 ---
-title: Implementation status
-description: What 0.1.0 implements and which measured release targets remain open.
+title: Status and limitations
+description: Implemented features, changes in 0.1.2, and remaining limits on scheduling, storage, and bundle size.
 ---
 
-The 0.1.0 implementation includes every core method, both rate algorithms,
-atomic multi-rule acquisition, local and shared lease concurrency, weighted priorities, queue
-bounds, cancellation, queue deadlines, shared pauses, pub/sub wakeups, provider feedback,
-fetch retries, and memory plus Redis/Valkey stores.
+import { site } from '@/lib/site';
 
-Unit and property suites, type inference, ESM/CommonJS packaging, TypeDoc,
-real-store parity, eight-process bounds, shared feedback pauses, script-cache
-recovery, timeouts, actual server restarts, and Redis Cluster are covered.
-CI includes the server matrix and the runnable examples.
+The latest recorded version is **{site.version}**. The package has not been
+published to npm. Follow [Installation](/docs/installation/) to build and
+install it from source, and check the [changelog](/changelog/) for version history.
 
-## Open release targets
+## Included
 
-The core and Redis entries exceed the original PRD size targets after adding
-shared concurrency and pub/sub. Measured gzip sizes are core 8,299 bytes, Redis 3,516 bytes, and headers 1,127
-bytes. CI ceilings are 8,704, 4,096, and 2,048 bytes respectively. See
-the benchmark reports for measured sizes and workload results.
+- `createValve` with `run`, `wrap`, `wrapFetch`, `observe`, `pause`, `resume`,
+  `stats`, `on`, `idle`, and `close`.
+- GCRA and fixed-window rate rules, with several rules checked atomically
+  on the store's clock.
+- Memory and Redis/Valkey stores. An optional subscriber wakes queues on
+  shared pause, resume, and concurrency-slot release notifications.
+- Local concurrency and global concurrency through renewable leases.
+- Local priorities, job cost, `maxQueue`, `maxWait`, and `AbortSignal`
+  cancellation.
+- Shared pauses from `Retry-After`, IETF `RateLimit`, and `x-ratelimit-*`
+  headers, plus backoff for rate limit responses without usable headers.
+- `wrapFetch` retries for 429 responses and 503 responses carrying
+  `Retry-After`. Stream request bodies are not retried.
+- ESM and CommonJS entry points with TypeScript declarations, and zero
+  runtime or peer dependencies. Applications supply their own Redis client.
 
-After removing positive jitter from rate eligibility waits with local concurrency,
-the PR #10 baseline comparison of 200 jobs at 100/sec measures 98.52 jobs/sec
-and 39.951ms p99 ideal-sequence delay. The longer 2,000-job run
-measures 376.061ms p99 ideal-sequence delay. The original 5ms
-target remains unmet. Small scheduling delays accumulate under strict burst-1
-admission; Valve does not introduce catch-up starts.
+## Changes in 0.1.2
 
-Asynchronous rate waits with local concurrency now account for elapsed acquisition
-time using a monotonic local clock. Every wakeup still requires store admission.
-The synchronous memory timing policy is unchanged, and the original 5ms target
-remains open. `packages/valve/bench/DRIFT.md` records the diagnosis, paired
-Node 20/22/24 measurements, clock definitions, and proposed target calibration.
+The footprint update minifies embedded Redis Lua at build time and lets
+bundlers discard unused default feedback readers. Public exports, types,
+rate algorithms, and store behavior are preserved.
 
-Global concurrency waits retain polling jitter because they may be waiting
-for slots. `packages/valve/bench/COMPARISON.md` records the full current
-comparison, shared budgets, injected latency, and links to all raw results.
-These measurements describe scheduler workloads, not production HTTP throughput.
+In the paired Node.js 24 measurements, the built Redis ESM entry decreased
+from **3,521 to 3,151 gzip bytes**. A consumer importing only `retryAfter()`
+decreased from **1,089 to 445 gzip bytes**. Core size is unchanged.
 
-The npm package has not been published and publishing is still deferred.
-These measured gaps are recorded in the private PRD as well as the public
-benchmark report. The implementation does not claim all release criteria pass.
+These are bundle-size improvements. The measurements do not establish a
+general startup, throughput, or latency improvement. See the
+[0.1.2 changelog entry](/changelog/#012) and the
+[footprint report](https://github.com/ksaurav24/valve/blob/161d4b09d974ae8f0fcdc4e9b38a1a10c258491e/packages/valve/bench/FOOTPRINT.md)
+for the measurement settings, regression controls, and build-time tradeoffs.
 
-## Decisions retained from the PRD
+## Not included
 
-Default burst is 1. Lua parity injects time into a test-only copy of the
-production source. Performance targets still need CI hardware calibration.
-IETF `r` and `t` were verified against draft 11. Global concurrency and pub/sub
-wakeups are implemented. Postgres and feedback counter syncing remain outside
-0.1.0. There are no remaining registered code TODOs.
+- Postgres or other built-in stores. You can
+  [implement a custom store](/docs/reference/custom-stores/).
+- Provider presets with known quotas.
+- Durable queued jobs. Waiting work is lost when its process exits.
+- Syncing a provider's reported `remaining` count into the shared budget.
+  Feedback produces pauses; it does not replace the configured rate rules.
+- Cross-process fairness or queue ordering.
+- Runtime changes to rate rules. Create a new valve instead.
+
+## Known limitations
+
+### Scheduling drift
+
+Under GCRA with `burst: 1`, timer delays accumulate under a saturated queue.
+The original **5ms p99 ideal-sequence delay target remains unmet**. valve
+never starts work early to compensate for accumulated delay.
+
+Version 0.1.1 removed positive jitter from local rate-eligibility waits and
+accounted for elapsed asynchronous acquisition time when scheduling the next
+check. Every check still requires atomic store admission. Global concurrency
+polling, shared pauses, and outage backoff retain their behavior.
+
+The [paced drift report](https://github.com/ksaurav24/valve/blob/161d4b09d974ae8f0fcdc4e9b38a1a10c258491e/packages/valve/bench/DRIFT.md)
+contains paired measurements across Node.js 20, 22, and 24, including the
+additional denied checks introduced by the asynchronous timing adjustment.
+These scheduler measurements do not predict production HTTP throughput.
+
+### Bundle-size targets
+
+The 0.1.2 footprint report records these minified and gzipped built ESM
+entry sizes, using Node.js 24.21.0 and esbuild 0.28.2:
+
+| Entry   | Recorded size | Original target | Status        |
+| ------- | ------------: | --------------: | ------------- |
+| Core    |   8,358 bytes |     4,096 bytes | Above target  |
+| Redis   |   3,151 bytes |     3,072 bytes | Above target  |
+| Headers |   1,130 bytes |     2,048 bytes | Within target |
+
+All three source-entry measurements pass the existing CI ceilings of
+8,704, 4,096, and 2,048 bytes respectively. Those ceilings are larger than
+the original core and Redis targets. Consumer sizes depend on which exports
+remain reachable after bundling; the full headers entry is larger than a
+consumer importing only `retryAfter()`.
+
+### Distributed guarantees
+
+- **Admission and arrival differ.** Rate bounds apply at atomic store
+  admission. Network delays can bunch requests together before they reach
+  the provider.
+- **Pauses affect subsequent grants.** Already-issued grants can still start.
+- **Leases need cooperative jobs.** A worker stalled beyond its lease can
+  outlive its ownership. Jobs must honor cancellation, and strict partition
+  safety requires external fencing.
+- **Fail-open gives up shared guarantees.** With `onStoreError: 'open'`,
+  work proceeds without shared rate admission while the store is unavailable.
+  Local concurrency still applies. Global concurrency rejects this policy.
+
+Read [Guarantees](/docs/guarantees/) before choosing rate rules, concurrency
+scope, and store-error behavior. The
+[benchmark comparison](https://github.com/ksaurav24/valve/blob/161d4b09d974ae8f0fcdc4e9b38a1a10c258491e/packages/valve/bench/COMPARISON.md)
+links the recorded performance evidence and remaining work.

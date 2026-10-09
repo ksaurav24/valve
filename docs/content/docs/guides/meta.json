@@ -1,10 +1,11 @@
 {
   "title": "Guides",
-  "defaultOpen": true,
   "pages": [
     "share-a-quota",
+    "global-concurrency",
     "respect-retry-after",
     "priorities-and-shutdown",
-    "global-concurrency"
+    "error-handling",
+    "observability"
   ]
 }

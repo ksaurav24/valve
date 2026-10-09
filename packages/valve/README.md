@@ -81,6 +81,7 @@ The Next.js and Fumadocs MDX documentation site lives in `docs/`. Build it with 
 - [Share a quota](https://github.com/ksaurav24/valve/blob/master/docs/content/docs/guides/share-a-quota.mdx)
 - [Respect Retry-After](https://github.com/ksaurav24/valve/blob/master/docs/content/docs/guides/respect-retry-after.mdx)
 - [Priorities and shutdown](https://github.com/ksaurav24/valve/blob/master/docs/content/docs/guides/priorities-and-shutdown.mdx)
+- [Migrate from Bottleneck](https://github.com/ksaurav24/valve/blob/master/docs/content/docs/migration/from-bottleneck.mdx)
 - [API reference](https://github.com/ksaurav24/valve/blob/master/docs/content/docs/reference/api.mdx)
 - [Tests and benchmarks](https://github.com/ksaurav24/valve/blob/master/docs/content/docs/reference/testing.mdx)
 - [Contributing](https://github.com/ksaurav24/valve/blob/master/CONTRIBUTING.md)

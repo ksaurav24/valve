@@ -1,59 +1,99 @@
 ---
-title: Respect Retry-After across workers
-description: Read provider feedback and pause a shared quota after a rate limit response.
+title: Respect provider feedback
+description: Read rate limit headers and pause every worker when the provider asks you to slow down.
 ---
 
-`wrapFetch()` observes every response and retries 429s, plus 503s carrying
-`Retry-After`. Its default is two retries. Each retry re-enters the queue,
-keeps its sequence, and releases the concurrency slot between attempts.
+A provider knows its own counters better than you do. valve reads the rate
+limit headers on each response and, when the provider asks for a pause, writes
+it to the store so every worker sharing the id waits.
+
+## With fetch
+
+`wrapFetch` observes every response automatically.
 
 ```ts
-const limitedFetch = api.wrapFetch(fetch, { retries: 2 });
-const response = await limitedFetch('https://api.example.com/contacts');
+const partnerFetch = partner.wrapFetch(fetch, { retries: 2 });
+const res = await partnerFetch('https://api.partner.example/v2/orders');
 ```
 
-A final 429 is returned unchanged. Network errors and unrelated HTTP failures
-are not retried. Set `retries: 0` to read feedback without retrying.
+When a response is a 429, or a 503 with `Retry-After`:
 
-## Feed another client
+1. valve writes a shared pause based on the headers.
+2. It cancels the unused response body to free the connection.
+3. It queues the request again at its original position, and releases its
+   concurrency slot while waiting.
+4. After `retries` attempts (default 2), it returns the last response
+   unchanged.
+
+Set `retries: 0` to read feedback without retrying. Network errors and other
+HTTP failures are never retried.
+
+### Request bodies
+
+A `Request` object's body is cloned for each attempt. A `ReadableStream`
+passed as `init.body` can only be sent once, so that request is never retried.
+
+## With any other client
+
+Use the `observe` run option to map a result to `{ status, headers }`:
 
 ```ts
-const response = await api.run(() => client.get(url), {
-  observe: (result) => ({ status: result.status, headers: result.headers }),
+const res = await partner.run(() => got(url, { throwHttpErrors: false }), {
+  observe: (r) => ({ status: r.statusCode, headers: r.headers }),
 });
 ```
 
-Or call `api.observe({ status, headers })` after a request. It returns `void`
-and schedules a shared pause write without waiting. Feedback never reads
-response bodies.
+`observe` only sees results that resolve. If your client throws on 4xx, either
+disable that behavior or call `valve.observe()` from your error handler. See
+[HTTP clients](/docs/examples/http-clients/) for axios, got, and undici.
 
-## Header support
+You can also call `valve.observe(response)` directly at any time. It returns
+`void` and writes the pause in the background.
 
-- `Retry-After`: seconds or an HTTP date, on 429 and 503 only. HTTP dates use
-  the response `Date` header when present.
-- IETF `RateLimit`: required `r` available quota and optional `t` effective
-  window in seconds. Both values must be non-negative integers. An omitted `t`
-  reports quota without a pause duration. Legacy `RateLimit-Remaining` and
-  `RateLimit-Reset` are supported too.
-- Common `x-ratelimit-*` and `x-rate-limit-*` fields. Reset values can be
-  epoch seconds, epoch milliseconds, relative seconds, or Go-style durations.
+## Which headers are read
 
-The structured field interpretation follows the
-[IETF rate limit draft](https://datatracker.ietf.org/doc/html/draft-ietf-httpapi-ratelimit-headers-11),
-revision 11, sections 4.1.1 and 4.1.2, verified on October 7, 2026. This draft
-can change before it becomes a standard. The effective window is a hint; it
-does not guarantee that the quota will be fully restored afterward.
+The default reader, `defaultFeedback`, combines three readers and keeps the
+longest pause.
 
-## No useful header
+| Header                                                              | Read when                  | Pause              |
+| ------------------------------------------------------------------- | -------------------------- | ------------------ |
+| `Retry-After` (seconds or HTTP date)                                | Status 429 or 503          | The given duration |
+| IETF `RateLimit: r=…;t=…`                                           | Any status, `r` is 0       | `t` seconds        |
+| `RateLimit-Remaining` and `RateLimit-Reset`                         | Any status, remaining is 0 | The reset duration |
+| `x-ratelimit-remaining`, `x-ratelimit-reset` (and `x-rate-limit-*`) | Any status, remaining is 0 | Until the reset    |
 
-A 429 falls back to exponential pauses of 1s, 2s, 4s, and so on, capped at
-30s. A non-429 resets that sequence. `feedback: false` disables header reading
-but retains 429 backoff. `maxPause`, default 15 minutes, caps feedback and
-backoff pauses and emits a warning when a cap applies.
+A response that reports zero remaining quota pauses the valve even when its
+status is 200, so the next request does not have to fail first.
 
-## Request bodies
+`Retry-After` HTTP dates are compared with the response `Date` header when it
+is present. `x-ratelimit-reset` accepts epoch seconds, epoch milliseconds,
+relative seconds, or Go-style durations such as `1m30s`.
 
-A `Request` body is cloned for each attempt. An `init.body` that is a
-`ReadableStream` is sent once and is never retried. Unused retry response
-bodies are cancelled to free the connection. Abort signals cancel queued
-attempts and are passed through to fetch for running attempts.
+The IETF reader follows
+[draft-ietf-httpapi-ratelimit-headers-11](https://datatracker.ietf.org/doc/html/draft-ietf-httpapi-ratelimit-headers-11),
+sections 4.1.1 and 4.1.2. The draft can still change.
+
+To change which headers are read, see [Feedback readers](/docs/reference/feedback/).
+
+## When there is no useful header
+
+A 429 without a usable header triggers exponential backoff: 1s, 2s, 4s, and so
+on, capped at 30s. Any non-429 response resets the sequence. Configure it
+with `backoff: { base, max }`.
+
+`feedback: false` turns header reading off but keeps 429 backoff.
+
+## Cap pauses
+
+`maxPause` (default `'15m'`) caps any single pause that comes from feedback or
+backoff, protecting you from a misread or hostile header. A capped pause emits
+a `warning` event. Manual `valve.pause()` calls are not capped.
+
+## Pause and resume manually
+
+```ts
+await partner.pause('2m'); // Every worker sharing the id waits 2 minutes.
+await partner.resume(); // Ends the pause everywhere.
+```
+
+Unlike `observe`, `pause` resolves once the store has recorded the pause.

@@ -1,96 +1,99 @@
 ---
 title: Guarantees
-description: Exact rate bounds, pause propagation, queue ordering, and failure behavior.
+description: The exact bounds valve provides, and the cases where they do not apply.
 ---
 
-Bounds describe the total **cost of jobs started**, on the store clock.
-They do not describe job completion times or the provider's own accounting.
+All bounds describe the total **cost of jobs started**, measured on the
+store's clock at atomic admission. They do not describe when jobs finish, when
+requests reach the provider, or how the provider counts.
+
+## Rate bounds
 
 | Rule                     | Bound                                                                              |
 | ------------------------ | ---------------------------------------------------------------------------------- |
-| GCRA                     | At most `limit + burst - 1` units in any half-open interval of length `interval`.  |
-| GCRA, default `burst: 1` | At most `limit` units per interval, spaced by `interval / limit`.                  |
-| Fixed window             | At most `limit` units in each aligned `[k * interval, (k + 1) * interval)` window. |
-| Several rules            | Each rule holds independently. The store checks and updates them atomically.       |
-| Local concurrency        | At most `concurrency` jobs running in one valve instance.                          |
+| GCRA, default `burst: 1` | At most `limit` units per `interval`, spaced `interval / limit` apart.             |
+| GCRA with `burst`        | At most `limit + burst - 1` units in any half-open window of length `interval`.    |
+| Fixed window             | At most `limit` units in each aligned `[k × interval, (k + 1) × interval)` window. |
+| Several rules            | Each rule holds independently. The store checks and spends them atomically.        |
 
-Fixed windows can admit up to `2 * limit` units near an adjacent-window
-boundary. Use them when that matches the provider's quota.
+Fixed windows can admit up to `2 × limit` units near an adjacent-window
+boundary.
 
-With local concurrency, rate eligibility waits add no random jitter. For an
-asynchronous store, the scheduler subtracts elapsed acquisition time from the
-returned delay, using a monotonic local clock. This estimates when to check again;
-it can wake early when request latency varies. Every wakeup checks admission
-again on the store's clock, and another worker may have spent the budget first.
-Global concurrency polling and store failure retries retain jitter.
+### Timing
 
-Timers can wake late. With GCRA burst 1, the next eligible admission follows the
-actual previous admission, so delays accumulate over a saturated queue. Valve
-does not catch up by admitting jobs closer together than the rule permits.
+Timers can fire late. Under GCRA with `burst: 1`, the next start follows the
+actual previous start, so small delays add up over a saturated queue. valve
+never catches up by starting jobs closer together than the rule allows.
+
+With local concurrency, rate waits add no random jitter. For asynchronous
+stores, the scheduler subtracts elapsed acquisition time from the store's
+suggested delay. Every wakeup still asks the store, and another worker may
+have spent the budget first.
+
+A start is a grant from the store. A delayed callback or network write can
+happen later, so request arrival times at the provider can bunch together.
 
 ## Shared pauses
 
-After a pause is written, subsequent acquires grant no jobs until it expires.
-A grant issued before the pause can still start. A pause only extends the
-existing pause. `resume()` deletes it.
+- After a pause is written, the store grants no jobs until it expires.
+- A grant issued before the pause can still start.
+- A pause only extends an existing pause. `resume()` deletes it.
 
-Each process caches a known pause to avoid repeated store calls. Another
-process's resume is seen on its next store call, which may be at the end of
-that cached pause. Pass a dedicated `subscriber` to `redisStore` to wake
-waiting processes through pub/sub after pause, resume, and slot release.
-Memory-store instances notify their listeners directly. Notifications are
-hints: the store still checks every admission atomically. Missed Redis
-notifications fall back to normal acquisition and pause-expiry checks.
+Each process caches a known pause to avoid extra store calls. Without a
+subscriber, another process's `resume()` is noticed on the next store call,
+which may be at the end of the cached pause. With a Redis `subscriber`,
+pause, resume, and slot release wake waiting processes immediately.
+Notifications are hints only; admission is always checked atomically.
 
-`observe()` writes a pause in the background and returns immediately. A
-failed write emits `store-error` and is not retried. Use `await pause(...)`
-when you need acknowledgement that the store recorded a pause.
+`observe()` writes a pause in the background and returns immediately. A failed
+write emits `store-error` and is not retried. Use `await valve.pause(...)`
+when you need confirmation that the store recorded the pause.
 
 ## Grants and cancellation
 
-A job cancelled while its acquire is in flight does not run. Its already
-issued grant is spent and is not reused. A timed-out Redis call can also
-consume budget even if its late result is ignored. These cases reduce use;
-they do not increase the allowed rate.
+A job cancelled while its acquire is in flight does not run, but its grant is
+spent and not reused. A timed-out Redis call can also spend budget after valve
+has given up on it. Both cases reduce throughput. Neither raises the rate.
 
-## Ordering and concurrency
+## Ordering
 
-Inside one valve, higher priorities start first and ties preserve call order.
-Fetch retries retain their original sequence. A batch already submitted to
-the store can receive grants before a newly arrived higher-priority job.
+Inside one valve, higher priorities start first and equal priorities keep call
+order. Fetch retries keep their original position. A batch already sent to the
+store can receive grants before a newly arrived higher-priority job.
+
 Across processes, there is no ordering or fairness guarantee.
 
-Concurrency counts jobs, not cost units. A number or `{ limit, scope: 'local' }`
-limits one valve instance. `{ limit, scope: 'global', leaseTtl: '30s' }` uses
-shared leases in the store, acquired atomically with the rate rules.
-Use matching limits and TTLs for every valve sharing an id.
+## Concurrency
 
-A lease is renewed every `leaseTtl / 3` while its job runs and released when
-the job settles. A crashed worker's slots expire. If renewal fails or a lease
-expires, the job's context signal aborts and its result rejects with
-`LEASE_LOST`. `wrapFetch` forwards this signal to the HTTP client.
+Concurrency counts jobs, not cost.
 
-Leases bound live ownership, not uninterruptible external work. A process
-paused longer than its TTL can resume after its slot was reassigned. Jobs
-must honor the abort signal; use external fencing if your system needs a
-strict bound even during process stalls or network partitions. Memory-store
-global scope shares only instances using that same store in one process.
+- A number, or `{ limit, scope: 'local' }`, limits one valve instance.
+- `{ limit, scope: 'global', leaseTtl }` limits every valve sharing the id,
+  using leases acquired atomically with the rate rules.
 
-Without a subscriber, global-slot waiters poll at most every 50ms, plus
-scheduler jitter, so a released slot can be reused before its former TTL.
+Leases renew every `leaseTtl / 3` while a job runs and release when it
+settles. A crashed worker's leases expire after the TTL. If renewal fails or a
+lease expires, the job's signal aborts and its promise rejects with
+`LEASE_LOST`.
 
-## Store failure and process failure
+Leases bound ownership, not external side effects. A process paused for longer
+than its TTL can resume after its slot was reassigned. Jobs must honor the
+abort signal. If you need a strict bound during process stalls or network
+partitions, use fencing tokens in the external system.
 
-The default `onStoreError: 'wait'` keeps jobs queued and retries with backoff,
-while respecting `maxWait`. `throw` rejects affected jobs. `open` starts jobs
-without enforcing shared rate rules while the store is down, so the rate
-bounds above do not hold during that period. Global concurrency rejects
-`onStoreError: 'open'` to avoid bypassing lease ownership.
+Without a subscriber, global-slot waiters poll at most every 50ms plus jitter.
 
-Queued jobs are held in memory. Process death loses queued work. A store
-restart that loses budget state permits a fresh budget; persistent store
-configuration is the application's responsibility. Use a durable job queue
-when work must survive a restart.
+## Store failures
 
-Rate bounds are measured at atomic store admission. A delayed callback or network
-write can occur later, so actual HTTP arrival times may bunch together.
+| `onStoreError`     | Behavior while the store is down                                                                         |
+| ------------------ | -------------------------------------------------------------------------------------------------------- |
+| `'wait'` (default) | Jobs stay queued. valve retries with backoff until each job's `maxWait`.                                 |
+| `'throw'`          | Affected jobs reject with `STORE_UNAVAILABLE`.                                                           |
+| `'open'`           | Jobs start without the shared rate rules. **Rate bounds do not hold.** Rejected with global concurrency. |
+
+## Process failures
+
+Queued jobs live in memory and are lost when the process exits. If the store
+restarts and loses state, the budget starts fresh; configure Redis
+persistence if that matters. Use a durable job queue when work must survive a
+restart, and call valve from its workers.

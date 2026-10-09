@@ -1,24 +1,19 @@
 import type { ReactNode } from 'react';
 import { DocsLayout } from 'fumadocs-ui/layouts/docs';
-import { Brand } from '@/components/brand';
 import { source } from '@/lib/source';
+import { AnimatedThemeToggler } from '@/components/magicui/animated-theme-toggler';
 
 export default function Layout({ children }: { children: ReactNode }) {
   return (
     <DocsLayout
       tree={source.getPageTree()}
-      nav={{ title: <Brand />, url: '/' }}
+      nav={{ title: <span className="wordmark">valve</span>, url: '/' }}
       githubUrl="https://github.com/ksaurav24/valve"
-      sidebar={{
-        defaultOpenLevel: 2,
-        footer: (
-          <p className="sidebar-note">
-            A shared budget for your outbound calls.
-          </p>
-        ),
-      }}
+      sidebar={{ defaultOpenLevel: 1 }}
+      slots={{ themeSwitch: AnimatedThemeToggler }}
       links={[
-        { text: 'Generated API', url: '/api/index.html', external: true },
+        { text: 'Changelog', url: '/changelog' },
+        { text: 'TypeDoc', url: '/api/index.html', external: true },
       ]}
     >
       {children}

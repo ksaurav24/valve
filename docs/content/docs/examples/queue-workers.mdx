@@ -1,0 +1,85 @@
+---
+title: Queue workers
+description: Share one provider quota across BullMQ worker processes, and let the job queue own retries.
+---
+
+A durable job queue and valve solve different problems. The queue keeps jobs
+safe across restarts and retries failed ones. valve makes sure every worker
+together stays under the provider's quota. Use both: put valve around the
+outbound calls inside each job.
+
+This example uses [BullMQ](https://docs.bullmq.io). The same pattern applies to
+any queue.
+
+```ts title="worker.ts"
+import { Worker } from 'bullmq';
+import { Redis } from 'ioredis';
+import { createValve, isValveError } from '@ksaurav24/valve';
+import { redisStore } from '@ksaurav24/valve/redis';
+
+// valve and BullMQ can share a server, but BullMQ workers need their own
+// connection with maxRetriesPerRequest set to null.
+const redis = new Redis(process.env.REDIS_URL!);
+const bullConnection = new Redis(process.env.REDIS_URL!, {
+  maxRetriesPerRequest: null,
+});
+
+const hubspot = createValve({
+  id: 'hubspot:portal-123',
+  rate: { limit: 190, interval: '10s' },
+  store: redisStore({ client: redis }),
+  maxWait: '30s',
+});
+
+const hubspotFetch = hubspot.wrapFetch();
+
+const worker = new Worker(
+  'contact-sync',
+  async (job) => {
+    const res = await hubspotFetch(
+      `https://api.hubapi.com/crm/v3/objects/contacts/${job.data.contactId}`,
+      { headers: { authorization: `Bearer ${process.env.HUBSPOT_TOKEN}` } },
+    );
+    if (!res.ok) throw new Error(`HubSpot returned ${res.status}`);
+    return res.json();
+  },
+  { connection: bullConnection, concurrency: 20 },
+);
+
+worker.on('failed', (job, error) => {
+  if (isValveError(error, 'MAX_WAIT_EXCEEDED')) {
+    // The quota was busy for 30s. BullMQ will retry using the job's attempts and backoff.
+  }
+});
+
+process.on('SIGTERM', async () => {
+  await worker.close(); // Stop taking new jobs and wait for active ones.
+  await hubspot.close();
+  await redis.quit();
+  await bullConnection.quit();
+});
+```
+
+Run as many copies of this worker as you like. Together they start at most 190
+HubSpot requests per 10 seconds, and a 429 seen by one pauses all of them.
+
+## Why not the queue's own rate limiter
+
+BullMQ has a `limiter` option that limits how fast one queue processes jobs.
+valve limits calls to a provider instead, which matters when:
+
+- one job makes several API calls, or a variable number of them;
+- several queues or services call the same provider with the same credential;
+- you want to react to the provider's rate limit headers.
+
+## Set maxWait below the job timeout
+
+Without `maxWait`, a job can wait in valve's queue for as long as the quota
+stays saturated. Set it so that a busy quota fails the job quickly, and let the
+job queue's retry and backoff policy decide when to try again.
+
+## Concurrency
+
+`concurrency: 20` in BullMQ limits jobs per worker process. valve's rate rule is
+fleet-wide. If the provider also caps concurrent requests, add a
+[global concurrency limit](/docs/guides/global-concurrency/) to the valve.

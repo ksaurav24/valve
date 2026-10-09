@@ -1,49 +1,123 @@
 ---
-title: Run your first valve
-description: Build the library locally and queue requests in a single process.
+title: Quickstart
+description: Create a valve, queue calls through it, and shut it down cleanly.
 ---
 
-## Prepare the workspace
+This page uses the default in-memory store, so you can run it without Redis.
+To share a budget between processes, finish here and then follow
+[Share a quota across workers](/docs/guides/share-a-quota/).
 
-Use Node.js 24 and pnpm 11.28.4 for development. The built library targets
-Node.js 20 or newer and uses web standard APIs in its core.
+## Before you begin
 
-```sh
-pnpm install
-pnpm build
-pnpm --filter @valve/example-memory start
-```
+[Install valve](/docs/installation/) in a Node.js 20+ project with ESM enabled.
 
-The package is named `@ksaurav24/valve`. It is not published yet. Examples use
-the workspace package. To try it elsewhere, run `pnpm --filter @ksaurav24/valve
-pack --out /tmp/valve-0.1.0.tgz` and install the generated tarball in that project.
+<Steps>
+<Step>
 
-## Queue a call
+### Create a valve
 
-```ts
+A valve is a named budget plus a local queue. This one allows 5 calls per
+second and at most 2 running at once.
+
+```ts title="quickstart.ts"
 import { createValve } from '@ksaurav24/valve';
 
-const api = createValve({
+const github = createValve({
   id: 'github:my-script',
   rate: { limit: 5, interval: '1s' },
   concurrency: 2,
 });
-
-const results = await Promise.all(
-  [1, 2, 3].map((id) => api.run(() => Promise.resolve({ id }))),
-);
-console.log(results);
-await api.close();
 ```
 
-Jobs start at least 200ms apart on the store clock. They retain their result
-and error types. A fresh private memory store is the default, so separate
-valves share nothing until you give them the same store instance.
+</Step>
+<Step>
 
-## Add Redis
+### Queue work with run
 
-Pass a connected client from `ioredis` or `redis`. valve neither opens nor
-closes your connection. Every worker must use the same server, prefix, id,
-and rule configuration.
+`run` queues a function and resolves with its result. Types are preserved.
 
-[Continue to the shared quota guide](/guides/share-a-quota/).
+```ts title="quickstart.ts"
+const users = ['octocat', 'torvalds', 'gaearon'];
+
+const profiles = await Promise.all(
+  users.map((name) =>
+    github.run(async ({ signal }) => {
+      const res = await fetch(`https://api.github.com/users/${name}`, {
+        signal,
+      });
+      return (await res.json()) as { login: string; public_repos: number };
+    }),
+  ),
+);
+
+console.log(profiles.map((p) => `${p.login}: ${p.public_repos}`));
+```
+
+With the default `burst: 1`, starts are spaced evenly: one every 200ms.
+
+</Step>
+<Step>
+
+### Or wrap fetch
+
+`wrapFetch` returns a drop-in `fetch` that goes through the valve, reads rate
+limit headers from every response, and retries 429s after the pause ends.
+
+```ts title="quickstart.ts"
+const githubFetch = github.wrapFetch();
+const res = await githubFetch('https://api.github.com/rate_limit');
+```
+
+</Step>
+<Step>
+
+### Close the valve
+
+`close` stops accepting work and waits for running jobs. Pass `drain: true`
+to also run everything still queued.
+
+```ts title="quickstart.ts"
+await github.close({ drain: true });
+```
+
+</Step>
+</Steps>
+
+## Run it
+
+```sh
+npx tsx quickstart.ts
+```
+
+## What you learned
+
+- A valve is identified by `id`. Valves with the same `id` and the same store
+  share one budget.
+- The default store is a new private memory store per valve. Separate valves
+  share nothing until you give them the same store instance.
+- `run` and `wrapFetch` queue work; `close` shuts the valve down.
+
+## Next steps
+
+<Cards>
+  <Card
+    href="/docs/concepts/"
+    title="How valve works"
+    description="The model behind ids, stores, and admission."
+  />
+  <Card
+    href="/docs/guides/share-a-quota/"
+    title="Share a quota across workers"
+    description="Move the budget into Redis."
+  />
+  <Card
+    href="/docs/examples/"
+    title="Examples"
+    description="Recipes for clients, workers, and handlers."
+  />
+  <Card
+    href="/docs/reference/api/"
+    title="API reference"
+    description="Every option and method."
+  />
+</Cards>

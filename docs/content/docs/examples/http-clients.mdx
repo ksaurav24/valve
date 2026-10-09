@@ -1,0 +1,125 @@
+---
+title: HTTP clients
+description: Route fetch, undici, axios, and got through a valve, with provider feedback.
+---
+
+valve works with any client. What differs is how it sees the response, which
+it needs to read rate limit headers.
+
+All snippets assume a valve like this one:
+
+```ts
+import { createValve } from '@ksaurav24/valve';
+import { redisStore } from '@ksaurav24/valve/redis';
+
+const partner = createValve({
+  id: 'partner:key-1',
+  rate: { limit: 50, interval: '1s' },
+  store: redisStore({ client: redis }),
+});
+```
+
+## fetch
+
+`wrapFetch` gives you a `fetch` with the same signature. It observes every
+response and retries 429s.
+
+```ts
+const partnerFetch = partner.wrapFetch();
+
+const res = await partnerFetch('https://api.partner.example/v2/orders', {
+  headers: { authorization: `Bearer ${token}` },
+});
+```
+
+Assign a cost or priority from the request:
+
+```ts
+const partnerFetch = partner.wrapFetch(fetch, {
+  cost: (input) => (String(input).includes('/search') ? 5 : 1),
+  priority: (_input, init) => (init?.method === 'GET' ? 1 : 0),
+});
+```
+
+## undici
+
+Pass undici's `fetch` as the implementation.
+
+```ts
+import { fetch as undiciFetch } from 'undici';
+
+const partnerFetch = partner.wrapFetch(undiciFetch, { retries: 3 });
+```
+
+## axios
+
+axios rejects non-2xx responses by default, and the `observe` run option only
+sees resolved results. Observe the error's response too, so a 429 still
+pauses every worker.
+
+axios header types do not match valve's `HeadersLike`, so map the response
+with a small helper. At runtime, axios headers support case-insensitive
+`get`, which valve uses.
+
+```ts
+import axios, { isAxiosError, type AxiosResponse } from 'axios';
+import type { ResponseLike } from '@ksaurav24/valve';
+
+const fromAxios = (res: AxiosResponse): ResponseLike => ({
+  status: res.status,
+  headers: res.headers as Record<string, string>,
+});
+
+async function partnerGet<T>(url: string) {
+  return partner.run(async ({ signal }) => {
+    try {
+      const res = await axios.get<T>(url, { signal });
+      partner.observe(fromAxios(res));
+      return res.data;
+    } catch (error) {
+      if (isAxiosError(error) && error.response)
+        partner.observe(fromAxios(error.response));
+      throw error;
+    }
+  });
+}
+```
+
+To let a 429 resolve instead, set `validateStatus` and use the `observe`
+option:
+
+```ts
+const res = await partner.run(
+  ({ signal }) => axios.get(url, { signal, validateStatus: () => true }),
+  { observe: fromAxios },
+);
+```
+
+## got
+
+got exposes `statusCode` instead of `status`, so map it.
+
+```ts
+import got from 'got';
+
+const res = await partner.run(
+  ({ signal }) => got(url, { signal, throwHttpErrors: false }),
+  { observe: (r) => ({ status: r.statusCode, headers: r.headers }) },
+);
+```
+
+## Reusable wrappers
+
+`wrap` turns any async function into a rate limited one with the same
+parameters. It is useful for SDK methods.
+
+```ts
+const getOrder = partner.wrap((id: string) => sdk.orders.get(id), {
+  priority: 1,
+});
+
+const order = await getOrder('ord_123');
+```
+
+`wrap` does not see the HTTP response, so pair it with
+`partner.observe(...)` inside the function if the SDK exposes headers.

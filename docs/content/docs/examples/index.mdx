@@ -1,0 +1,74 @@
+---
+title: Examples
+description: Recipes for common integrations, plus runnable examples in the repository.
+---
+
+## Recipes
+
+Each recipe is a complete pattern you can adapt. Rules and URLs are
+illustrative; set limits from your provider's documented quota.
+
+<Cards>
+  <Card
+    href="/docs/examples/http-clients/"
+    title="HTTP clients"
+    description="fetch, undici, axios, and got, with provider feedback."
+  />
+  <Card
+    href="/docs/examples/batch-scripts/"
+    title="Batch scripts"
+    description="Process a large list within a quota, with progress and failures."
+  />
+  <Card
+    href="/docs/examples/queue-workers/"
+    title="Queue workers"
+    description="Share one quota across BullMQ worker processes."
+  />
+  <Card
+    href="/docs/examples/request-handlers/"
+    title="Request handlers"
+    description="Call a provider from a web server and fail fast when busy."
+  />
+  <Card
+    href="/docs/examples/per-tenant-budgets/"
+    title="Per-tenant budgets"
+    description="One valve per customer credential, created on demand."
+  />
+  <Card
+    href="/docs/examples/layered-quotas/"
+    title="Layered quotas"
+    description="Per-second and daily limits, with weighted endpoints."
+  />
+</Cards>
+
+## Runnable examples
+
+The repository includes small, self-checking programs under
+[`examples/`](https://github.com/ksaurav24/valve/tree/master/examples). Each
+asserts its own result and needs no provider credentials.
+
+| Example      | Shows                                                        | Needs Redis |
+| ------------ | ------------------------------------------------------------ | ----------- |
+| `memory`     | Spacing calls in one process with the default memory store.  | No          |
+| `priorities` | Interactive work starting before background work.            | No          |
+| `observe`    | Feeding an axios-shaped response into shared feedback.       | No          |
+| `shutdown`   | Rejecting queued work and finishing running work on `close`. | No          |
+| `shared`     | Six valve instances sharing one Redis budget.                | Yes         |
+| `feedback`   | A 429 in one valve pausing another valve on the same budget. | Yes         |
+
+Build the workspace once, then run any example by name:
+
+```sh
+pnpm install
+pnpm build
+pnpm --filter @valve/example-memory start
+```
+
+For the Redis examples, start a server and set `REDIS_URL`:
+
+```sh
+docker compose -f compose.test.yml up -d
+REDIS_URL=redis://127.0.0.1:6379 pnpm --filter @valve/example-feedback start
+```
+
+`pnpm examples` runs all six in sequence.

@@ -1,88 +1,207 @@
 ---
 title: API reference
-description: Public entry points, options, methods, and defaults for valve 0.1.0.
+description: createValve options, valve methods, job options, and types.
 ---
 
-## Entry points
+The declaration files shipped with the package document every type with
+examples. The [generated TypeDoc reference](/api/index.html) renders them.
 
-| Import                     | Exports                                                                                        |
-| -------------------------- | ---------------------------------------------------------------------------------------------- |
-| `@ksaurav24/valve`         | `createValve`, `memoryStore`, `ValveError`, `isValveError`, `defaultFeedback`, and core types. |
-| `@ksaurav24/valve/redis`   | `redisStore` and structural client and adapter types.                                          |
-| `@ksaurav24/valve/headers` | `retryAfter`, `ietfRateLimit`, `xRateLimit`, `combine`, `defaultFeedback`, and feedback types. |
+## createValve
 
-## createValve(options)
+```ts
+function createValve(options: ValveOptions): Valve;
+```
 
-| Option         | Default                      | Meaning                                                       |
-| -------------- | ---------------------------- | ------------------------------------------------------------- |
-| `id`           | Required                     | 1 to 200 characters, without braces.                          |
-| `rate`         | None                         | One rule or nonempty array of rules.                          |
-| `concurrency`  | `Infinity`                   | A number, or `{ limit, scope, leaseTtl? }` for shared leases. |
-| `store`        | New memory store             | Where the shared budget lives.                                |
-| `maxQueue`     | `Infinity`                   | Positive limit on waiting jobs.                               |
-| `maxWait`      | Unlimited                    | Queue deadline as milliseconds or duration string.            |
-| `feedback`     | `defaultFeedback`            | A feedback reader, or `false` to disable header reading.      |
-| `maxPause`     | `'15m'`                      | Cap on one feedback or backoff pause.                         |
-| `backoff`      | `{ base: '1s', max: '30s' }` | Fallback for 429s without a useful header.                    |
-| `onStoreError` | `'wait'`                     | `wait`, `throw`, or `open`.                                   |
-| `batch`        | `32`                         | Positive maximum jobs requested in one store call.            |
+Creates a valve. Throws `ValveError` with code `INVALID_OPTIONS` if an option
+is invalid. At least one of `rate` or a finite `concurrency` is required.
 
-At least a rate rule or finite concurrency is required. Durations accept
-nonnegative milliseconds, or decimal strings ending in `ms`, `s`, `m`, or `h`.
-Rule intervals must be at least 1ms. Limits, bursts, costs, batch size, and queue
-limits must be positive safe integers. Rule algorithm defaults to `gcra` and
-burst defaults to 1. Duplicate algorithm/interval pairs are rejected.
+### ValveOptions
 
-## Methods
+| Option         | Type                                  | Default                      | Description                                                                            |
+| -------------- | ------------------------------------- | ---------------------------- | -------------------------------------------------------------------------------------- |
+| `id`           | `string`                              | Required                     | Name of the shared budget. 1 to 200 characters, without `{` or `}`.                    |
+| `rate`         | `RateRule \| RateRule[]`              | None                         | One rule, or a non-empty array of rules.                                               |
+| `concurrency`  | `number \| ConcurrencyOptions`        | `Infinity`                   | A number limits this instance. The object form can select global scope.                |
+| `store`        | `Store`                               | A new private memory store   | Where the shared budget lives.                                                         |
+| `maxQueue`     | `number`                              | `Infinity`                   | Maximum jobs waiting in this process. Beyond it, `run` rejects with `QUEUE_FULL`.      |
+| `maxWait`      | `Duration`                            | No limit                     | Maximum time a job may wait before starting.                                           |
+| `feedback`     | `Feedback \| false`                   | `defaultFeedback`            | Reads provider responses. `false` disables header reading.                             |
+| `maxPause`     | `Duration`                            | `'15m'`                      | Cap on any one pause caused by feedback or backoff.                                    |
+| `backoff`      | `{ base?: Duration; max?: Duration }` | `{ base: '1s', max: '30s' }` | Exponential pause after a 429 with no usable header.                                   |
+| `onStoreError` | `'wait' \| 'throw' \| 'open'`         | `'wait'`                     | Behavior when the store fails. See [Store failures](/docs/guarantees/#store-failures). |
+| `batch`        | `number`                              | `32`                         | Maximum jobs requested from the store in one call.                                     |
 
-| Method                            | Returns                | Behavior                                                                            |
-| --------------------------------- | ---------------------- | ----------------------------------------------------------------------------------- |
-| `run(fn, options?)`               | `Promise<Awaited<R>>`  | Queue a function with optional cost, priority, maxWait, signal, and observe mapper. |
-| `wrap(fn, options?)`              | Wrapped async function | Preserve arguments and infer awaited return values.                                 |
-| `wrapFetch(fetchImpl?, options?)` | Same fetch type        | Observe responses, retry rate limit responses, and preserve request arguments.      |
-| `observe(response)`               | `void`                 | Read feedback and write a shared pause in the background.                           |
-| `pause(duration)`                 | `Promise<void>`        | Extend a shared pause. Manual pauses are not capped by maxPause.                    |
-| `resume()`                        | `Promise<void>`        | Delete the shared pause and notify subscribed processes.                            |
-| `stats()`                         | `ValveStats`           | Fresh snapshot of local queue, running jobs, pause estimate, and totals.            |
-| `on(event, listener)`             | Unsubscribe function   | Subscribe to pause, resume, reject, store-error, idle, or warning.                  |
-| `idle()`                          | `Promise<void>`        | Wait for the instance to become idle.                                               |
-| `close({ drain? }?)`              | `Promise<void>`        | Stop accepting work and wait for completion.                                        |
+### RateRule
 
-`run` never throws synchronously. Job errors pass through unchanged.
+| Field       | Type                       | Default  | Description                                                     |
+| ----------- | -------------------------- | -------- | --------------------------------------------------------------- |
+| `limit`     | `number`                   | Required | Cost units allowed per `interval`. Positive integer.            |
+| `interval`  | `Duration`                 | Required | Window length. At least 1ms.                                    |
+| `burst`     | `number`                   | `1`      | Units that may start back to back. GCRA only. Positive integer. |
+| `algorithm` | `'gcra' \| 'fixed-window'` | `'gcra'` | See [Choose an algorithm](/docs/choosing-an-algorithm/).        |
 
-## wrapFetch options
+Two rules in one valve cannot share the same `algorithm` and `interval`.
 
-`retries` defaults to 2. `cost` and `priority` accept numbers or functions of
-the fetch arguments. `maxWait` overrides the valve queue deadline for each
-attempt. The input or init abort signal is used for each attempt.
+### ConcurrencyOptions
 
-## Redis options
+| Field      | Type                  | Default   | Description                                                      |
+| ---------- | --------------------- | --------- | ---------------------------------------------------------------- |
+| `limit`    | `number`              | Required  | Maximum running jobs. Positive integer.                          |
+| `scope`    | `'local' \| 'global'` | `'local'` | `'global'` shares the limit across every valve with the same id. |
+| `leaseTtl` | `Duration`            | `'30s'`   | Global lease lifetime, renewed every third. Minimum 30ms.        |
 
-Pass exactly one of `client` or `adapter`. `prefix` defaults to `valve` and
-must not contain braces. `timeout` defaults to 2s. Scripts load lazily through
-`EVALSHA` and recover from `NOSCRIPT` through `EVAL`. All time math uses Redis
-`TIME`. Optional `subscriber` is a separate connected ioredis or node-redis
-connection. With node-redis, call `connect()` on the duplicated subscriber
-before passing it in. `store.close()` unsubscribes its listeners but never
-disconnects either user-owned client.
+Global scope requires a store that implements `release` and `renew`. Both
+built-in stores do.
 
-Global concurrency defaults to a 30s lease TTL (minimum 30ms). Custom stores
-must provide `release` and `renew`; `renew` returns false for lost slots and
-must never resurrect expired ownership. `subscribe` is optional. Numeric
-concurrency preserves the existing per-instance behavior.
+### Duration
 
-## Errors
+A number of milliseconds, or a string ending in `ms`, `s`, `m`, or `h`.
+Decimals are allowed.
 
-`ValveError` exposes `code`, `valveId`, and optional `cause`. Use
-`isValveError(error, code?)` to narrow an unknown value.
+```ts
+250; // 250 ms
+('1.5s'); // 1500 ms
+('10m'); // 600000 ms
+('24h'); // 86400000 ms
+```
 
-Codes: `INVALID_OPTIONS`, `COST_EXCEEDS_LIMIT`, `QUEUE_FULL`,
-`MAX_WAIT_EXCEEDED`, `ABORTED`, `CLOSED`, `STORE_UNAVAILABLE`, and `LEASE_LOST`.
+Negative values, `NaN`, `Infinity`, and unknown units are rejected.
 
-## Generated reference
+## Valve
 
-Run `pnpm --filter @ksaurav24/valve docs:api` to generate TypeDoc reference
-files under `docs/public/api/`. The declaration files shipped with the
-package contain the complete typed API and examples.
+### run
 
-[Open the generated TypeDoc reference](/api/index.html). The docs build generates it before building the MDX site.
+```ts
+run<R>(fn: (ctx: JobContext) => R, options?: RunOptions<Awaited<R>>): Promise<Awaited<R>>
+```
+
+Queues `fn` and calls it when every rule and the concurrency limit allow.
+Resolves or rejects with whatever `fn` returns or throws. `fn` receives
+`{ signal }`, the signal from `options.signal` (or the lease signal under
+global concurrency). `run` never throws synchronously, and never calls `fn`
+synchronously.
+
+#### RunOptions
+
+| Option     | Type                                    | Default         | Description                                                |
+| ---------- | --------------------------------------- | --------------- | ---------------------------------------------------------- |
+| `cost`     | `number`                                | `1`             | Units spent from every rule.                               |
+| `priority` | `number`                                | `0`             | Higher starts first. Integer.                              |
+| `maxWait`  | `Duration`                              | Valve `maxWait` | Queue deadline for this job.                               |
+| `signal`   | `AbortSignal`                           | None            | Cancels the job while queued. Passed to `fn` once running. |
+| `observe`  | `(result) => ResponseLike \| undefined` | None            | Maps a resolved result to a response for feedback.         |
+
+### wrap
+
+```ts
+wrap<A extends unknown[], R>(fn: (...args: A) => R, options?: Omit<RunOptions, 'signal'>): (...args: A) => Promise<Awaited<R>>
+```
+
+Returns a function with the same parameters as `fn`. Each call goes through
+the valve with `options`.
+
+### wrapFetch
+
+```ts
+wrapFetch<F extends FetchLike = typeof fetch>(fetchImpl?: F, options?: WrapFetchOptions<F>): F
+```
+
+Returns a function with the same type as `fetchImpl` (default
+`globalThis.fetch`). It queues each request, observes each response, and
+retries rate limit responses. See [Respect provider feedback](/docs/guides/respect-retry-after/#with-fetch).
+
+#### WrapFetchOptions
+
+| Option     | Type                            | Default         | Description                                                     |
+| ---------- | ------------------------------- | --------------- | --------------------------------------------------------------- |
+| `retries`  | `number`                        | `2`             | Retries after a 429, or a 503 with `Retry-After`. `0` disables. |
+| `cost`     | `number \| (...args) => number` | `1`             | Cost per request, or a function of the fetch arguments.         |
+| `priority` | `number \| (...args) => number` | `0`             | Priority per request, or a function of the fetch arguments.     |
+| `maxWait`  | `Duration`                      | Valve `maxWait` | Queue deadline for each attempt.                                |
+
+The request's abort signal, from `init.signal` or the `Request`, cancels queued
+attempts and is passed to `fetchImpl` for running ones.
+
+### observe
+
+```ts
+observe(response: ResponseLike): void
+```
+
+Reads a response with the valve's feedback reader. If it asks for a pause,
+writes a shared pause in the background. Safe to call with any response.
+
+### pause
+
+```ts
+pause(duration: Duration): Promise<void>
+```
+
+Pauses the valve in every process sharing it. Only extends an existing pause.
+Resolves once the store records it. Not capped by `maxPause`.
+
+### resume
+
+```ts
+resume(): Promise<void>
+```
+
+Ends the current pause in every process sharing the valve.
+
+### stats
+
+```ts
+stats(): ValveStats
+```
+
+Returns a snapshot for this process. See [Monitor a valve](/docs/guides/observability/#export-queue-metrics).
+
+### on
+
+```ts
+on<E extends keyof ValveEventMap>(event: E, listener: (payload: ValveEventMap[E]) => void): () => void
+```
+
+Adds a listener and returns a function that removes it. See
+[Events](/docs/reference/events/).
+
+### idle
+
+```ts
+idle(): Promise<void>
+```
+
+Resolves when nothing is queued or running in this process.
+
+### close
+
+```ts
+close(options?: { drain?: boolean }): Promise<void>
+```
+
+Stops accepting jobs. Without `drain`, queued jobs reject with `CLOSED`. With
+`drain: true`, they run first. Resolves when running jobs finish. Repeated
+calls return the same promise. Never closes a client you supplied.
+
+Valves also implement `[Symbol.asyncDispose]`, which calls `close()`.
+
+### id
+
+```ts
+readonly id: string
+```
+
+The id passed to `createValve`.
+
+## Other exports
+
+| Export                       | Entry point                | Description                                            |
+| ---------------------------- | -------------------------- | ------------------------------------------------------ |
+| `memoryStore(options?)`      | `@ksaurav24/valve`         | In-process store. Share one instance to share budgets. |
+| `redisStore(options)`        | `@ksaurav24/valve/redis`   | See [Redis store](/docs/reference/redis-store/).       |
+| `ValveError`, `isValveError` | `@ksaurav24/valve`         | See [Errors](/docs/reference/errors/).                 |
+| `defaultFeedback`            | Both                       | The default feedback reader.                           |
+| Feedback readers             | `@ksaurav24/valve/headers` | See [Feedback readers](/docs/reference/feedback/).     |
+
+`memoryStore` accepts `{ clock?: () => number }`, a source of epoch
+milliseconds. It defaults to `Date.now`.
