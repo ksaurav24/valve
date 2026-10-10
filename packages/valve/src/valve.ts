@@ -625,7 +625,11 @@ export function createValve(options: ValveOptions): Valve {
       const stream =
         typeof ReadableStream !== 'undefined' &&
         init?.body instanceof ReadableStream;
-      const attempts = stream ? 0 : retries;
+      const method = (init?.method ?? request?.method ?? 'GET').toUpperCase();
+      const retryable =
+        fetchOptions.retryUnsafeMethods === true ||
+        ['GET', 'HEAD', 'OPTIONS', 'PUT', 'DELETE'].includes(method);
+      const attempts = stream || !retryable ? 0 : retries;
       const cost =
         typeof fetchOptions.cost === 'function'
           ? fetchOptions.cost(...args)

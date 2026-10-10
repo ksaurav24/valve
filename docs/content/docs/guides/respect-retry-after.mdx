@@ -16,7 +16,11 @@ const partnerFetch = partner.wrapFetch(fetch, { retries: 2 });
 const res = await partnerFetch('https://api.partner.example/v2/orders');
 ```
 
-When a response is a 429, or a 503 with a valid `Retry-After`:
+Every response updates provider feedback, even when the request cannot retry.
+Automatic retries default to GET, HEAD, OPTIONS, PUT and DELETE. The method
+comes from `init.method`, then the `Request` method, then GET.
+
+For an eligible request receiving a 429, or a 503 with a valid `Retry-After`:
 
 1. valve processes provider feedback and establishes a shared pause when a
    positive delay is available. A 429 without a positive provider delay uses
@@ -37,6 +41,38 @@ A malformed or empty `Retry-After` on a 503 is treated as absent, so the
 response is returned without retrying or consuming its body. Zero seconds and
 expired HTTP dates are valid and allow a retry without a header-based pause.
 A 429 without a positive provider delay still uses exponential backoff.
+
+### Requests with side effects
+
+POST, PATCH and other methods return the first response by default, with its
+body available to the caller. Their responses still establish shared pauses.
+An `Idempotency-Key` header does not enable retries: providers differ in how
+they handle keys, committed operations and error responses.
+
+After verifying the provider's idempotency contract for a specific operation,
+create a dedicated wrapper to opt in:
+
+```ts
+const createOrderFetch = partner.wrapFetch(fetch, {
+  retries: 2,
+  retryUnsafeMethods: true,
+});
+const res = await createOrderFetch('https://api.partner.example/v2/orders', {
+  method: 'POST',
+  headers: { 'Idempotency-Key': orderOperationId },
+  body: JSON.stringify(order),
+});
+```
+
+The caller must ensure replaying the operation is safe, including reusing the
+same key and payload if the provider requires them. PUT and DELETE also need
+provider-specific review despite their HTTP idempotent semantics. This option
+applies to every request through that wrapper; keep it scoped to operations
+you have verified. It does not override `retries: 0` or streamed `init.body`.
+
+**Compatibility change:** earlier versions retried all methods automatically.
+POST and PATCH callers now receive the first response unless they explicitly
+opt in. Setting only `retries` no longer enables retries for these methods.
 
 ### Request bodies
 

@@ -15,6 +15,131 @@ afterEach(async () => {
   vi.useRealTimers();
 });
 describe('fetch wrapping', () => {
+  it.each(['POST', 'PATCH', 'post', 'CUSTOM'])(
+    'returns %s responses without replaying, even with an idempotency key',
+    async (method) => {
+      for (const status of [429, 503]) {
+        const response = new Response('provider response', {
+          status,
+          headers: { 'Retry-After': '0' },
+        });
+        const fake = vi.fn().mockResolvedValue(response);
+        const valve = make({ id: 'unsafe', concurrency: 1, maxPause: 0 });
+        expect(
+          await valve.wrapFetch(fake)('https://example.com', {
+            method,
+            headers: { 'Idempotency-Key': 'operation-123' },
+          }),
+        ).toBe(response);
+        expect(fake).toHaveBeenCalledTimes(1);
+        expect(valve.stats().totals.retried).toBe(0);
+        expect(await response.text()).toBe('provider response');
+      }
+    },
+  );
+  it.each(['GET', 'HEAD', 'OPTIONS', 'PUT', 'DELETE', 'get', undefined])(
+    'retries the idempotent method %s by default',
+    async (method) => {
+      const fake = vi
+        .fn()
+        .mockResolvedValueOnce(new Response('', { status: 429 }))
+        .mockResolvedValue(new Response('ok'));
+      const valve = make({ id: 'safe', concurrency: 1, maxPause: 0 });
+      expect(
+        (await valve.wrapFetch(fake)('https://example.com', { method })).status,
+      ).toBe(200);
+      expect(fake).toHaveBeenCalledTimes(2);
+    },
+  );
+  it.each([429, 503])(
+    'shares status %s cooldowns for unsafe requests without replaying',
+    async (status) => {
+      vi.useFakeTimers();
+      const store = memoryStore();
+      const valve = make({ id: 'unsafe-shared', concurrency: 1, store });
+      const peer = make({ id: 'unsafe-shared', concurrency: 1, store });
+      const response = new Response('slow down', {
+        status,
+        headers: { 'Retry-After': '0.02' },
+      });
+      const fake = vi.fn().mockResolvedValue(response);
+      expect(
+        await valve.wrapFetch(fake)('https://example.com', { method: 'POST' }),
+      ).toBe(response);
+      const next = vi.fn(() => 'peer');
+      const result = peer.run(next);
+      await vi.advanceTimersByTimeAsync(19);
+      expect(next).not.toHaveBeenCalled();
+      await vi.advanceTimersByTimeAsync(1);
+      expect(await result).toBe('peer');
+      expect(fake).toHaveBeenCalledTimes(1);
+      expect(await response.text()).toBe('slow down');
+    },
+  );
+  it.each(['POST', 'PATCH'])(
+    'retries opted-in %s requests only within their budget',
+    async (method) => {
+      for (const retries of [0, 1, 2]) {
+        const fake = vi.fn<typeof fetch>(
+          async () =>
+            new Response('final', {
+              status: 503,
+              headers: { 'Retry-After': '0' },
+            }),
+        );
+        const valve = make({ id: 'opt-in', concurrency: 1 });
+        const result = await valve.wrapFetch(fake, {
+          retryUnsafeMethods: true,
+          retries,
+        })('https://example.com', { method, body: 'payload' });
+        expect(fake).toHaveBeenCalledTimes(retries + 1);
+        expect(valve.stats().totals.retried).toBe(retries);
+        expect(await result.text()).toBe('final');
+      }
+    },
+  );
+  it('uses the Request method and lets init override it', async () => {
+    const valve = make({ id: 'methods', concurrency: 1, maxPause: 0 });
+    const fake = vi.fn<typeof fetch>(
+      async () => new Response('', { status: 429 }),
+    );
+    const post = new Request('https://example.com', {
+      method: 'POST',
+      body: 'payload',
+    });
+    await valve.wrapFetch(fake)(post);
+    expect(fake).toHaveBeenCalledTimes(1);
+    fake.mockClear();
+    await valve.wrapFetch(fake)(post, { method: 'PUT' });
+    expect(fake).toHaveBeenCalledTimes(3);
+    fake.mockClear();
+    await valve.wrapFetch(fake)(new Request('https://example.com'), {
+      method: 'PATCH',
+    });
+    expect(fake).toHaveBeenCalledTimes(1);
+  });
+  it('aborts an opted-in retry while waiting for its cooldown', async () => {
+    vi.useFakeTimers();
+    const valve = make({ id: 'abort-retry', concurrency: 1 });
+    const controller = new AbortController();
+    const fake = vi.fn<typeof fetch>(
+      async () =>
+        new Response('', { status: 429, headers: { 'Retry-After': '1' } }),
+    );
+    const result = valve.wrapFetch(fake, { retryUnsafeMethods: true })(
+      'https://example.com',
+      { method: 'POST', signal: controller.signal },
+    );
+    const rejected = expect(result).rejects.toMatchObject({
+      code: 'ABORTED',
+      cause: 'stop',
+    });
+    await vi.advanceTimersByTimeAsync(0);
+    controller.abort('stop');
+    await rejected;
+    await vi.advanceTimersByTimeAsync(1000);
+    expect(fake).toHaveBeenCalledTimes(1);
+  });
   it.each(['invalid', '', ' ', '-1', 'Infinity', '1e3', '9'.repeat(308)])(
     'returns a 503 with unusable Retry-After %j without retrying or consuming its body',
     async (value) => {
@@ -177,9 +302,13 @@ describe('fetch wrapping', () => {
       expect(init?.body).toBeInstanceOf(ReadableStream);
       return new Response('', { status: 429 });
     });
-    await valve.wrapFetch(f)('https://example.com', {
-      body: new ReadableStream(),
-    });
+    await valve.wrapFetch(f, { retryUnsafeMethods: true })(
+      'https://example.com',
+      {
+        method: 'POST',
+        body: new ReadableStream(),
+      },
+    );
     expect(f).toHaveBeenCalledTimes(1);
   });
   it('clones Request bodies and preserves init and abort signals', async () => {
@@ -194,7 +323,7 @@ describe('fetch wrapping', () => {
       method: 'POST',
       body: 'payload',
     });
-    await valve.wrapFetch(fake)(original);
+    await valve.wrapFetch(fake, { retryUnsafeMethods: true })(original);
     expect(bodies).toEqual(['payload', 'payload']);
     expect(original.bodyUsed).toBe(false);
     const controller = new AbortController();

@@ -22,7 +22,8 @@ const partner = createValve({
 ## fetch
 
 `wrapFetch` gives you a `fetch` with the same signature. It observes every
-response and retries 429s.
+response and retries 429s for idempotent methods by default. POST and PATCH
+require [explicit opt-in](/docs/guides/respect-retry-after/#requests-with-side-effects).
 
 ```ts
 const partnerFetch = partner.wrapFetch();

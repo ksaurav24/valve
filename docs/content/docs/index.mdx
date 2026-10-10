@@ -34,8 +34,8 @@ const response = await limitedFetch(
 - **Listens to the provider.** valve reads `Retry-After`, IETF `RateLimit`,
   and common `x-ratelimit-*` headers, then pauses every worker sharing the
   budget.
-- **Retries rate limit responses.** `wrapFetch` retries a 429 after the shared
-  pause ends, without losing its place in the queue.
+- **Retries rate limit responses for idempotent methods.** `wrapFetch` retries
+  a 429 after the shared pause ends, without losing its place in the queue.
 - **Stays small.** Zero runtime dependencies. ESM and CommonJS builds with
   full TypeScript declarations. Bring your own `ioredis` or `node-redis`
   client.

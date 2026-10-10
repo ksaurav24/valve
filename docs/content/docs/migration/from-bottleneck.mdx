@@ -236,7 +236,9 @@ Bottleneck retries jobs when a `failed` listener returns a delay. valve has no
 general retry hook.
 
 - For rate limit responses, use `wrapFetch`. It retries 429s, and 503s with
-  `Retry-After`, after a shared pause.
+  a valid `Retry-After`, after a shared pause, for GET, HEAD, OPTIONS, PUT and
+  DELETE by default. Other methods require [explicit opt-in after verifying
+  provider idempotency](/docs/guides/respect-retry-after/#requests-with-side-effects).
 - For other failures, retry around `run` with your preferred library, or let
   your job queue retry.
 
