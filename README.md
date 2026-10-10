@@ -2,6 +2,8 @@
 
 [![CI](https://github.com/ksaurav24/valve/actions/workflows/ci.yml/badge.svg?branch=master)](https://github.com/ksaurav24/valve/actions/workflows/ci.yml)
 [![License: Apache-2.0](https://img.shields.io/badge/license-Apache--2.0-blue.svg)](LICENSE)
+[![GitHub stars](https://img.shields.io/github/stars/ksaurav24/valve)](https://github.com/ksaurav24/valve/stargazers)
+[![GitHub issues](https://img.shields.io/github/issues/ksaurav24/valve)](https://github.com/ksaurav24/valve/issues)
 
 **One rate limit for every worker that calls an API.**
 
@@ -11,7 +13,7 @@ worker sharing that budget pauses. A memory store supports single-process use.
 
 ## Quickstart
 
-The package is `@ksaurav24/valve`, version 0.1.2. The source repository is
+The package is `@ksaurav24/valve`. The source repository is
 public, but the package is **not published to npm yet**. Build it locally with
 `pnpm install && pnpm build`, then run a workspace example or install a packed
 tarball in another project.
