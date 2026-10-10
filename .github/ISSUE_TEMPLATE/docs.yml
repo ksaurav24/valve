@@ -1,6 +1,6 @@
 name: Documentation improvement
 description: Request clarification, examples, or corrections.
-labels: ["documentation"]
+labels: ['documentation']
 body:
   - type: textarea
     id: gap
