@@ -188,7 +188,7 @@ export interface JobContext {
 export interface WrapFetchOptions<F extends FetchLike = typeof fetch> {
   /**
    * How many times to retry after a 429, or after a 503 that carries
-   * `Retry-After`. Each retry waits for the shared pause and re-enters the
+   * a valid `Retry-After`. Each retry waits for the shared pause and re-enters the
    * queue at its original position. Integer, `0` or more. Default `2`.
    * Requests with a stream body are never retried.
    */

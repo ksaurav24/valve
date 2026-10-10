@@ -1,5 +1,5 @@
 // Provider feedback readers that never read or consume response bodies.
-import { compound, header, number, reference } from './parse.js';
+import { compound, header, number, reference, retryAfterMs } from './parse.js';
 import type { Feedback, FeedbackSignal } from './types.js';
 export type {
   Feedback,
@@ -14,19 +14,8 @@ export type {
 export function retryAfter(): Feedback {
   return (response) => {
     if (response.status !== 429 && response.status !== 503) return undefined;
-    const value = header(response.headers, 'retry-after');
-    if (value === undefined) return undefined;
-    const seconds = number(value);
-    const date = /[a-z]/i.test(value) ? Date.parse(value) : NaN;
-    const pauseMs =
-      seconds !== undefined
-        ? seconds * 1000
-        : Number.isFinite(date)
-          ? Math.max(0, date - reference(response.headers))
-          : undefined;
-    return pauseMs !== undefined && Number.isFinite(pauseMs)
-      ? { pauseMs }
-      : undefined;
+    const pauseMs = retryAfterMs(response.headers);
+    return pauseMs === undefined ? undefined : { pauseMs };
   };
 }
 /** Read RateLimit available quota (r) and optional effective-window seconds (t).

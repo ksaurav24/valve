@@ -16,7 +16,7 @@ const partnerFetch = partner.wrapFetch(fetch, { retries: 2 });
 const res = await partnerFetch('https://api.partner.example/v2/orders');
 ```
 
-When a response is a 429, or a 503 with `Retry-After`:
+When a response is a 429, or a 503 with a valid `Retry-After`:
 
 1. valve writes a shared pause based on the headers.
 2. It cancels the unused response body to free the connection.
@@ -27,6 +27,11 @@ When a response is a 429, or a 503 with `Retry-After`:
 
 Set `retries: 0` to read feedback without retrying. Network errors and other
 HTTP failures are never retried.
+
+A malformed or empty `Retry-After` on a 503 is treated as absent, so the
+response is returned without retrying or consuming its body. Zero seconds and
+expired HTTP dates are valid and allow a retry without a header-based pause.
+A 429 without a positive provider delay still uses exponential backoff.
 
 ### Request bodies
 
