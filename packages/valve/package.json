@@ -1,6 +1,6 @@
 {
   "name": "@ksaurav24/valve",
-  "version": "0.1.2",
+  "version": "0.1.3",
   "description": "One rate limit for every worker that calls an API.",
   "type": "module",
   "sideEffects": false,
