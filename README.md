@@ -1,6 +1,9 @@
 # valve
 
-One rate limit for every worker that calls an API.
+[![CI](https://github.com/ksaurav24/valve/actions/workflows/ci.yml/badge.svg?branch=master)](https://github.com/ksaurav24/valve/actions/workflows/ci.yml)
+[![License: Apache-2.0](https://img.shields.io/badge/license-Apache--2.0-blue.svg)](LICENSE)
+
+**One rate limit for every worker that calls an API.**
 
 valve queues outbound API calls under one budget shared by your workers,
 stored in Redis or Valkey. When the provider asks you to slow down, every
@@ -8,8 +11,8 @@ worker sharing that budget pauses. A memory store supports single-process use.
 
 ## Quickstart
 
-The package is `@ksaurav24/valve`, version 0.1.2. It is being prepared in this
-private repository and is **not published to npm yet**. Build it locally with
+The package is `@ksaurav24/valve`, version 0.1.2. The source repository is
+public, but the package is **not published to npm yet**. Build it locally with
 `pnpm install && pnpm build`, then run a workspace example or install a packed
 tarball in another project.
 
@@ -95,6 +98,10 @@ and `pnpm test:types` for inference checks. With Redis running, use
 
 Postgres, global concurrency, provider presets, and Bottleneck compatibility
 are planned for later versions. Publishing remains to be configured.
+
+## Contributing and security
+
+Contributions are welcome through [GitHub Issues](https://github.com/ksaurav24/valve/issues) and pull requests. Read the [contributing guide](CONTRIBUTING.md) and [Code of Conduct](CODE_OF_CONDUCT.md) before contributing. Report suspected vulnerabilities privately using the [security policy](SECURITY.md), not public issues.
 
 ## License
 
