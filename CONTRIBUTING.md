@@ -11,7 +11,7 @@ conventions, packaging, and measured bundle regression ceilings.
 Use `pnpm format` to format files.
 
 The repository is a pnpm monorepo. Library packages will live in `packages/*`
-and use the `@ksaurav24` scope. The 0.1.0 library lives in `packages/valve`, with an MDX site in `docs/` and
+and use the `@ksaurav24` scope. The 0.1.2 library lives in `packages/valve`, with an MDX site in `docs/` and
 runnable use cases in `examples/`.
 
 New TypeScript packages should extend the root `tsconfig.base.json` and provide
