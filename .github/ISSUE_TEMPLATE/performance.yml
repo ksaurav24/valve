@@ -1,0 +1,23 @@
+name: Performance report
+description: Report a reproducible performance bottleneck or regression.
+labels: ['perf']
+body:
+  - type: textarea
+    id: workload
+    attributes:
+      label: Workload and benchmark commands
+      description: Include rules, workers, concurrency, store, and workload duration.
+    validations:
+      required: true
+  - type: textarea
+    id: results
+    attributes:
+      label: Baseline and measurements
+      description: Include repeated samples, hardware and versions when available.
+    validations:
+      required: true
+  - type: textarea
+    id: correctness
+    attributes:
+      label: Correctness constraints
+      description: Identify guarantees that must not change.

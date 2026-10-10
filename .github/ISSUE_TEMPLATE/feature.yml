@@ -1,0 +1,22 @@
+name: Feature proposal
+description: Propose a scoped improvement to Valve.
+labels: ['enhancement']
+body:
+  - type: textarea
+    id: usecase
+    attributes:
+      label: Real-world use case
+      description: Describe the problem and who encounters it.
+    validations:
+      required: true
+  - type: textarea
+    id: approach
+    attributes:
+      label: Proposed behavior or API
+    validations:
+      required: true
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: Alternatives and scope boundaries
+      description: What should remain the application's responsibility?
