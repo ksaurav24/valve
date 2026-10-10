@@ -1,6 +1,7 @@
 {
   "entryPoints": ["src/index.ts", "src/headers/index.ts", "src/redis/index.ts"],
   "out": "../../apps/web/public/api",
+  "sourceLinkTemplate": "https://github.com/ksaurav24/valve/blob/{gitRevision}/{path}#L{line}",
   "treatWarningsAsErrors": true,
   "excludePrivate": true,
   "excludeInternal": true,
