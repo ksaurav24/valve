@@ -29,6 +29,7 @@ const api = createValve({
   rate: { limit: 100, interval: '1s' },
 });
 
+// GET retries after the provider's Retry-After; POST needs retryUnsafeMethods.
 const limitedFetch = api.wrapFetch();
 await limitedFetch('https://api.example.com/contacts');
 await api.close({ drain: true });`,

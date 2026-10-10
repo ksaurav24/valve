@@ -34,8 +34,8 @@ const features = [
   {
     title: 'A fetch that backs off.',
     description:
-      'wrapFetch retries 429s and 503s with a valid Retry-After for idempotent methods.',
-    snippet: 'const limitedFetch = api.wrapFetch()',
+      'Retries 429s and 503s with a valid Retry-After for GET, HEAD, OPTIONS, PUT, and DELETE. POST and PATCH opt in.',
+    snippet: 'api.wrapFetch(fetch, { retryUnsafeMethods: true })',
     href: '/docs/reference/api',
   },
   {
