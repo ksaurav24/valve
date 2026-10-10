@@ -3,6 +3,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 import { createServer } from 'node:http';
 import { createValve } from '../src/index.js';
 import type { Valve } from '../src/index.js';
+import { memoryStore } from '../src/index.js';
 const valves: Valve[] = [];
 const make: typeof createValve = (options) => {
   const valve = createValve(options);
@@ -14,6 +15,115 @@ afterEach(async () => {
   vi.useRealTimers();
 });
 describe('fetch wrapping', () => {
+  it.each(['invalid', '', ' ', '-1', 'Infinity', '1e3', '9'.repeat(308)])(
+    'returns a 503 with unusable Retry-After %j without retrying or consuming its body',
+    async (value) => {
+      const response = new Response('unavailable', {
+        status: 503,
+        headers: { 'Retry-After': value },
+      });
+      const fake = vi.fn().mockResolvedValue(response);
+      const valve = make({ id: 'invalid', concurrency: 1 });
+      const pause = vi.fn();
+      valve.on('pause', pause);
+      expect(await valve.wrapFetch(fake)()).toBe(response);
+      expect(fake).toHaveBeenCalledTimes(1);
+      expect(pause).not.toHaveBeenCalled();
+      expect(valve.stats().totals.retried).toBe(0);
+      expect(await response.text()).toBe('unavailable');
+    },
+  );
+  it.each(['0', 'Wed, 01 Jan 2020 00:00:00 GMT'])(
+    'retries a 503 with valid zero-delay Retry-After %s',
+    async (value) => {
+      const first = new Response('', {
+        status: 503,
+        headers: { 'Retry-After': value },
+      });
+      const last = new Response('ok');
+      const fake = vi.fn().mockResolvedValueOnce(first).mockResolvedValue(last);
+      const valve = make({ id: 'zero', concurrency: 1 });
+      const pause = vi.fn();
+      valve.on('pause', pause);
+      expect(await valve.wrapFetch(fake)()).toBe(last);
+      expect(fake).toHaveBeenCalledTimes(2);
+      expect(pause).not.toHaveBeenCalled();
+      expect(valve.stats().totals.retried).toBe(1);
+    },
+  );
+  it.each(['0.02', 'Wed, 07 Oct 2026 00:00:02 GMT', '999999999'])(
+    'shares a capped 503 pause for Retry-After %s before retrying',
+    async (value) => {
+      vi.useFakeTimers();
+      const store = memoryStore();
+      const valve = make({ id: 'shared', concurrency: 1, store, maxPause: 20 });
+      const peer = make({ id: 'shared', concurrency: 1, store });
+      const pause = vi.fn();
+      const warning = vi.fn();
+      valve.on('pause', pause);
+      valve.on('warning', warning);
+      const first = new Response('', {
+        status: 503,
+        headers: {
+          'Retry-After': value,
+          Date: 'Wed, 07 Oct 2026 00:00:00 GMT',
+        },
+      });
+      const last = new Response('ok');
+      const fake = vi.fn().mockResolvedValueOnce(first).mockResolvedValue(last);
+      const result = valve.wrapFetch(fake)();
+      await vi.advanceTimersByTimeAsync(0);
+      expect(pause).toHaveBeenCalledWith({
+        durationMs: 20,
+        reason: 'feedback',
+      });
+      expect(warning).toHaveBeenCalledTimes(value === '0.02' ? 0 : 1);
+      expect(valve.stats().running).toBe(0);
+      const next = vi.fn(() => 'peer');
+      const concurrent = peer.run(next);
+      await vi.advanceTimersByTimeAsync(19);
+      expect(fake).toHaveBeenCalledTimes(1);
+      expect(next).not.toHaveBeenCalled();
+      await vi.advanceTimersByTimeAsync(1);
+      expect(await result).toBe(last);
+      expect(await concurrent).toBe('peer');
+      expect(fake).toHaveBeenCalledTimes(2);
+      expect(valve.stats().totals.retried).toBe(1);
+    },
+  );
+  it.each([undefined, 'invalid', '', '0', 'Wed, 01 Jan 2020 00:00:00 GMT'])(
+    'uses exponential 429 backoff without a positive Retry-After delay (%s)',
+    async (value) => {
+      vi.useFakeTimers();
+      const response = new Response('', {
+        status: 429,
+        headers: value === undefined ? {} : { 'Retry-After': value },
+      });
+      const fake = vi.fn().mockResolvedValue(response);
+      const valve = make({
+        id: 'backoff',
+        concurrency: 1,
+        backoff: { base: 10, max: 100 },
+      });
+      const pause = vi.fn();
+      valve.on('pause', pause);
+      const result = valve.wrapFetch(fake)();
+      await vi.advanceTimersByTimeAsync(9);
+      expect(fake).toHaveBeenCalledTimes(1);
+      await vi.advanceTimersByTimeAsync(1);
+      expect(fake).toHaveBeenCalledTimes(2);
+      await vi.advanceTimersByTimeAsync(19);
+      expect(fake).toHaveBeenCalledTimes(2);
+      await vi.advanceTimersByTimeAsync(1);
+      expect(await result).toBe(response);
+      expect(fake).toHaveBeenCalledTimes(3);
+      expect(pause.mock.calls.map(([event]) => event)).toEqual([
+        { durationMs: 10, reason: 'backoff' },
+        { durationMs: 20, reason: 'backoff' },
+        { durationMs: 40, reason: 'backoff' },
+      ]);
+    },
+  );
   it.each([429, 503])(
     'retries status %s, cancels unused bodies, and returns final response',
     async (status) => {

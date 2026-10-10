@@ -112,15 +112,19 @@ retries rate limit responses. See [Respect provider feedback](/docs/guides/respe
 
 #### WrapFetchOptions
 
-| Option     | Type                            | Default         | Description                                                     |
-| ---------- | ------------------------------- | --------------- | --------------------------------------------------------------- |
-| `retries`  | `number`                        | `2`             | Retries after a 429, or a 503 with `Retry-After`. `0` disables. |
-| `cost`     | `number \| (...args) => number` | `1`             | Cost per request, or a function of the fetch arguments.         |
-| `priority` | `number \| (...args) => number` | `0`             | Priority per request, or a function of the fetch arguments.     |
-| `maxWait`  | `Duration`                      | Valve `maxWait` | Queue deadline for each attempt.                                |
+| Option     | Type                            | Default         | Description                                                             |
+| ---------- | ------------------------------- | --------------- | ----------------------------------------------------------------------- |
+| `retries`  | `number`                        | `2`             | Retries after a 429, or a 503 with a valid `Retry-After`. `0` disables. |
+| `cost`     | `number \| (...args) => number` | `1`             | Cost per request, or a function of the fetch arguments.                 |
+| `priority` | `number \| (...args) => number` | `0`             | Priority per request, or a function of the fetch arguments.             |
+| `maxWait`  | `Duration`                      | Valve `maxWait` | Queue deadline for each attempt.                                        |
 
 The request's abort signal, from `init.signal` or the `Request`, cancels queued
 attempts and is passed to `fetchImpl` for running ones.
+
+`retries` counts additional attempts after the initial request. The default of
+`2` permits up to three total requests. Once the retry limit is exhausted, the
+final response is returned unchanged.
 
 ### observe
 

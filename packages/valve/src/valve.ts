@@ -4,7 +4,7 @@ import { emitter } from './emitter.js';
 import { failure, invalid } from './errors.js';
 import type { ValveErrorCode } from './errors.js';
 import { defaultFeedback } from './headers/index.js';
-import { header } from './headers/parse.js';
+import { retryAfterMs } from './headers/parse.js';
 import type { ResponseLike } from './headers/types.js';
 import { leaseManager } from './leases.js';
 import { memoryStore } from './memory-store.js';
@@ -667,7 +667,7 @@ export function createValve(options: ValveOptions): Valve {
           (response.status !== 429 &&
             !(
               response.status === 503 &&
-              header(response.headers, 'retry-after') !== undefined
+              retryAfterMs(response.headers) !== undefined
             ))
         )
           return response;

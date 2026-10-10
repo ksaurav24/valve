@@ -30,6 +30,22 @@ export function reference(headers: HeadersLike) {
   const date = Date.parse(header(headers, 'date') ?? '');
   return Number.isFinite(date) ? date : Date.now();
 }
+// Keep retry eligibility and provider feedback on the same validation rules.
+export function retryAfterMs(headers: HeadersLike): number | undefined {
+  const value = header(headers, 'retry-after');
+  if (value === undefined) return undefined;
+  const seconds = number(value);
+  const date = /[a-z]/i.test(value) ? Date.parse(value) : NaN;
+  const pauseMs =
+    seconds !== undefined
+      ? seconds * 1000
+      : Number.isFinite(date)
+        ? Math.max(0, date - reference(headers))
+        : undefined;
+  return pauseMs !== undefined && Number.isFinite(pauseMs)
+    ? pauseMs
+    : undefined;
+}
 export function compound(value: string | undefined): number | undefined {
   if (!value || !/^(?:\d+(?:\.\d+)?(?:ms|s|m|h))+$/.test(value))
     return undefined;
