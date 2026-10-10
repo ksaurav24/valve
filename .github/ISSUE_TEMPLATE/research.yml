@@ -1,6 +1,6 @@
 name: Research or investigation
 description: Investigate a hypothesis before committing to an implementation.
-labels: ["research"]
+labels: ['research']
 body:
   - type: textarea
     id: hypothesis
