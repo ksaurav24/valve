@@ -122,6 +122,10 @@ retries rate limit responses. See [Respect provider feedback](/docs/guides/respe
 The request's abort signal, from `init.signal` or the `Request`, cancels queued
 attempts and is passed to `fetchImpl` for running ones.
 
+`retries` counts additional attempts after the initial request. The default of
+`2` permits up to three total requests. Once the retry limit is exhausted, the
+final response is returned unchanged.
+
 ### observe
 
 ```ts

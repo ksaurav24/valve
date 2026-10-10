@@ -18,12 +18,17 @@ const res = await partnerFetch('https://api.partner.example/v2/orders');
 
 When a response is a 429, or a 503 with a valid `Retry-After`:
 
-1. valve writes a shared pause based on the headers.
+1. valve processes provider feedback and establishes a shared pause when a
+   positive delay is available. A 429 without a positive provider delay uses
+   exponential backoff.
 2. It cancels the unused response body to free the connection.
 3. It queues the request again at its original position, and releases its
    concurrency slot while waiting.
-4. After `retries` attempts (default 2), it returns the last response
+4. Once the configured retry limit is exhausted, it returns the final response
    unchanged.
+
+The `retries` option specifies additional attempts after the initial request.
+The default of `2` permits up to three total requests.
 
 Set `retries: 0` to read feedback without retrying. Network errors and other
 HTTP failures are never retried.
