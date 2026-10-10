@@ -27,6 +27,11 @@ test('run and wrap preserve awaited return types', () => {
     headers: { url },
   });
   expectTypeOf(api.wrapFetch(fake)).toEqualTypeOf<typeof fake>();
+  expectTypeOf(
+    api.wrapFetch(fake, { retryUnsafeMethods: true, retries: 1 }),
+  ).toEqualTypeOf<typeof fake>();
+  // @ts-expect-error Retry opt-in must be a boolean.
+  api.wrapFetch(fake, { retryUnsafeMethods: 'true' });
   expectTypeOf(memoryStore()).toEqualTypeOf<Store>();
   api.run(
     (ctx) => {

@@ -61,7 +61,9 @@ With the default `burst: 1`, starts are spaced evenly: one every 200ms.
 ### Or wrap fetch
 
 `wrapFetch` returns a drop-in `fetch` that goes through the valve, reads rate
-limit headers from every response, and retries 429s after the pause ends.
+limit headers from every response, and retries 429s after the pause ends for
+GET, HEAD, OPTIONS, PUT and DELETE. POST and PATCH require an explicit opt-in;
+see [Requests with side effects](/docs/guides/respect-retry-after/#requests-with-side-effects).
 
 ```ts title="quickstart.ts"
 const githubFetch = github.wrapFetch();

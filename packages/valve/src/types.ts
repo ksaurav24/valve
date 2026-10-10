@@ -191,9 +191,17 @@ export interface WrapFetchOptions<F extends FetchLike = typeof fetch> {
    * with a valid `Retry-After`. Each retry waits for any shared pause and
    * re-enters the queue at its original position. Integer, `0` or more.
    * Default `2`, permitting up to three total requests.
-   * Requests with a stream body are never retried.
+   * Only GET, HEAD, OPTIONS, PUT and DELETE retry by default.
+   * Requests with a stream passed as `init.body` are never retried.
    */
   retries?: number;
+  /**
+   * Allow retries for other methods, including POST and PATCH. Default `false`.
+   * Use a dedicated wrapper only after verifying the provider's idempotency
+   * contract. An idempotency key alone does not enable retries.
+   * Does not override `retries: 0` or the `init.body` stream restriction.
+   */
+  retryUnsafeMethods?: boolean;
   /** Cost per request. A number or a function of the fetch arguments. Default `1`. */
   cost?: number | ((...args: Parameters<F>) => number);
   /** Priority per request. A number or a function of the fetch arguments. Default `0`. */
@@ -300,7 +308,9 @@ export interface Valve extends AsyncDisposable {
 
   /**
    * Returns a fetch that goes through this valve, feeds every response
-   * to feedback, and retries 429s after the shared pause.
+   * to feedback, and retries 429s or 503s with a valid Retry-After after the
+   * shared pause. Only idempotent methods retry by default; see
+   * {@link WrapFetchOptions.retryUnsafeMethods} to opt in for other methods.
    *
    * @param fetchImpl Defaults to `globalThis.fetch`.
    *

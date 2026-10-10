@@ -33,6 +33,11 @@ Pass a connected `ioredis` or `node-redis` client. valve uses its structural
 interface and never owns its connection. Each worker uses the same server,
 prefix, id, and rules. The library has zero runtime and peer dependencies.
 
+`wrapFetch` retries rate limit responses for GET, HEAD, OPTIONS, PUT and
+DELETE by default. POST and PATCH require `retryUnsafeMethods: true` after
+verifying the provider's idempotency contract. Every response still updates
+shared cooldowns; `retries: 0` disables automatic retries.
+
 ## What it does
 
 - Shares a rate budget across processes with atomic Redis/Valkey scripts.
