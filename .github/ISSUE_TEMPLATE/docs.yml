@@ -1,0 +1,15 @@
+name: Documentation improvement
+description: Request clarification, examples, or corrections.
+labels: ["documentation"]
+body:
+  - type: textarea
+    id: gap
+    attributes:
+      label: Missing or incorrect documentation
+      description: Link the relevant page if possible.
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: Suggested explanation or example
