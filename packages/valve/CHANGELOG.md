@@ -1,5 +1,13 @@
 # @ksaurav24/valve
 
+## 0.2.0
+
+### Minor Changes
+
+- 0e878bc: Document provider quota scopes with examples for deliberate budget sharing and
+  independent endpoint or model cooldowns. Clarify how Valve IDs and shared stores
+  determine feedback isolation, with an executable sharing and isolation example.
+
 ## 0.1.3
 
 ### Patch Changes
