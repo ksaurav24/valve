@@ -1,0 +1,44 @@
+{
+  "name": "@valve/web",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "sync": "node scripts/sync-content.mjs && node scripts/sync-metadata.mjs",
+    "sync:snapshot": "node scripts/sync-metadata.mjs --write-snapshot",
+    "dev": "pnpm sync && next dev --hostname 127.0.0.1 --port 4321",
+    "build": "pnpm sync && pnpm --filter @ksaurav24/valve docs:api && next build --webpack",
+    "preview": "python3 -m http.server 4321 --bind 127.0.0.1 --directory out",
+    "typecheck": "pnpm sync && fumadocs-mdx && next typegen && tsc --noEmit",
+    "postinstall": "node scripts/sync-content.mjs && fumadocs-mdx",
+    "test": "node --test scripts/merge-metadata.test.mjs",
+    "test:browser": "playwright test"
+  },
+  "dependencies": {
+    "@base-ui/react": "1.9.0",
+    "@fontsource-variable/geist": "5.3.0",
+    "@fontsource-variable/geist-mono": "5.3.0",
+    "class-variance-authority": "0.7.1",
+    "clsx": "2.1.1",
+    "framer-motion": "14.0.0",
+    "fumadocs-core": "16.16.2",
+    "fumadocs-mdx": "15.4.6",
+    "fumadocs-ui": "16.16.2",
+    "lucide-react": "1.54.0",
+    "next": "16.4.0",
+    "next-themes": "0.4.6",
+    "react": "19.3.0",
+    "react-dom": "19.3.0",
+    "shiki": "4.5.0",
+    "swr": "2.5.1",
+    "tailwind-merge": "3.7.0"
+  },
+  "devDependencies": {
+    "@playwright/test": "1.63.0",
+    "@tailwindcss/postcss": "4.3.3",
+    "@types/mdx": "^2.0.13",
+    "@types/react": "^19.2.0",
+    "@types/react-dom": "^19.2.0",
+    "tailwindcss": "4.3.3",
+    "typescript": "^6.0.3"
+  }
+}

@@ -73,7 +73,7 @@ Concurrency and queue order are local to a valve instance. A pause blocks
 subsequent grants; already-issued grants can still start. A cancelled job or
 timed-out store call can waste its grant. Queued work does not survive process
 failure, and `onStoreError: 'open'` gives up shared rate guarantees while the
-store is unavailable. Read the [full guarantees](docs/content/docs/guarantees.mdx).
+store is unavailable. Read the [full guarantees](apps/web/content/docs/guarantees.mdx).
 
 ## Documentation and development
 
@@ -83,18 +83,18 @@ pnpm check
 pnpm docs:dev
 ```
 
-The Next.js website lives in `docs/`: `/` introduces the project, `/docs` serves
+The Next.js website lives in `apps/web/`: `/` introduces the project, `/docs` serves
 the Fumadocs MDX documentation, and `/changelog` renders the package
 changelog. Blog scaffolds are kept for future library and release posts. Build it with `pnpm docs:build`.
-See [website maintenance](docs/README.md) for content and routing conventions.
+See [website maintenance](apps/web/README.md) for content and routing conventions.
 
-- [Quickstart](docs/content/docs/quickstart.mdx)
-- [Share a quota](docs/content/docs/guides/share-a-quota.mdx)
-- [Respect Retry-After](docs/content/docs/guides/respect-retry-after.mdx)
-- [Priorities and shutdown](docs/content/docs/guides/priorities-and-shutdown.mdx)
-- [Migrate from Bottleneck](docs/content/docs/migration/from-bottleneck.mdx)
-- [API reference](docs/content/docs/reference/api.mdx)
-- [Tests and benchmarks](docs/content/docs/reference/testing.mdx)
+- [Quickstart](apps/web/content/docs/quickstart.mdx)
+- [Share a quota](apps/web/content/docs/guides/share-a-quota.mdx)
+- [Respect Retry-After](apps/web/content/docs/guides/respect-retry-after.mdx)
+- [Priorities and shutdown](apps/web/content/docs/guides/priorities-and-shutdown.mdx)
+- [Migrate from Bottleneck](apps/web/content/docs/migration/from-bottleneck.mdx)
+- [API reference](apps/web/content/docs/reference/api.mdx)
+- [Tests and benchmarks](apps/web/content/docs/reference/testing.mdx)
 - [Contributing](CONTRIBUTING.md)
 
 Run `pnpm test` for unit and property tests, `pnpm test:coverage` for coverage,

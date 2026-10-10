@@ -70,7 +70,7 @@ Concurrency and queue order are local to a valve instance. A pause blocks
 subsequent grants; already-issued grants can still start. A cancelled job or
 timed-out store call can waste its grant. Queued work does not survive process
 failure, and `onStoreError: 'open'` gives up shared rate guarantees while the
-store is unavailable. Read the [full guarantees](https://github.com/ksaurav24/valve/blob/master/docs/content/docs/guarantees.mdx).
+store is unavailable. Read the [full guarantees](https://github.com/ksaurav24/valve/blob/master/apps/web/content/docs/guarantees.mdx).
 
 ## Documentation and development
 
@@ -82,13 +82,13 @@ pnpm docs:dev
 
 The Next.js and Fumadocs MDX documentation site lives in `docs/`. Build it with `pnpm docs:build`.
 
-- [Quickstart](https://github.com/ksaurav24/valve/blob/master/docs/content/docs/quickstart.mdx)
-- [Share a quota](https://github.com/ksaurav24/valve/blob/master/docs/content/docs/guides/share-a-quota.mdx)
-- [Respect Retry-After](https://github.com/ksaurav24/valve/blob/master/docs/content/docs/guides/respect-retry-after.mdx)
-- [Priorities and shutdown](https://github.com/ksaurav24/valve/blob/master/docs/content/docs/guides/priorities-and-shutdown.mdx)
-- [Migrate from Bottleneck](https://github.com/ksaurav24/valve/blob/master/docs/content/docs/migration/from-bottleneck.mdx)
-- [API reference](https://github.com/ksaurav24/valve/blob/master/docs/content/docs/reference/api.mdx)
-- [Tests and benchmarks](https://github.com/ksaurav24/valve/blob/master/docs/content/docs/reference/testing.mdx)
+- [Quickstart](https://github.com/ksaurav24/valve/blob/master/apps/web/content/docs/quickstart.mdx)
+- [Share a quota](https://github.com/ksaurav24/valve/blob/master/apps/web/content/docs/guides/share-a-quota.mdx)
+- [Respect Retry-After](https://github.com/ksaurav24/valve/blob/master/apps/web/content/docs/guides/respect-retry-after.mdx)
+- [Priorities and shutdown](https://github.com/ksaurav24/valve/blob/master/apps/web/content/docs/guides/priorities-and-shutdown.mdx)
+- [Migrate from Bottleneck](https://github.com/ksaurav24/valve/blob/master/apps/web/content/docs/migration/from-bottleneck.mdx)
+- [API reference](https://github.com/ksaurav24/valve/blob/master/apps/web/content/docs/reference/api.mdx)
+- [Tests and benchmarks](https://github.com/ksaurav24/valve/blob/master/apps/web/content/docs/reference/testing.mdx)
 - [Contributing](https://github.com/ksaurav24/valve/blob/master/CONTRIBUTING.md)
 
 Run `pnpm test` for unit and property tests, `pnpm test:coverage` for coverage,

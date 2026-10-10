@@ -11,7 +11,7 @@ conventions, packaging, and measured bundle regression ceilings.
 Use `pnpm format` to format files.
 
 The repository is a pnpm monorepo. Library packages will live in `packages/*`
-and use the `@ksaurav24` scope. The 0.1.2 library lives in `packages/valve`, with an MDX site in `docs/` and
+and use the `@ksaurav24` scope. The 0.1.2 library lives in `packages/valve`, with an website in `apps/web/` and
 runnable use cases in `examples/`.
 
 New TypeScript packages should extend the root `tsconfig.base.json` and provide
@@ -44,7 +44,8 @@ For documentation and tooling changes, run `pnpm changeset --empty`.
 Version PRs are exempt from requiring a new changeset.
 Automation opens version/changelog PRs after changesets merge into `master`.
 It explicitly dispatches CI for bot-created PRs so required checks can run.
-There is no publishing workflow yet.
+Merging a version PR publishes to npm through trusted publishing, then creates
+the git tag and GitHub Release. The first public release is 1.0.0.
 
 ## Conduct and license
 
@@ -63,9 +64,9 @@ to run all six use cases after building the library.
 
 Run `pnpm docs:dev` for the Next.js and Fumadocs MDX site at
 `http://127.0.0.1:4321`. `pnpm docs:build` exports static pages and a local
-search index into `docs/out/`. After `pnpm docs:build`, run
-`pnpm --filter @valve/docs test:browser` for browser checks. Install Chromium
-with `pnpm --filter @valve/docs exec playwright install chromium` first.
+search index into `apps/web/out/`. After `pnpm docs:build`, run
+`pnpm --filter @valve/web test:browser` for browser checks. Install Chromium
+with `pnpm --filter @valve/web exec playwright install chromium` first.
 
 See `packages/valve/bench/COMPARISON.md` for measured targets that remain open.
 Keep `pvt/` untracked; source checks use the tracked TODO register for CI.

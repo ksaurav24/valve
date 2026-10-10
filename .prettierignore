@@ -5,12 +5,12 @@ build/
 coverage/
 LICENSE
 pvt/
-docs/public/api/
+apps/web/public/api/
 test-results/
 playwright-report/
 
 .next/
 .source/
 out/
-docs/next-env.d.ts
+apps/web/next-env.d.ts
 .codegraph/

@@ -1,0 +1,116 @@
+---
+title: Status and limitations
+description: Implemented features, changes in 0.1.2, and remaining limits on scheduling, storage, and bundle size.
+---
+
+import { site } from '@/lib/site';
+
+The current version is **{site.version}**.
+
+<Unpublished>
+  It has not been published to npm. Follow [Installation](/docs/installation/)
+  to build and install it from source.
+</Unpublished>
+
+Check the [changelog](/changelog/) for version history and
+[releases](/releases/) for published versions.
+
+## Included
+
+- `createValve` with `run`, `wrap`, `wrapFetch`, `observe`, `pause`, `resume`,
+  `stats`, `on`, `idle`, and `close`.
+- GCRA and fixed-window rate rules, with several rules checked atomically
+  on the store's clock.
+- Memory and Redis/Valkey stores. An optional subscriber wakes queues on
+  shared pause, resume, and concurrency-slot release notifications.
+- Local concurrency and global concurrency through renewable leases.
+- Local priorities, job cost, `maxQueue`, `maxWait`, and `AbortSignal`
+  cancellation.
+- Shared pauses from `Retry-After`, IETF `RateLimit`, and `x-ratelimit-*`
+  headers, plus backoff for rate limit responses without usable headers.
+- `wrapFetch` retries for 429 responses and 503 responses carrying a valid
+  `Retry-After`, defaulting to GET, HEAD, OPTIONS, PUT and DELETE. Other
+  methods require `retryUnsafeMethods: true`. Streamed `init.body` requests
+  are not retried. Every response still updates provider feedback.
+- ESM and CommonJS entry points with TypeScript declarations, and zero
+  runtime or peer dependencies. Applications supply their own Redis client.
+
+## Changes in 0.1.2
+
+The footprint update minifies embedded Redis Lua at build time and lets
+bundlers discard unused default feedback readers. Public exports, types,
+rate algorithms, and store behavior are preserved.
+
+In the paired Node.js 24 measurements, the built Redis ESM entry decreased
+from **3,521 to 3,151 gzip bytes**. A consumer importing only `retryAfter()`
+decreased from **1,089 to 445 gzip bytes**. Core size is unchanged.
+
+These are bundle-size improvements. The measurements do not establish a
+general startup, throughput, or latency improvement. See the
+[0.1.2 changelog entry](/changelog/#012) and the
+[footprint report](https://github.com/ksaurav24/valve/blob/161d4b09d974ae8f0fcdc4e9b38a1a10c258491e/packages/valve/bench/FOOTPRINT.md)
+for the measurement settings, regression controls, and build-time tradeoffs.
+
+## Not included
+
+- Postgres or other built-in stores. You can
+  [implement a custom store](/docs/reference/custom-stores/).
+- Provider presets with known quotas.
+- Durable queued jobs. Waiting work is lost when its process exits.
+- Syncing a provider's reported `remaining` count into the shared budget.
+  Feedback produces pauses; it does not replace the configured rate rules.
+- Cross-process fairness or queue ordering.
+- Runtime changes to rate rules. Create a new valve instead.
+
+## Known limitations
+
+### Scheduling drift
+
+Under GCRA with `burst: 1`, timer delays accumulate under a saturated queue.
+The original **5ms p99 ideal-sequence delay target remains unmet**. valve
+never starts work early to compensate for accumulated delay.
+
+Version 0.1.1 removed positive jitter from local rate-eligibility waits and
+accounted for elapsed asynchronous acquisition time when scheduling the next
+check. Every check still requires atomic store admission. Global concurrency
+polling, shared pauses, and outage backoff retain their behavior.
+
+The [paced drift report](https://github.com/ksaurav24/valve/blob/161d4b09d974ae8f0fcdc4e9b38a1a10c258491e/packages/valve/bench/DRIFT.md)
+contains paired measurements across Node.js 20, 22, and 24, including the
+additional denied checks introduced by the asynchronous timing adjustment.
+These scheduler measurements do not predict production HTTP throughput.
+
+### Bundle-size targets
+
+The 0.1.2 footprint report records these minified and gzipped built ESM
+entry sizes, using Node.js 24.21.0 and esbuild 0.28.2:
+
+| Entry   | Recorded size | Original target | Status        |
+| ------- | ------------: | --------------: | ------------- |
+| Core    |   8,358 bytes |     4,096 bytes | Above target  |
+| Redis   |   3,151 bytes |     3,072 bytes | Above target  |
+| Headers |   1,130 bytes |     2,048 bytes | Within target |
+
+All three source-entry measurements pass the existing CI ceilings of
+8,704, 4,096, and 2,048 bytes respectively. Those ceilings are larger than
+the original core and Redis targets. Consumer sizes depend on which exports
+remain reachable after bundling; the full headers entry is larger than a
+consumer importing only `retryAfter()`.
+
+### Distributed guarantees
+
+- **Admission and arrival differ.** Rate bounds apply at atomic store
+  admission. Network delays can bunch requests together before they reach
+  the provider.
+- **Pauses affect subsequent grants.** Already-issued grants can still start.
+- **Leases need cooperative jobs.** A worker stalled beyond its lease can
+  outlive its ownership. Jobs must honor cancellation, and strict partition
+  safety requires external fencing.
+- **Fail-open gives up shared guarantees.** With `onStoreError: 'open'`,
+  work proceeds without shared rate admission while the store is unavailable.
+  Local concurrency still applies. Global concurrency rejects this policy.
+
+Read [Guarantees](/docs/guarantees/) before choosing rate rules, concurrency
+scope, and store-error behavior. The
+[benchmark comparison](https://github.com/ksaurav24/valve/blob/161d4b09d974ae8f0fcdc4e9b38a1a10c258491e/packages/valve/bench/COMPARISON.md)
+links the recorded performance evidence and remaining work.

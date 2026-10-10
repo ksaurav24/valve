@@ -1,7 +1,7 @@
 documentation:
   - changed-files:
       - any-glob-to-any-file:
-          - 'docs/**'
+          - 'apps/web/**'
           - 'README.md'
           - 'CONTRIBUTING.md'
           - 'SECURITY.md'

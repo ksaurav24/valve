@@ -80,7 +80,9 @@ suite('real Redis/Valkey', () => {
     );
     for (let caseIndex = 0; caseIndex < cases.length; caseIndex++) {
       const data = cases[caseIndex]!;
-      let now = 1791331200000;
+      // Keys expire at absolute times derived from this clock, so it must
+      // stay ahead of the server's real time for the whole run.
+      let now = 4102444800000;
       const memory = memoryStore({ clock: () => now });
       const id = `parity-${caseIndex}`;
       const rules = normalize({
@@ -119,7 +121,47 @@ suite('real Redis/Valkey', () => {
           expected.pausedMs,
         ]);
       }
+      await io.del(...keys);
     }
+  });
+  it('keeps rate and lease keys alive until the times they store', async () => {
+    // PEXPIRETIME needs Redis 7 or Valkey 7.2; Redis 6.2 skips the check.
+    const version = /redis_version:(\d+)/.exec(await io.info('server'))?.[1];
+    if (Number(version) < 7) return;
+    const store = redisStore({ client: io, prefix });
+    const rules = normalize({
+      id: 'expiry',
+      rate: { limit: 100, interval: 1000, burst: 1 },
+    }).rules;
+    for (let i = 0; i < 20; i++) {
+      const id = `expiry-${i}`;
+      const result = await store.acquire({
+        id,
+        rules,
+        costs: [1],
+        lease: { limit: 1, ttlMs: 50, owner: `owner-${i}` },
+      });
+      expect(result.granted).toBe(1);
+      const rate = `${prefix}:{${id}}:r:${rules[0]!.key}`;
+      const leases = `${prefix}:{${id}}:leases`;
+      const arrival = Number(await io.get(rate));
+      const [, lastLease] = await io.zrange(leases, -1, -1, 'WITHSCORES');
+      // A relative TTL counted from Redis's millisecond snapshot expired these
+      // keys up to 1ms early, letting the next admission start too soon.
+      expect(Number(await io.call('PEXPIRETIME', rate))).toBeGreaterThanOrEqual(
+        arrival,
+      );
+      expect(
+        Number(await io.call('PEXPIRETIME', leases)),
+      ).toBeGreaterThanOrEqual(Number(lastLease));
+      expect(await store.renew!(id, result.leases!, 50)).toBe(true);
+      const [, renewed] = await io.zrange(leases, -1, -1, 'WITHSCORES');
+      expect(
+        Number(await io.call('PEXPIRETIME', leases)),
+      ).toBeGreaterThanOrEqual(Number(renewed));
+      await io.del(rate, leases);
+    }
+    await store.close();
   });
   it('keeps 5000 atomic admissions across eight child processes inside the global rolling bound', async () => {
     const id = `multiprocess-${process.pid}`;
