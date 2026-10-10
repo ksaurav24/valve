@@ -508,6 +508,28 @@ describe('cancellation and lifecycle', () => {
 });
 
 describe('pauses and feedback', () => {
+  it('shares observed feedback by id without pausing an independent quota', async () => {
+    const store = memoryStore();
+    const search = make({ id: 'partner:search', concurrency: 1, store });
+    const peer = make({ id: 'partner:search', concurrency: 1, store });
+    const exportData = make({ id: 'partner:export', concurrency: 1, store });
+    search.observe({ status: 429, headers: { 'Retry-After': '1' } });
+
+    const sharedFn = vi.fn(() => 'search complete');
+    const sharedJob = peer.run(sharedFn);
+    const independentJob = exportData.run(() => 'export complete');
+    await tick();
+
+    expect(await independentJob).toBe('export complete');
+    expect(exportData.stats().pausedUntil).toBeNull();
+    expect(sharedFn).not.toHaveBeenCalled();
+    expect(peer.stats().queued).toBe(1);
+    await vi.advanceTimersByTimeAsync(999);
+    expect(sharedFn).not.toHaveBeenCalled();
+    await vi.advanceTimersByTimeAsync(26);
+    expect(await sharedJob).toBe('search complete');
+    expect(sharedFn).toHaveBeenCalledTimes(1);
+  });
   it('extends manual pauses, emits resume on expiry, and leaves no idle timer', async () => {
     const valve = make({ id: 'x', concurrency: 1 });
     const pause = vi.fn();

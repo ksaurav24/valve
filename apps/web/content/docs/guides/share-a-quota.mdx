@@ -35,8 +35,10 @@ export const store = redisStore({ client: redis });
 
 ### Create the valve with the provider's quota
 
-Use one id per credential. Every worker must use the same id, the same rules,
-and the same Redis server and `prefix`.
+For a credential-wide quota, use one id per credential. Every worker must use
+the same id, the same rules, and the same Redis server, database, and `prefix`.
+If the provider has independent endpoint, resource, or model quotas, choose
+separate IDs for those scopes. See [Choose provider quota scopes](/docs/guides/provider-quota-scopes/).
 
 ```ts title="valves.ts"
 import { createValve } from '@ksaurav24/valve';

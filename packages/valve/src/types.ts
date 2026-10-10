@@ -92,8 +92,10 @@ export interface ConcurrencyOptions {
 export interface ValveOptions {
   /**
    * Name of the shared budget. Valves with the same `id` and the same
-   * store share one budget. Include the provider and the credential, for
-   * example `"hubspot:portal-123"` or `"github:app-42"`.
+   * store share matching rate rules and one feedback cooldown. Match the
+   * provider's quota scope: credential, account, endpoint, resource, or model.
+   * Use separate ids for independent quotas, for example
+   * `"partner:credential-42:endpoint-search"`. Use non-secret identifiers.
    *
    * 1 to 200 characters. Must not contain `{` or `}`.
    */
@@ -329,8 +331,9 @@ export interface Valve extends AsyncDisposable {
 
   /**
    * Reads a provider response with this valve's feedback. If it asks for
-   * a pause, every process sharing the valve pauses. Safe to call with
-   * any response, including successes.
+   * a pause, every process sharing its id and store pauses. Feedback applies
+   * to this id; it does not infer provider quota scopes. Safe to call with
+   * any response, including successes. Store writes happen in the background.
    *
    * @example
    * const res = await got(url, { throwHttpErrors: false });

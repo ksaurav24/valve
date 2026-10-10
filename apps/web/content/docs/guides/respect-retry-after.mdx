@@ -5,7 +5,13 @@ description: Read rate limit headers and pause every worker when the provider as
 
 A provider knows its own counters better than you do. valve reads the rate
 limit headers on each response and, when the provider asks for a pause, writes
-it to the store so every worker sharing the id waits.
+it to the store so every worker sharing the id and store waits.
+
+Feedback pauses the configured Valve ID; it does not infer which provider
+quota a response describes. Use the same ID and store for a shared quota,
+and separate IDs for independent quotas. See
+[Choose provider quota scopes](/docs/guides/provider-quota-scopes/) for
+credential-wide, endpoint, and model examples.
 
 ## With fetch
 
