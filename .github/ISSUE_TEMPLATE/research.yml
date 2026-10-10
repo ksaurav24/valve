@@ -1,0 +1,23 @@
+name: Research or investigation
+description: Investigate a hypothesis before committing to an implementation.
+labels: ["research"]
+body:
+  - type: textarea
+    id: hypothesis
+    attributes:
+      label: Question or hypothesis
+    validations:
+      required: true
+  - type: textarea
+    id: evidence
+    attributes:
+      label: Existing evidence
+    validations:
+      required: true
+  - type: textarea
+    id: decision
+    attributes:
+      label: Decision criteria
+      description: What evidence justifies implementation versus documentation or no change?
+    validations:
+      required: true
