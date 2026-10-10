@@ -1,6 +1,6 @@
 name: Performance report
 description: Report a reproducible performance bottleneck or regression.
-labels: ["perf"]
+labels: ['perf']
 body:
   - type: textarea
     id: workload
