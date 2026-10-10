@@ -28,8 +28,10 @@ Check the [changelog](/changelog/) for version history and
   cancellation.
 - Shared pauses from `Retry-After`, IETF `RateLimit`, and `x-ratelimit-*`
   headers, plus backoff for rate limit responses without usable headers.
-- `wrapFetch` retries for 429 responses and 503 responses carrying
-  `Retry-After`. Stream request bodies are not retried.
+- `wrapFetch` retries for 429 responses and 503 responses carrying a valid
+  `Retry-After`, defaulting to GET, HEAD, OPTIONS, PUT and DELETE. Other
+  methods require `retryUnsafeMethods: true`. Streamed `init.body` requests
+  are not retried. Every response still updates provider feedback.
 - ESM and CommonJS entry points with TypeScript declarations, and zero
   runtime or peer dependencies. Applications supply their own Redis client.
 

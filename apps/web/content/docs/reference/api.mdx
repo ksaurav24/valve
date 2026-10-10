@@ -108,16 +108,18 @@ wrapFetch<F extends FetchLike = typeof fetch>(fetchImpl?: F, options?: WrapFetch
 
 Returns a function with the same type as `fetchImpl` (default
 `globalThis.fetch`). It queues each request, observes each response, and
-retries rate limit responses. See [Respect provider feedback](/docs/guides/respect-retry-after/#with-fetch).
+retries eligible rate limit responses for GET, HEAD, OPTIONS, PUT and DELETE
+by default. See [Respect provider feedback](/docs/guides/respect-retry-after/#with-fetch).
 
 #### WrapFetchOptions
 
-| Option     | Type                            | Default         | Description                                                             |
-| ---------- | ------------------------------- | --------------- | ----------------------------------------------------------------------- |
-| `retries`  | `number`                        | `2`             | Retries after a 429, or a 503 with a valid `Retry-After`. `0` disables. |
-| `cost`     | `number \| (...args) => number` | `1`             | Cost per request, or a function of the fetch arguments.                 |
-| `priority` | `number \| (...args) => number` | `0`             | Priority per request, or a function of the fetch arguments.             |
-| `maxWait`  | `Duration`                      | Valve `maxWait` | Queue deadline for each attempt.                                        |
+| Option               | Type                            | Default         | Description                                                                        |
+| -------------------- | ------------------------------- | --------------- | ---------------------------------------------------------------------------------- |
+| `retries`            | `number`                        | `2`             | Retries after a 429, or a 503 with a valid `Retry-After`. `0` disables.            |
+| `retryUnsafeMethods` | `boolean`                       | `false`         | Opt in to retries for other methods after verifying provider-specific idempotency. |
+| `cost`               | `number \| (...args) => number` | `1`             | Cost per request, or a function of the fetch arguments.                            |
+| `priority`           | `number \| (...args) => number` | `0`             | Priority per request, or a function of the fetch arguments.                        |
+| `maxWait`            | `Duration`                      | Valve `maxWait` | Queue deadline for each attempt.                                                   |
 
 The request's abort signal, from `init.signal` or the `Request`, cancels queued
 attempts and is passed to `fetchImpl` for running ones.
@@ -125,6 +127,13 @@ attempts and is passed to `fetchImpl` for running ones.
 `retries` counts additional attempts after the initial request. The default of
 `2` permits up to three total requests. Once the retry limit is exhausted, the
 final response is returned unchanged.
+
+`init.method` overrides the `Request` method; otherwise the method defaults to
+GET. POST, PATCH and unrecognized methods do not retry unless
+`retryUnsafeMethods: true`. A supplied idempotency key does not opt in.
+All responses still update shared cooldowns. Streamed `init.body` requests
+never retry, including with the opt-in enabled. Use a dedicated wrapper for
+verified operations; see the [compatibility notes](/docs/guides/respect-retry-after/#requests-with-side-effects).
 
 ### observe
 
