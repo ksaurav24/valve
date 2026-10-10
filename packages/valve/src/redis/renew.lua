@@ -9,5 +9,6 @@ for i=2,#ARGV do
   else valid = 0 end
 end
 local last = redis.call('ZRANGE', KEYS[1], -1, -1, 'WITHSCORES')
-if #last > 0 then redis.call('PEXPIRE', KEYS[1], math.max(1, math.ceil(tonumber(last[2]) - now))) end
+-- Absolute expiry on the TIME clock; see acquire.lua.
+if #last > 0 then redis.call('PEXPIREAT', KEYS[1], math.ceil(tonumber(last[2]))) end
 return valid

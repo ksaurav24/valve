@@ -76,7 +76,10 @@ if granted > 0 then
   for i = 1, nr do
     local r = rules[i]
     if r.algo == 0 then
-      redis.call('SET', KEYS[i+1], string.format('%.17g', r.a), 'PX', math.max(1, math.ceil(r.a - now)))
+      -- Expire at an absolute time from the same clock as `now`. A relative TTL
+      -- counts from Redis's millisecond snapshot, which can trail TIME, so the
+      -- key could vanish just before its theoretical arrival time.
+      redis.call('SET', KEYS[i+1], string.format('%.17g', r.a), 'PXAT', math.ceil(r.a))
     else
       redis.call('HSET', KEYS[i+1], 'w', string.format('%.17g', r.a), 'n', string.format('%.17g', r.b))
       redis.call('PEXPIRE', KEYS[i+1], math.ceil(r.interval * 2))
@@ -91,7 +94,7 @@ if leaseLimit then
     tokens[i] = token
   end
   local last = redis.call('ZRANGE', slotKey, -1, -1, 'WITHSCORES')
-  if #last > 0 then redis.call('PEXPIRE', slotKey, math.max(1, math.ceil(tonumber(last[2]) - now))) end
+  if #last > 0 then redis.call('PEXPIREAT', slotKey, math.ceil(tonumber(last[2]))) end
   return {granted, math.max(0, retry), 0, tokens}
 end
 return {granted, math.max(0, retry), 0}
