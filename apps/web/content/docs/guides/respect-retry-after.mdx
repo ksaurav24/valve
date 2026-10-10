@@ -123,11 +123,37 @@ To change which headers are read, see [Feedback readers](/docs/reference/feedbac
 
 ## When there is no useful header
 
-A 429 without a usable header triggers exponential backoff: 1s, 2s, 4s, and so
-on, capped at 30s. Any non-429 response resets the sequence. Configure it
-with `backoff: { base, max }`.
+A 429 without a positive provider delay triggers exponential backoff: 1s, 2s,
+4s, and so on, capped at 30s. Configure it with `backoff: { base, max }`.
+
+Each `createValve()` instance tracks its own consecutive 429 responses. A 429
+with a positive provider delay still increments the counter, but uses that
+delay instead of fallback backoff. Any observed non-429 resets only that
+instance's counter. Pause expiry and manual `resume()` do not reset it.
 
 `feedback: false` turns header reading off but keeps 429 backoff.
+
+### Local escalation and shared cooldowns
+
+Backoff escalation is intentionally local; cooldown enforcement belongs to
+the shared store. Workers using the same `id` and shared store respect the
+longest established cooldown. A shorter pause from another worker cannot
+shorten it, and a non-429 response does not clear it.
+
+If 429 responses rotate across workers, escalation can be slower than if one
+instance receives them all. For example, the first headerless 429 on each of
+three instances requests a 1s pause, rather than advancing one shared sequence
+through 1s, 2s, and 4s.
+
+Workers can wake together when a cooldown expires. Every queued request must
+still pass store admission, so configured rate rules continue to apply.
+Simultaneous wakeups can cause contention in store acquisition. A valve
+configured only with concurrency limits can start several requests together;
+configure a rate rule when the provider requires spacing or a request budget.
+
+`observe()` writes pauses in the background. Enforcement across workers begins
+once the store records the pause. A new pause does not cancel requests already
+admitted or running.
 
 ## Cap pauses
 
