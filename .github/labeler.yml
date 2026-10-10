@@ -1,15 +1,15 @@
 documentation:
   - changed-files:
       - any-glob-to-any-file:
-          - "docs/**"
-          - "README.md"
-          - "CONTRIBUTING.md"
-          - "SECURITY.md"
-          - "packages/valve/README.md"
+          - 'docs/**'
+          - 'README.md'
+          - 'CONTRIBUTING.md'
+          - 'SECURITY.md'
+          - 'packages/valve/README.md'
 
 perf:
   - changed-files:
       - any-glob-to-any-file:
-          - "packages/valve/bench/**"
-          - "scripts/*bench*"
-          - "scripts/*footprint*"
+          - 'packages/valve/bench/**'
+          - 'scripts/*bench*'
+          - 'scripts/*footprint*'
