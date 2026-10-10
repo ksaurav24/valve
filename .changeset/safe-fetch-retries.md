@@ -1,5 +1,5 @@
 ---
-'@ksaurav24/valve': minor
+'@ksaurav24/valve': patch
 ---
 
 Automatic `wrapFetch()` retries now default to GET, HEAD, OPTIONS, PUT and DELETE.
