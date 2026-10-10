@@ -1,0 +1,38 @@
+name: Bug report
+description: Report incorrect behavior with a reproducible example.
+labels: ["bug"]
+body:
+  - type: textarea
+    id: behavior
+    attributes:
+      label: Actual behavior
+      description: What happened?
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: Expected behavior
+    validations:
+      required: true
+  - type: textarea
+    id: repro
+    attributes:
+      label: Minimal reproduction
+      description: Include code or steps without credentials.
+    validations:
+      required: true
+  - type: input
+    id: version
+    attributes:
+      label: Valve version or commit
+      placeholder: 0.1.2
+    validations:
+      required: true
+  - type: textarea
+    id: environment
+    attributes:
+      label: Environment
+      description: Node version, Redis/Valkey and client versions, topology if relevant.
+    validations:
+      required: false
