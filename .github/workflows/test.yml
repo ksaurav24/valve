@@ -25,9 +25,26 @@ jobs:
       - run: pnpm check:source
       - run: pnpm check:package
       - run: pnpm check:size
-      - run: pnpm --filter @ksaurav24/valve docs:api
+  website:
+    name: website
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803
+        with:
+          persist-credentials: false
+      - uses: pnpm/action-setup@0977fd99725f1db4007ccb2928dbb4e90d06cc86
+      - uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38
+        with:
+          node-version-file: .node-version
+          cache: pnpm
+      # Vercel checkouts may lack origin. Keep install hooks and the full
+      # website build independent of remote discovery (including TypeDoc).
+      - name: Reproduce Vercel checkout without origin
+        run: git remote remove origin
+      - run: pnpm install --frozen-lockfile
       - run: pnpm --filter @valve/web test
-      - run: pnpm docs:build
+      - name: Build website for deployment
+        run: pnpm docs:build
       - run: pnpm --filter @valve/web exec playwright install --with-deps chromium
       - run: pnpm --filter @valve/web test:browser
   integration:
