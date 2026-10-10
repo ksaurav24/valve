@@ -1,0 +1,202 @@
+// Verify the MDX site, navigation, search, and layout.
+import { expect, test } from '@playwright/test';
+import release from '../.generated/release.json' with { type: 'json' };
+test('introduction renders without horizontal overflow', async ({
+  page,
+}, info) => {
+  await page.goto('/docs/');
+  await expect(page.getByRole('heading', { level: 1 })).toHaveText(
+    'Introduction',
+  );
+  await expect(
+    page.getByRole('link', { name: /Migrate from Bottleneck/ }).first(),
+  ).toBeVisible();
+  const overflow = await page.evaluate(
+    () => document.documentElement.scrollWidth > window.innerWidth,
+  );
+  expect(overflow).toBe(false);
+  await page.screenshot({
+    path: `/tmp/valve-docs-${info.project.name}.png`,
+    fullPage: true,
+  });
+});
+test('every page and the generated reference resolve', async ({
+  page,
+  request,
+}) => {
+  for (const route of [
+    '/docs/installation/',
+    '/docs/quickstart/',
+    '/docs/concepts/',
+    '/docs/choosing-an-algorithm/',
+    '/docs/guarantees/',
+    '/docs/guides/share-a-quota/',
+    '/docs/guides/global-concurrency/',
+    '/docs/guides/respect-retry-after/',
+    '/docs/guides/priorities-and-shutdown/',
+    '/docs/guides/error-handling/',
+    '/docs/guides/observability/',
+    '/docs/examples/',
+    '/docs/examples/http-clients/',
+    '/docs/examples/batch-scripts/',
+    '/docs/examples/queue-workers/',
+    '/docs/examples/request-handlers/',
+    '/docs/examples/per-tenant-budgets/',
+    '/docs/examples/layered-quotas/',
+    '/docs/migration/from-bottleneck/',
+    '/docs/reference/api/',
+    '/docs/reference/redis-store/',
+    '/docs/reference/feedback/',
+    '/docs/reference/errors/',
+    '/docs/reference/events/',
+    '/docs/reference/custom-stores/',
+    '/docs/reference/implementation-status/',
+    '/docs/reference/testing/',
+    '/docs/faq/',
+    '/api/index.html',
+  ]) {
+    const response = await request.get(route);
+    expect(response.status(), route).toBe(200);
+  }
+  await page.goto('/docs/guarantees/');
+  await expect(page.getByRole('heading', { level: 1 })).toHaveText(
+    'Guarantees',
+  );
+  await expect(
+    page.getByRole('heading', { name: /^Grants and cancellation/, level: 2 }),
+  ).toBeVisible();
+});
+test('built search finds the Bottleneck migration guide', async ({ page }) => {
+  await page.goto('/docs/');
+  await page
+    .getByRole('button', { name: /Search/ })
+    .first()
+    .click();
+  await page.getByRole('combobox').fill('bottleneck');
+  await expect(
+    page
+      .getByRole('option')
+      .filter({ hasText: 'Migrate from Bottleneck' })
+      .first(),
+  ).toBeVisible();
+});
+
+test('home page leads with install, usage, and documentation', async ({
+  page,
+  request,
+}) => {
+  await page.goto('/');
+  await expect(page.getByRole('heading', { level: 1 })).toHaveText(
+    'Shared rate limits for outbound API calls.',
+  );
+  await expect(
+    page.getByRole('link', { name: 'Get started', exact: true }),
+  ).toHaveAttribute('href', '/docs/quickstart/');
+  await expect(
+    page.getByRole('link', { name: 'valve home' }).locator('svg, img'),
+  ).toHaveCount(0);
+  await expect(
+    page.getByRole('link', { name: /^v\d+\.\d+\.\d+/ }).first(),
+  ).toContainText(release.version);
+  // Unpublished packages default to the source install, never a registry claim.
+  await expect(page.getByRole('tab', { name: 'source' })).toHaveAttribute(
+    'aria-selected',
+    'true',
+  );
+  await page.getByRole('tab', { name: 'shared.ts' }).click();
+  await expect(page.getByRole('tabpanel', { name: 'shared.ts' })).toContainText(
+    'redisStore',
+  );
+  expect(
+    await page.evaluate(
+      () => document.documentElement.scrollWidth > window.innerWidth,
+    ),
+  ).toBe(false);
+  for (const route of [
+    '/docs/',
+    '/changelog/',
+    '/releases/',
+    '/contributors/',
+  ]) {
+    expect((await request.get(route)).status(), route).toBe(200);
+  }
+  expect((await request.get('/blog/')).status()).toBe(404);
+  await page.goto('/changelog/');
+  await expect(
+    page
+      .getByRole('heading', { level: 2 })
+      .getByRole('link', { name: release.version, exact: true }),
+  ).toBeVisible();
+});
+
+test('releases list only published versions', async ({ page }) => {
+  await page.goto('/releases/');
+  await expect(page.getByRole('heading', { level: 1 })).toHaveText('Releases');
+  await expect(
+    page.getByRole('heading', { name: 'No published releases yet' }),
+  ).toBeVisible();
+  await expect(page.locator('main')).not.toContainText('latest');
+});
+
+test('contributors page renders people and the root guide', async ({
+  page,
+}) => {
+  await page.goto('/contributors/');
+  await expect(page.getByRole('heading', { level: 1 })).toHaveText(
+    'Built in the open',
+  );
+  await expect(
+    page.getByRole('link', { name: /contribution/ }).first(),
+  ).toBeVisible();
+  await expect(
+    page.getByRole('heading', { name: 'Commit conventions', level: 2 }),
+  ).toBeVisible();
+  await expect(
+    page.getByRole('link', { name: 'the Code of Conduct' }),
+  ).toHaveAttribute(
+    'href',
+    'https://github.com/ksaurav24/valve/blob/master/CODE_OF_CONDUCT.md',
+  );
+});
+
+test('former docs URLs preserve query strings and heading anchors', async ({
+  page,
+}) => {
+  await page.goto('/guarantees/?from=bookmark#store-failures');
+  await page.waitForURL('**/docs/guarantees/?from=bookmark#store-failures');
+  await expect(page.getByRole('heading', { level: 1 })).toHaveText(
+    'Guarantees',
+  );
+});
+
+test('theme defaults to dark and persists between pages with reduced motion', async ({
+  page,
+}, info) => {
+  await page.emulateMedia({ colorScheme: 'light', reducedMotion: 'reduce' });
+  await page.goto('/');
+  await page.evaluate(() => localStorage.removeItem('theme'));
+  await page.reload();
+  await expect(page.locator('html')).toHaveClass(/dark/);
+  await page
+    .getByRole('button', { name: 'Toggle color theme', exact: true })
+    .click();
+  await expect(page.locator('html')).not.toHaveClass(/dark/);
+  await expect(page.locator('html')).not.toHaveAttribute(
+    'data-theme-transition',
+    'active',
+  );
+  await page.goto('/docs/');
+  await expect(page.locator('html')).not.toHaveClass(/dark/);
+  if (info.project.name === 'mobile') {
+    await page
+      .getByRole('button', { name: 'Open Sidebar', exact: true })
+      .click();
+  }
+  await page
+    .getByRole('button', { name: 'Toggle color theme', exact: true })
+    .first()
+    .click();
+  await expect(page.locator('html')).toHaveClass(/dark/);
+  await page.reload();
+  await expect(page.locator('html')).toHaveClass(/dark/);
+});

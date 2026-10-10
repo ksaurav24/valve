@@ -26,9 +26,10 @@ jobs:
       - run: pnpm check:package
       - run: pnpm check:size
       - run: pnpm --filter @ksaurav24/valve docs:api
+      - run: pnpm --filter @valve/web test
       - run: pnpm docs:build
-      - run: pnpm --filter @valve/docs exec playwright install --with-deps chromium
-      - run: pnpm --filter @valve/docs test:browser
+      - run: pnpm --filter @valve/web exec playwright install --with-deps chromium
+      - run: pnpm --filter @valve/web test:browser
   integration:
     name: integration (${{ matrix.image }})
     runs-on: ubuntu-latest

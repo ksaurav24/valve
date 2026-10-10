@@ -1,6 +1,6 @@
 {
   "entryPoints": ["src/index.ts", "src/headers/index.ts", "src/redis/index.ts"],
-  "out": "../../docs/public/api",
+  "out": "../../apps/web/public/api",
   "treatWarningsAsErrors": true,
   "excludePrivate": true,
   "excludeInternal": true,

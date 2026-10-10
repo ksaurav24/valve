@@ -14,8 +14,8 @@ export default tseslint.config(
       '**/.next/**',
       '**/.source/**',
       '**/out/**',
-      'docs/next-env.d.ts',
-      'docs/public/api/**',
+      'apps/web/next-env.d.ts',
+      'apps/web/public/api/**',
     ],
   },
   js.configs.recommended,
@@ -23,6 +23,16 @@ export default tseslint.config(
   {
     files: ['packages/valve/src/**/*.ts'],
     rules: { 'no-restricted-imports': ['error', { patterns: ['node:*'] }] },
+  },
+  {
+    // shadcn registry components drop props by destructuring them away.
+    files: ['apps/web/components/ui/**/*.tsx'],
+    rules: {
+      '@typescript-eslint/no-unused-vars': [
+        'error',
+        { ignoreRestSiblings: true, argsIgnorePattern: '^_' },
+      ],
+    },
   },
   {
     files: ['scripts/smoke.cjs'],
