@@ -8,7 +8,7 @@
   },
   "dependencies": {
     "@ksaurav24/valve": "workspace:*",
-    "ioredis": "5.11.1"
+    "ioredis": "6.0.0"
   },
   "devDependencies": {
     "tsx": "4.23.15"
