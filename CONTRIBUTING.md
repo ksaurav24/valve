@@ -5,13 +5,35 @@
 Use Node.js 24 and pnpm 11.28.4. Install pnpm with your preferred package manager,
 then run `pnpm install`. Git hooks are installed automatically.
 
-Create a branch from `master` and open a pull request when the change is ready.
-Run `pnpm check` before submitting it. It includes tests, types, builds, source
-conventions, packaging, and measured bundle regression ceilings.
-Use `pnpm format` to format files.
+## Pull request workflow
+
+1. Fork [ksaurav24/valve](https://github.com/ksaurav24/valve) to your GitHub account.
+2. Clone your fork and add the original repository as upstream:
+
+   ```sh
+   git clone https://github.com/YOUR_USERNAME/valve.git
+   cd valve
+   git remote add upstream https://github.com/ksaurav24/valve.git
+   ```
+
+3. Create a branch from the latest upstream `master`:
+
+   ```sh
+   git fetch upstream
+   git switch -c fix/42-short-description upstream/master
+   ```
+
+4. Make your changes, run `pnpm format` and `pnpm check`, and commit.
+5. Push your branch with `git push -u origin fix/42-short-description`.
+6. Open a pull request **from your fork into `ksaurav24/valve:master`**. Describe the change, link the issue (for example, `Closes #42`), and ensure checks pass.
+
+**Preferred branch naming:** `<type>/<issue-number>-<short-description>`.
+Examples: `feat/12-add-provider-feedback`, `fix/42-scheduler-timing`, `docs/15-update-quickstart`, `refactor/38-simplify-queue`, `test/51-add-gcra-tests`, and `chore/24-update-dependencies`. Issue numbers are preferred when a related issue exists, but are not mandatory; `docs/improve-readme` is also valid. Branch naming is not enforced.
+
+`pnpm check` includes tests, types, builds, source conventions, packaging, and measured bundle regression ceilings.
 
 The repository is a pnpm monorepo. Library packages will live in `packages/*`
-and use the `@ksaurav24` scope. The 0.1.2 library lives in `packages/valve`, with an website in `apps/web/` and
+and use the `@ksaurav24` scope. The library lives in `packages/valve`, with an website in `apps/web/` and
 runnable use cases in `examples/`.
 
 New TypeScript packages should extend the root `tsconfig.base.json` and provide
@@ -69,13 +91,8 @@ search index into `apps/web/out/`. After `pnpm docs:build`, run
 with `pnpm --filter @valve/web exec playwright install chromium` first.
 
 See `packages/valve/bench/COMPARISON.md` for measured targets that remain open.
-Keep `pvt/` untracked; source checks use the tracked TODO register for CI.
 
-## Code navigation and performance
-
-Install CodeGraph separately, then run `codegraph init --yes` once and
-`pnpm codegraph:sync` after changes. The local `.codegraph/` index is ignored;
-private `pvt/` material must remain ignored and untracked.
+## Performance
 
 Run `pnpm bench:compare` for repeated comparisons with Bottleneck, p-limit and
 p-queue. Set `REDIS_URL` and `VALKEY_URL` to include shared-store cases. Raw
