@@ -1,6 +1,6 @@
 name: Bug report
 description: Report incorrect behavior with a reproducible example.
-labels: ["bug"]
+labels: ['bug']
 body:
   - type: textarea
     id: behavior
