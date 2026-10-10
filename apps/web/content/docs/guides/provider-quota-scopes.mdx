@@ -1,0 +1,143 @@
+---
+title: Choose provider quota scopes
+description: Choose Valve IDs that deliberately share budgets and isolate independent cooldowns.
+---
+
+Choose a Valve `id` for each quota scope the provider actually enforces. A
+scope might cover a credential, account, endpoint, resource, or model. Check
+the provider's quota documentation for your account before choosing IDs.
+The limits and provider names below are illustrative.
+
+Valves with the same ID and shared store share matching rate rules and one
+cooldown. `observe()` applies feedback to the ID of the valve you call it on;
+`wrapFetch()` and the `observe` run option do the same automatically. Valve
+does not discover quota scopes from request URLs, credentials, or response
+headers. A custom feedback reader changes the delay, not its scope.
+
+## Share a credential-wide quota
+
+If all endpoints spend one credential-wide quota, use the same ID, store,
+and rate rules for every caller. Two local instances can share an explicit
+memory store:
+
+```ts
+import { createValve, memoryStore } from '@ksaurav24/valve';
+
+const store = memoryStore();
+const options = {
+  id: 'partner:credential-42',
+  rate: { limit: 100, interval: '1s' },
+  store,
+} as const;
+
+const contacts = createValve(options);
+const orders = createValve(options);
+const contactsFetch = contacts.wrapFetch();
+const ordersFetch = orders.wrapFetch();
+```
+
+Both wrappers spend the same budget. Feedback from either pauses new
+admissions through both. Giving contacts and orders different IDs would
+incorrectly give each a full budget and let one ignore the other's cooldown.
+
+Across processes, use Redis or Valkey with the same server, database, prefix,
+ID, and rules. Each process can create its own `redisStore` instance pointing
+at that shared namespace. See [Share a quota](/docs/guides/share-a-quota/).
+Omitting `store` creates a private memory store for each valve: the same ID
+alone does not share anything.
+
+## Separate independent endpoint or model quotas
+
+If the provider enforces independent quotas, give them different IDs. They
+can still use the same store:
+
+```ts
+import { createValve, memoryStore } from '@ksaurav24/valve';
+
+const store = memoryStore();
+const search = createValve({
+  id: 'partner:credential-42:endpoint-search',
+  rate: { limit: 20, interval: '1s' },
+  store,
+});
+const exportData = createValve({
+  id: 'partner:credential-42:endpoint-export',
+  rate: { limit: 5, interval: '1s' },
+  store,
+});
+
+const searchFetch = search.wrapFetch();
+const exportFetch = exportData.wrapFetch();
+```
+
+Route search calls through `searchFetch` and export calls through `exportFetch`.
+A search cooldown does not pause exports. For independent model quotas, use
+IDs such as `inference:account-42:model-small` and
+`inference:account-42:model-large`, routing each request to its model's valve.
+If models share a quota pool, use the pool's ID instead.
+
+Different rate rules under one ID do not isolate feedback: a pause belongs
+to the whole ID. Include stable, non-secret credential or account identifiers
+in IDs; do not put raw API keys in Redis key names. IDs must be 1 to 200
+characters and contain no `{` or `}`.
+
+## Verify sharing and isolation
+
+This example needs no HTTP server or Redis. It feeds a synthetic 429 into a
+shared memory store, verifies a same-ID caller waits while another ID runs,
+then resumes the shared scope explicitly:
+
+```ts
+import assert from 'node:assert/strict';
+import { createValve, memoryStore } from '@ksaurav24/valve';
+
+const store = memoryStore();
+const search = createValve({ id: 'partner:search', concurrency: 1, store });
+const searchPeer = createValve({ id: 'partner:search', concurrency: 1, store });
+const exportData = createValve({ id: 'partner:export', concurrency: 1, store });
+
+try {
+  search.observe({ status: 429, headers: { 'Retry-After': '60' } });
+  let searchStarted = false;
+  const waiting = searchPeer.run(() => {
+    searchStarted = true;
+    return 'search complete';
+  });
+
+  assert.equal(
+    await exportData.run(() => 'export complete'),
+    'export complete',
+  );
+  assert.equal(searchStarted, false);
+  assert.equal(searchPeer.stats().queued, 1);
+
+  await search.resume();
+  assert.equal(await waiting, 'search complete');
+} finally {
+  await Promise.all([search.close(), searchPeer.close(), exportData.close()]);
+  await store.close();
+}
+```
+
+The memory store records this pause synchronously. `observe()` returns `void`;
+with Redis, its write happens in the background, so other workers enforce the
+pause after the store records it. Pauses do not cancel already admitted or
+running requests. See [Respect provider feedback](/docs/guides/respect-retry-after/).
+
+## Avoid scope mismatches
+
+- Do not add worker IDs or random suffixes when workers share a provider quota.
+  They would each spend an independent budget.
+- Do not combine unrelated credentials, endpoints, or models under one ID
+  when their quotas are independent. Feedback would pause unrelated traffic.
+- Do not assume a different URL means a different quota, or that one
+  credential always means one quota. Follow the provider's documented scope.
+- Keep rules consistent across callers sharing a quota. A list of rate rules
+  applies every rule to every job in that valve; it does not select rules by
+  endpoint or model. See [Layered quotas](/docs/examples/layered-quotas/).
+
+If a request consumes both an account-wide quota and an independent model
+quota, separate IDs alone do not enforce both. Coordinate admission through
+the relevant valves in your application and send feedback to the scope it
+describes. Admissions across different IDs are not atomic. Valve does not
+automatically route responses to multiple scopes.

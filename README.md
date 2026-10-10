@@ -92,6 +92,7 @@ See [website maintenance](apps/web/README.md) for content and routing convention
 
 - [Quickstart](apps/web/content/docs/quickstart.mdx)
 - [Share a quota](apps/web/content/docs/guides/share-a-quota.mdx)
+- [Choose provider quota scopes](apps/web/content/docs/guides/provider-quota-scopes.mdx)
 - [Respect Retry-After](apps/web/content/docs/guides/respect-retry-after.mdx)
 - [Priorities and shutdown](apps/web/content/docs/guides/priorities-and-shutdown.mdx)
 - [Migrate from Bottleneck](apps/web/content/docs/migration/from-bottleneck.mdx)

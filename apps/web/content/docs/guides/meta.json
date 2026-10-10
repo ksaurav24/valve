@@ -2,6 +2,7 @@
   "title": "Guides",
   "pages": [
     "share-a-quota",
+    "provider-quota-scopes",
     "global-concurrency",
     "respect-retry-after",
     "priorities-and-shutdown",
