@@ -638,6 +638,169 @@ describe('pauses and feedback', () => {
   });
 });
 
+describe('optional subscriptions', () => {
+  it.each(['sync', 'async'] as const)(
+    'admits through the %s store while subscription startup remains pending',
+    async (mode) => {
+      const backing = memoryStore();
+      const acquire = vi.fn(backing.acquire);
+      const acquireSync = vi.fn(backing.acquireSync!);
+      const subscribe = vi.fn(() => new Promise<() => void>(() => {}));
+      const store: Store = { ...backing, acquire, acquireSync, subscribe };
+      if (mode === 'async') delete store.acquireSync;
+      const valve = make({
+        id: 'pending',
+        rate: { limit: 10, interval: '1s' },
+        store,
+      });
+      const job = valve.run(() => 42);
+      await tick();
+      expect(valve.stats().totals.started).toBe(1);
+      expect(await job).toBe(42);
+      expect(mode === 'sync' ? acquireSync : acquire).toHaveBeenCalledTimes(1);
+      expect(subscribe).toHaveBeenCalledTimes(1);
+      await valve.close({ drain: true });
+      expect(vi.getTimerCount()).toBe(0);
+    },
+  );
+  it('keeps shared rate limits and store pauses authoritative without notifications', async () => {
+    const backing = memoryStore();
+    await backing.pause('shared', 100);
+    const store = {
+      ...backing,
+      subscribe: () => new Promise<() => void>(() => {}),
+    };
+    const options = { id: 'shared', rate: { limit: 1, interval: 100 }, store };
+    const first = make(options);
+    const second = make(options);
+    const jobs = [first.run(() => Date.now()), second.run(() => Date.now())];
+    await vi.advanceTimersByTimeAsync(99);
+    expect(first.stats().totals.started + second.stats().totals.started).toBe(
+      0,
+    );
+    await vi.advanceTimersByTimeAsync(1);
+    expect(first.stats().totals.started + second.stats().totals.started).toBe(
+      1,
+    );
+    await vi.advanceTimersByTimeAsync(100);
+    expect((await Promise.all(jobs)).sort((a, b) => a - b)).toEqual([100, 200]);
+  });
+  it('keeps queued jobs abortable, bounded by maxWait, and closable during startup', async () => {
+    const acquire = vi
+      .fn<Store['acquire']>()
+      .mockResolvedValue({ granted: 0, retryAfterMs: 1000, pausedMs: 0 });
+    const valve = make({
+      id: 'pending',
+      concurrency: 1,
+      store: {
+        ...failing(acquire),
+        subscribe: () => new Promise<() => void>(() => {}),
+      },
+    });
+    const controller = new AbortController();
+    const aborted = expect(
+      valve.run(() => 1, { signal: controller.signal }),
+    ).rejects.toMatchObject({ code: 'ABORTED' });
+    const expired = expect(
+      valve.run(() => 2, { maxWait: 100 }),
+    ).rejects.toMatchObject({ code: 'MAX_WAIT_EXCEEDED' });
+    const closed = expect(valve.run(() => 3)).rejects.toMatchObject({
+      code: 'CLOSED',
+    });
+    await tick();
+    expect(acquire).toHaveBeenCalledTimes(1);
+    controller.abort();
+    await aborted;
+    await vi.advanceTimersByTimeAsync(100);
+    await expired;
+    await valve.close();
+    await closed;
+    expect(valve.stats().totals.started).toBe(0);
+    expect(vi.getTimerCount()).toBe(0);
+  });
+  it.each(['wait', 'open', 'throw'] as const)(
+    'reports a failed subscription without applying the %s admission error policy',
+    async (onStoreError) => {
+      let reject!: (error: Error) => void;
+      const backing = memoryStore();
+      const valve = make({
+        id: 'failed',
+        concurrency: 1,
+        onStoreError,
+        store: {
+          ...backing,
+          subscribe: () =>
+            new Promise<() => void>((_resolve, r) => {
+              reject = r;
+            }),
+        },
+      });
+      const errors = vi.fn();
+      valve.on('store-error', errors);
+      reject(new Error('subscriber offline'));
+      const job = valve.run(() => 42);
+      await tick();
+      expect(await job).toBe(42);
+      expect(errors).toHaveBeenCalledTimes(1);
+      expect(valve.stats().totals.storeErrors).toBe(1);
+    },
+  );
+  it('restores fast wake-ups after late readiness without subscribing again', async () => {
+    const backing = memoryStore();
+    let resolve!: (off: () => void) => void;
+    let notify!: Parameters<NonNullable<Store['subscribe']>>[1];
+    const off = vi.fn();
+    const subscribe = vi.fn((_id: string, listener: typeof notify) => {
+      notify = listener;
+      return new Promise<() => void>((r) => {
+        resolve = r;
+      });
+    });
+    const valve = make({
+      id: 'recover',
+      concurrency: 1,
+      store: { ...backing, subscribe },
+    });
+    await backing.pause('recover', 1000);
+    const job = valve.run(() => Date.now());
+    await tick();
+    expect(valve.stats().queued).toBe(1);
+    await vi.advanceTimersByTimeAsync(100);
+    resolve(off);
+    await tick();
+    await backing.resume('recover');
+    notify({ type: 'resume' });
+    await tick();
+    expect(await job).toBe(100);
+    expect(subscribe).toHaveBeenCalledTimes(1);
+    await valve.close();
+    expect(off).toHaveBeenCalledTimes(1);
+    expect(vi.getTimerCount()).toBe(0);
+  });
+  it('unsubscribes once when startup completes after close', async () => {
+    let resolve!: (off: () => void) => void;
+    const off = vi.fn();
+    const backing = memoryStore();
+    const valve = make({
+      id: 'closed',
+      concurrency: 1,
+      store: {
+        ...backing,
+        subscribe: () =>
+          new Promise<() => void>((r) => {
+            resolve = r;
+          }),
+      },
+    });
+    await valve.close();
+    resolve(off);
+    await tick();
+    await valve.close();
+    expect(off).toHaveBeenCalledTimes(1);
+    expect(vi.getTimerCount()).toBe(0);
+  });
+});
+
 describe('store error policies', () => {
   it('retains jitter for outage retries', async () => {
     const random = vi.spyOn(Math, 'random').mockReturnValue(0.5);
