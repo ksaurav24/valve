@@ -47,6 +47,37 @@ export class JobQueue<T extends Queued> {
     }
     this.items[i] = job;
   }
+  private siftDown(i: number, job: T) {
+    while (i * 2 + 1 < this.items.length) {
+      let child = i * 2 + 1;
+      if (
+        child + 1 < this.items.length &&
+        this.better(this.items[child + 1]!, this.items[child]!)
+      )
+        child++;
+      if (!this.better(this.items[child]!, job)) break;
+      this.items[i] = this.items[child]!;
+      i = child;
+    }
+    this.items[i] = job;
+  }
+  private compact() {
+    if (!this.size) {
+      this.items = [];
+      this.head = 0;
+      this.heap = false;
+    } else if (this.items.length > 1024 && this.items.length > this.size * 2) {
+      // Drop consumed FIFO entries as well as cancellation tombstones.
+      this.items = this.items
+        .slice(this.head)
+        .filter((job) => job.state === 'queued');
+      this.head = 0;
+      // Filtering a heap can break its ordering; rebuild it in linear time.
+      if (this.heap)
+        for (let i = (this.items.length >>> 1) - 1; i >= 0; i--)
+          this.siftDown(i, this.items[i]!);
+    }
+  }
   private popRaw(): T | undefined {
     if (!this.heap) {
       const job = this.items[this.head++];
@@ -58,21 +89,7 @@ export class JobQueue<T extends Queued> {
     }
     const first = this.items[0];
     const last = this.items.pop();
-    if (this.items.length && last) {
-      let i = 0;
-      while (i * 2 + 1 < this.items.length) {
-        let child = i * 2 + 1;
-        if (
-          child + 1 < this.items.length &&
-          this.better(this.items[child + 1]!, this.items[child]!)
-        )
-          child++;
-        if (!this.better(this.items[child]!, last)) break;
-        this.items[i] = this.items[child]!;
-        i = child;
-      }
-      this.items[i] = last;
-    }
+    if (this.items.length && last) this.siftDown(0, last);
     return first;
   }
   take(count: number): T[] {
@@ -85,12 +102,14 @@ export class JobQueue<T extends Queued> {
         jobs.push(job);
       }
     }
+    this.compact();
     return jobs;
   }
   cancel(job: T) {
     if (job.state === 'queued') {
       this.size--;
       job.state = 'cancelled';
+      this.compact();
     }
   }
 }
