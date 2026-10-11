@@ -84,7 +84,6 @@ export function createValve(options: ValveOptions): Valve {
   const owner = config.global ? globalThis.crypto.randomUUID() : '';
   let leaseSequence = 0;
   let unsubscribe: (() => void) | undefined;
-  let subscriptionReady = true;
   let noticeVersion = 0;
   const leases = config.global
     ? leaseManager(store, id, config.leaseTtl, reportStore, () => {
@@ -359,7 +358,7 @@ export function createValve(options: ValveOptions): Valve {
   }
   function pump() {
     scheduled = false;
-    if (inFlight || !subscriptionReady) return;
+    if (inFlight) return;
     const now = Date.now();
     if (!waiting.size) {
       finishIdle();
@@ -727,18 +726,12 @@ export function createValve(options: ValveOptions): Valve {
     try {
       const ready = store.subscribe(id, listener);
       if (typeof ready === 'function') unsubscribe = ready;
-      else {
-        subscriptionReady = false;
-        void ready
-          .then((off) => {
-            if (closingStore) off();
-            else unsubscribe = off;
-          }, reportStore)
-          .finally(() => {
-            subscriptionReady = true;
-            schedule();
-          });
-      }
+      // Notifications accelerate wake-ups; admission never waits for them.
+      else
+        void ready.then((off) => {
+          if (closingStore) off();
+          else unsubscribe = off;
+        }, reportStore);
     } catch (error) {
       reportStore(error);
     }
