@@ -53,7 +53,17 @@ when you need confirmation that the store recorded the pause.
 
 A job cancelled while its acquire is in flight does not run, but its grant is
 spent and not reused. A timed-out Redis call can also spend budget after valve
-has given up on it. Both cases reduce throughput. Neither raises the rate.
+has given up on it. Both cases reduce throughput. Neither raises the rate
+under `onStoreError: 'wait'` or `'throw'`.
+
+A Redis timeout does not cancel the client command. An offline queue can replay
+it after reconnection, creating an abandoned lease or applying a late pause,
+resume, renewal, or release. Lease TTLs start at server execution; renewal never
+resurrects expired ownership, and release only removes the supplied tokens.
+Disable client offline queues to reject commands issued while disconnected.
+Commands already sent still have an unknown outcome, with no exactly-once
+execution guarantee. See [Timeouts and reconnection](/docs/reference/redis-store/#timeouts-and-reconnection)
+for client settings and operation effects.
 
 ## Ordering
 

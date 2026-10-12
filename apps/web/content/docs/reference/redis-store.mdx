@@ -37,6 +37,78 @@ Invalid options throw `ValveError` with code `INVALID_OPTIONS`, including a
 Clients are matched by shape, not imported. valve never opens, closes, or
 reconfigures them.
 
+## Timeouts and reconnection
+
+`timeout` bounds how long valve waits for a store operation. It does not cancel
+or remove the underlying client command. A timeout has an **unknown outcome**:
+Redis may already have executed the script, or the client may send it after
+reconnecting. Successful reconnection does not make the earlier call successful.
+
+Disable offline queuing on the command client to reject commands issued while
+disconnected. For ioredis, also disable automatic resending of unfulfilled
+commands and bound request retries:
+
+```ts
+import { Redis } from 'ioredis';
+
+const redis = new Redis(process.env.REDIS_URL!, {
+  lazyConnect: true,
+  enableOfflineQueue: false,
+  autoResendUnfulfilledCommands: false,
+  maxRetriesPerRequest: 1,
+  retryStrategy: (attempt) => Math.min(attempt * 100, 1000),
+});
+redis.on('error', (error) => console.error('Redis connection error', error));
+await redis.connect(); // Wait for readiness before passing the client to valve.
+const store = redisStore({ client: redis, timeout: '2s' });
+```
+
+For node-redis v4/v5:
+
+```ts
+import { createClient } from 'redis';
+
+const redis = createClient({
+  url: process.env.REDIS_URL!,
+  disableOfflineQueue: true,
+  socket: {
+    reconnectStrategy: (attempt) => Math.min((attempt + 1) * 100, 1000),
+  },
+});
+redis.on('error', (error) => console.error('Redis connection error', error));
+await redis.connect();
+const store = redisStore({ client: redis, timeout: '2s' });
+```
+
+These examples cap reconnect delays while allowing recovery. Choose an outage
+retry budget for your application, and set valve's `maxWait` to bound how long
+jobs wait under `onStoreError: 'wait'`. Client retry settings and valve's timeout
+are separate controls. See the [ioredis reconnect and offline queue documentation](https://github.com/redis/ioredis#auto-reconnect)
+and [node-redis client configuration](https://github.com/redis/node-redis/blob/master/docs/client-configuration.md).
+
+Disabling offline queues prevents replay of commands issued while disconnected;
+it does not cancel commands already sent to Redis, roll back scripts, or provide
+exactly-once execution. valve does not change your client's settings.
+
+| Timed-out operation | Possible effect after reconnection                                                                                                             |
+| ------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------- |
+| `acquire`           | Spends rate budget without starting the abandoned job. A global lease can occupy a slot until its TTL expires, measured from server execution. |
+| `pause`             | Writes or extends a pause after the caller saw an error.                                                                                       |
+| `resume`            | Removes a pause after the caller saw an error.                                                                                                 |
+| `renew`             | Extends an existing unexpired token. It cannot resurrect expired ownership or renew a replacement token.                                       |
+| `release`           | Removes only the supplied tokens. An expired old token cannot release its replacement.                                                         |
+
+With `wait` and `throw`, late acquire responses do not run the abandoned callback;
+Redis still enforces the rate rules. With `open`, a job can run before Redis
+recovers, so shared rate bounds do not hold. Global concurrency rejects `open`.
+
+Queued pause/resume commands preserve order in the tested single-client offline
+FIFO case. There is no ordering guarantee across clients, failovers, or retries.
+After a control-operation timeout, let pending commands settle or discard the
+original connection before reapplying the desired pause or resume through a
+healthy connection. Otherwise an older queued command can overwrite that
+correction later. The error alone does not establish which state Redis holds. See [Guarantees](/docs/guarantees/).
+
 ## Bring your own client
 
 Implement two methods. Errors whose message contains `NOSCRIPT` must be

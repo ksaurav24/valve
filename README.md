@@ -32,7 +32,11 @@ const response = await limitedFetch('https://api.example.com/contacts');
 ```
 
 Pass a connected `ioredis` or `node-redis` client. valve uses its structural
-interface and never owns its connection. Each worker uses the same server,
+interface and never owns its connection. Disable command-client offline queues
+(`enableOfflineQueue: false` for ioredis, `disableOfflineQueue: true` for
+node-redis) to reject commands issued while disconnected. Store timeouts do not
+cancel commands already sent; see [timeouts and reconnection](apps/web/content/docs/reference/redis-store.mdx#timeouts-and-reconnection).
+Each worker uses the same server,
 prefix, id, and rules. The library has zero runtime and peer dependencies.
 
 `wrapFetch` retries rate limit responses for GET, HEAD, OPTIONS, PUT and
