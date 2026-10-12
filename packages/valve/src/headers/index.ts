@@ -114,24 +114,35 @@ export function xRateLimit(options: XRateLimitOptions = {}): Feedback {
     };
   };
 }
-/** Combine readers, keeping the longest pause and first remaining/reset values.
- * @param feedbacks Readers in precedence order.
+/** Combine readers, keeping the longest explicit pause and exhausted quota window.
+ * Remaining/reset stay paired; without exhaustion, the first quota reader wins.
+ * @param feedbacks Readers in precedence order for non-exhausted quotas and ties.
  * @returns A composed feedback reader.
  * @example const feedback = combine(retryAfter(), xRateLimit());
  */
 export function combine(...feedbacks: readonly Feedback[]): Feedback {
   return (response) => {
     let result: FeedbackSignal | undefined;
+    let quota: FeedbackSignal | undefined;
     for (const reader of feedbacks) {
       const next = reader(response);
       if (!next) continue;
       result ??= {};
       if (next.pauseMs !== undefined)
         result.pauseMs = Math.max(result.pauseMs ?? 0, next.pauseMs);
-      if (result.remaining === undefined && next.remaining !== undefined)
-        result.remaining = next.remaining;
-      if (result.resetMs === undefined && next.resetMs !== undefined)
-        result.resetMs = next.resetMs;
+      if (
+        (next.remaining !== undefined || next.resetMs !== undefined) &&
+        (!quota ||
+          (next.remaining !== undefined &&
+            next.remaining <= 0 &&
+            ((quota.remaining ?? Infinity) > 0 ||
+              (next.resetMs ?? 0) > (quota.resetMs ?? 0))))
+      )
+        quota = next;
+    }
+    if (result && quota) {
+      if (quota.remaining !== undefined) result.remaining = quota.remaining;
+      if (quota.resetMs !== undefined) result.resetMs = quota.resetMs;
     }
     return result;
   };

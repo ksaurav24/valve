@@ -104,8 +104,13 @@ You can also call `valve.observe(response)` directly at any time. It returns
 
 ## Which headers are read
 
-The default reader, `defaultFeedback`, combines three readers and keeps the
-longest pause.
+The default reader, `defaultFeedback`, combines three readers and honors the
+longest explicit pause. Without a positive explicit pause, it uses the longest
+exhausted quota reset. Remaining and reset values stay paired within each
+reader: an unexhausted earlier family cannot hide an exhausted later family.
+A positive `Retry-After` keeps precedence over quota resets.
+If your provider documents one family as authoritative, select its reader
+explicitly. See [Conflicting quotas](/docs/reference/feedback/#conflicting-quotas).
 
 | Header                                                              | Read when                  | Pause              |
 | ------------------------------------------------------------------- | -------------------------- | ------------------ |
