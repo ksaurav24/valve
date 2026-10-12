@@ -47,6 +47,26 @@ describe('queue retention', () => {
   );
 
   it.each([false, true])(
+    'bounds retained cancellations when live jobs are taken (heap=%s)',
+    (heap) => {
+      const queue = new JobQueue<Queued>();
+      const live = Array.from({ length: 2048 }, (_, seq) =>
+        job(seq, heap ? 1 : 0),
+      );
+      const cancelled = Array.from({ length: 2048 }, (_, seq) =>
+        job(seq + 2048),
+      );
+      for (const item of [...live, ...cancelled]) queue.push(item);
+      for (const item of cancelled) queue.cancel(item);
+      expect(queue.take(2047)).toEqual(live.slice(0, 2047));
+      expect(queue.size).toBe(1);
+      expect(retained(queue)).toBeLessThanOrEqual(1024);
+      expect(queue.take(1)).toEqual(live.slice(2047));
+      expect(retained(queue)).toBe(0);
+    },
+  );
+
+  it.each([false, true])(
     'preserves ordering after compaction (heap=%s)',
     (heap) => {
       const queue = new JobQueue<Queued>();
