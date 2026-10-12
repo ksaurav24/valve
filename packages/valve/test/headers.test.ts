@@ -7,6 +7,7 @@ import {
   retryAfter,
   xRateLimit,
 } from '../src/headers/index.js';
+import type { FeedbackSignal } from '../src/headers/index.js';
 import { compound, header, number } from '../src/headers/parse.js';
 const response = (
   headers: Record<string, string | number | readonly string[] | undefined>,
@@ -171,16 +172,158 @@ describe('feedback', () => {
     });
     expect(xRateLimit()(response({}))).toBeUndefined();
   });
-  it('combines the longest pause, first remaining and first reset', () => {
+  it('combines the longest pause and keeps the first quota pair', () => {
     const f = combine(
       () => undefined,
       () => ({ pauseMs: 1, remaining: 2 }),
       () => ({ pauseMs: 2, remaining: 3, resetMs: 4 }),
     );
-    expect(f(response({}))).toEqual({ pauseMs: 2, remaining: 2, resetMs: 4 });
+    expect(f(response({}))).toEqual({ pauseMs: 2, remaining: 2 });
     expect(combine()(response({}))).toBeUndefined();
     expect(defaultFeedback(response({ 'retry-after': '2' }))).toEqual({
       pauseMs: 2000,
     });
+  });
+  it.each([200, 429, 503])(
+    'honors an exhausted later header family on status %s',
+    (status) => {
+      expect(
+        defaultFeedback(
+          response(
+            {
+              RateLimit: 'r=10;t=60',
+              'X-RateLimit-Remaining': '0',
+              'X-RateLimit-Reset': '120',
+            },
+            status,
+          ),
+        ),
+      ).toEqual({ remaining: 0, resetMs: 120000 });
+    },
+  );
+  it.each([
+    [
+      { remaining: 0, resetMs: 60 },
+      { remaining: 0, resetMs: 120 },
+      { remaining: 0, resetMs: 120 },
+    ],
+    [
+      { remaining: 0, resetMs: 120 },
+      { remaining: 0, resetMs: 60 },
+      { remaining: 0, resetMs: 120 },
+    ],
+    [{ remaining: 0 }, { remaining: 10, resetMs: 120 }, { remaining: 0 }],
+    [{ resetMs: 120 }, { remaining: 0 }, { remaining: 0 }],
+    [{ remaining: 10 }, { resetMs: 120 }, { remaining: 10 }],
+    [
+      { remaining: 0 },
+      { remaining: 0, resetMs: 60 },
+      { remaining: 0, resetMs: 60 },
+    ],
+    [
+      { remaining: 0, resetMs: 60 },
+      { remaining: 0 },
+      { remaining: 0, resetMs: 60 },
+    ],
+    [
+      { remaining: 0, resetMs: 0 },
+      { remaining: 0, resetMs: 60 },
+      { remaining: 0, resetMs: 60 },
+    ],
+    [
+      { remaining: 10, resetMs: 120 },
+      { remaining: 0, resetMs: 60 },
+      { remaining: 0, resetMs: 60 },
+    ],
+    [
+      { remaining: 0, resetMs: 60 },
+      { remaining: 10, resetMs: 120 },
+      { remaining: 0, resetMs: 60 },
+    ],
+    [
+      { remaining: 10, resetMs: 120 },
+      { remaining: 5, resetMs: 60 },
+      { remaining: 10, resetMs: 120 },
+    ],
+    [
+      { pauseMs: 10 },
+      { remaining: 0, resetMs: 60 },
+      { pauseMs: 10, remaining: 0, resetMs: 60 },
+    ],
+    [
+      { pauseMs: 120 },
+      { remaining: 0, resetMs: 60 },
+      { pauseMs: 120, remaining: 0, resetMs: 60 },
+    ],
+    [
+      { pauseMs: 10 },
+      { remaining: 10, resetMs: 60 },
+      { pauseMs: 10, remaining: 10, resetMs: 60 },
+    ],
+    [
+      { remaining: -1, resetMs: 60 },
+      { remaining: 10, resetMs: 120 },
+      { remaining: -1, resetMs: 60 },
+    ],
+    [
+      { pauseMs: 10, remaining: 0 },
+      { resetMs: 120 },
+      { pauseMs: 10, remaining: 0 },
+    ],
+  ] satisfies [FeedbackSignal, FeedbackSignal, FeedbackSignal][])(
+    'selects a whole quota pair and preserves explicit pauses: %j / %j',
+    (first, second, expected) => {
+      const before = [{ ...first }, { ...second }];
+      expect(
+        combine(
+          () => first,
+          () => second,
+        )(response({})),
+      ).toEqual(expected);
+      expect([first, second]).toEqual(before);
+    },
+  );
+  it('ignores malformed resets without borrowing a different family window', () => {
+    expect(
+      defaultFeedback(
+        response(
+          {
+            RateLimit: 'r=10;t=60',
+            'x-ratelimit-remaining': '0',
+            'x-ratelimit-reset': 'bad',
+          },
+          200,
+        ),
+      ),
+    ).toEqual({ remaining: 0 });
+    expect(
+      defaultFeedback(
+        response({
+          RateLimit: 'r=bad;t=60',
+          'x-ratelimit-remaining': '0',
+          'x-ratelimit-reset': '120',
+        }),
+      ),
+    ).toEqual({ remaining: 0, resetMs: 120000 });
+  });
+  it('preserves single-reader signals and supports nested combinations', () => {
+    for (const signal of [
+      {},
+      { remaining: 0 },
+      { resetMs: 60 },
+      { remaining: 0, resetMs: 60 },
+      { pauseMs: 120 },
+    ])
+      expect(combine(() => signal)(response({}))).toEqual(signal);
+    expect(
+      combine(defaultFeedback, () => ({ remaining: 0, resetMs: 180000 }))(
+        response({
+          'retry-after': '10',
+          RateLimit: 'r=0;t=60',
+          'x-ratelimit-remaining': '0',
+          'x-ratelimit-reset': '120',
+        }),
+      ),
+    ).toEqual({ pauseMs: 10000, remaining: 0, resetMs: 180000 });
   });
 });

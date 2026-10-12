@@ -508,6 +508,77 @@ describe('cancellation and lifecycle', () => {
 });
 
 describe('pauses and feedback', () => {
+  it.each([200, 429, 503])(
+    'blocks shared admissions through the longest exhausted reset on status %s',
+    async (status) => {
+      const store = memoryStore();
+      const valve = make({ id: 'mixed', concurrency: 1, store });
+      const peer = make({ id: 'mixed', concurrency: 1, store });
+      valve.observe({
+        status,
+        headers: {
+          RateLimit: 'r=10;t=60',
+          'x-ratelimit-remaining': '0',
+          'x-ratelimit-reset': '120',
+        },
+      });
+      expect(valve.stats().pausedUntil).toBe(120000);
+      const fn = vi.fn(() => Date.now());
+      const job = peer.run(fn);
+      await vi.advanceTimersByTimeAsync(119999);
+      expect(fn).not.toHaveBeenCalled();
+      await vi.advanceTimersByTimeAsync(26);
+      expect(await job).toBeGreaterThanOrEqual(120000);
+    },
+  );
+  it.each([429, 503])(
+    'preserves Retry-After precedence on status %s',
+    (status) => {
+      const valve = make({ id: 'explicit', concurrency: 1 });
+      valve.observe({
+        status,
+        headers: {
+          RateLimit: 'r=0;t=60',
+          'x-ratelimit-remaining': '0',
+          'x-ratelimit-reset': '120',
+          'Retry-After': '1',
+        },
+      });
+      expect(valve.stats().pausedUntil).toBe(1000);
+    },
+  );
+  it('uses 429 backoff when the exhausted quota has no usable reset', () => {
+    const valve = make({ id: 'missing-reset', concurrency: 1 });
+    valve.observe({
+      status: 429,
+      headers: {
+        RateLimit: 'r=10;t=60',
+        'x-ratelimit-remaining': '0',
+      },
+    });
+    expect(valve.stats().pausedUntil).toBe(1000);
+  });
+  it('caps mixed quota feedback and does not pause on an exhausted quota without its own reset', () => {
+    const valve = make({ id: 'mixed', concurrency: 1, maxPause: 1500 });
+    const warning = vi.fn();
+    valve.on('warning', warning);
+    valve.observe({
+      status: 200,
+      headers: { RateLimit: 'r=10;t=60', 'x-ratelimit-remaining': '0' },
+    });
+    expect(valve.stats().pausedUntil).toBeNull();
+    valve.observe({
+      status: 200,
+      headers: {
+        RateLimit: 'r=10;t=60',
+        'x-ratelimit-remaining': '0',
+        'x-ratelimit-reset': '120',
+      },
+    });
+    expect(valve.stats().pausedUntil).toBe(1500);
+    expect(warning).toHaveBeenCalledTimes(1);
+  });
+
   it('shares observed feedback by id without pausing an independent quota', async () => {
     const store = memoryStore();
     const search = make({ id: 'partner:search', concurrency: 1, store });

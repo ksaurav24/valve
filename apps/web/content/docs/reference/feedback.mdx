@@ -32,13 +32,49 @@ interface FeedbackSignal {
 
 Import them from `@ksaurav24/valve/headers`.
 
-| Reader                 | Reads                                                                                        |
-| ---------------------- | -------------------------------------------------------------------------------------------- |
-| `retryAfter()`         | `Retry-After` as seconds or an HTTP date, on 429 and 503 only.                               |
-| `ietfRateLimit()`      | IETF `RateLimit: r=…;t=…`, plus legacy `RateLimit-Remaining` and `RateLimit-Reset`.          |
-| `xRateLimit(options?)` | `x-ratelimit-remaining` and `x-ratelimit-reset`, or the `x-rate-limit-*` spelling.           |
-| `combine(...readers)`  | Runs readers in order. Keeps the longest `pauseMs`, and the first `remaining` and `resetMs`. |
-| `defaultFeedback`      | `combine(retryAfter(), ietfRateLimit(), xRateLimit())`.                                      |
+| Reader                 | Reads                                                                                      |
+| ---------------------- | ------------------------------------------------------------------------------------------ |
+| `retryAfter()`         | `Retry-After` as seconds or an HTTP date, on 429 and 503 only.                             |
+| `ietfRateLimit()`      | IETF `RateLimit: r=…;t=…`, plus legacy `RateLimit-Remaining` and `RateLimit-Reset`.        |
+| `xRateLimit(options?)` | `x-ratelimit-remaining` and `x-ratelimit-reset`, or the `x-rate-limit-*` spelling.         |
+| `combine(...readers)`  | Keeps the longest explicit pause and exhausted quota window; keeps remaining/reset paired. |
+| `defaultFeedback`      | `combine(retryAfter(), ietfRateLimit(), xRateLimit())`.                                    |
+
+### Conflicting quotas
+
+`combine()` treats each reader's quota as applicable to the observed request.
+It selects an exhausted quota (`remaining <= 0`) over an unexhausted one. If
+several quotas are exhausted, it selects the one with the longest `resetMs`.
+Missing resets count as zero for selection; equal windows keep reader order.
+Without an exhausted quota, the first reader with either `remaining` or
+`resetMs` wins. Both fields always come from that same reader, including when
+one field is missing.
+
+Explicit `pauseMs` values are combined by taking the longest. A positive
+explicit pause still takes precedence over quota resets, preserving
+`Retry-After` handling. For example, `Retry-After: 1` on a 429 or 503 selects
+a one-second pause even if an exhausted quota reports a longer reset. The
+[IETF draft's client behavior](https://datatracker.ietf.org/doc/html/draft-ietf-httpapi-ratelimit-headers-11#section-6)
+requires `Retry-After` precedence over its effective window. An exhausted
+quota without its own usable reset does not create a pause on a successful
+response; a 429 still uses fallback backoff. All feedback pauses remain
+capped by `maxPause`.
+
+For example, `RateLimit: r=10;t=60` together with
+`X-RateLimit-Remaining: 0` and `X-RateLimit-Reset: 120` yields
+`{ remaining: 0, resetMs: 120000 }`. The next admission waits 120 seconds,
+even after a 200 response. The unexhausted quota's 60-second window is ignored.
+
+This is a conservative policy for independent quotas or conflicting encodings
+of one quota. If the provider documents one header family as authoritative,
+select it explicitly, for example `feedback: combine(retryAfter(), xRateLimit())`.
+Readers do not discover or route quota scopes: the resulting pause applies to
+this valve's ID. See [Choose provider quota scopes](/docs/guides/provider-quota-scopes/).
+
+**Compatibility change:** earlier `combine()` calls kept the first remaining
+and first reset independently. Later exhausted readers now take precedence,
+and missing fields are no longer filled from a different quota reader.
+Standalone readers keep their existing parsing behavior.
 
 ### xRateLimit options
 
