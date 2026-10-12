@@ -80,6 +80,9 @@ async function fixture(kind: Kind = 'ioredis', offlineQueue = true) {
       : (client as ReturnType<typeof createV5>).isReady;
   const prefix = `replay-${process.pid}-${address.port}`;
   const store = redisStore({ client, prefix, timeout: 40 });
+  // Only fault-injected operations use the short timeout. Healthy setup and
+  // verification must tolerate runner scheduling and network latency.
+  const online = redisStore({ client, prefix, timeout: 5000 });
   try {
     await observer.connect();
     for (const script of [ACQUIRE, PAUSE, RESUME, RENEW, RELEASE])
@@ -91,6 +94,7 @@ async function fixture(kind: Kind = 'ioredis', offlineQueue = true) {
   }
   async function close() {
     await store.close();
+    await online.close();
     if (kind === 'ioredis') (client as Redis).disconnect();
     else if (kind === 'node-redis-v4')
       await (client as ReturnType<typeof createV4>).disconnect();
@@ -104,6 +108,7 @@ async function fixture(kind: Kind = 'ioredis', offlineQueue = true) {
   return {
     observer,
     store,
+    online,
     prefix,
     close,
     async interrupt() {
@@ -146,7 +151,7 @@ suite('post-timeout offline replay', () => {
       expect(Number(await f.observer.hget(key, 'w'))).toBeGreaterThanOrEqual(
         Math.floor(before / 3_600_000),
       );
-      expect((await f.store.acquire(request('quota'))).granted).toBe(0);
+      expect((await f.online.acquire(request('quota'))).granted).toBe(0);
     } finally {
       await f.close();
     }
@@ -165,7 +170,7 @@ suite('post-timeout offline replay', () => {
         expect(await f.observer.exists(key)).toBe(0);
         await f.restore();
         expect(await f.observer.exists(key)).toBe(0);
-        expect((await f.store.acquire(request('quota'))).granted).toBe(1);
+        expect((await f.online.acquire(request('quota'))).granted).toBe(1);
       } finally {
         await f.close();
       }
@@ -192,7 +197,7 @@ suite('post-timeout offline replay', () => {
       ).toBeGreaterThanOrEqual(before + 1000);
       expect(
         (
-          await f.store.acquire({
+          await f.online.acquire({
             id: 'quota',
             rules: [],
             costs: [1],
@@ -241,7 +246,7 @@ suite('post-timeout offline replay', () => {
       const f = await fixture();
       const key = `${f.prefix}:{active}:leases`;
       try {
-        const result = await f.store.acquire({
+        const result = await f.online.acquire({
           id: 'active',
           rules: [],
           costs: [1],
@@ -273,7 +278,7 @@ suite('post-timeout offline replay', () => {
       const f = await fixture();
       const key = `${f.prefix}:{lease}:leases`;
       const acquire = (owner: string, ttlMs: number) =>
-        f.store.acquire({
+        f.online.acquire({
           id: 'lease',
           rules: [],
           costs: [1],
@@ -342,7 +347,7 @@ suite('post-timeout offline replay', () => {
         ).toBe('1');
         expect(
           (
-            await f.store.acquire({
+            await f.online.acquire({
               id: 'policy',
               rules: normalize({
                 id: 'policy',
