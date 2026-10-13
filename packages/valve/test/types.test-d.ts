@@ -28,10 +28,16 @@ test('run and wrap preserve awaited return types', () => {
   });
   expectTypeOf(api.wrapFetch(fake)).toEqualTypeOf<typeof fake>();
   expectTypeOf(
-    api.wrapFetch(fake, { retryUnsafeMethods: true, retries: 1 }),
+    api.wrapFetch(fake, {
+      retryUnsafeMethods: true,
+      retries: 1,
+      maxReplayBodySize: 65536,
+    }),
   ).toEqualTypeOf<typeof fake>();
   // @ts-expect-error Retry opt-in must be a boolean.
   api.wrapFetch(fake, { retryUnsafeMethods: 'true' });
+  // @ts-expect-error Replay byte limits must be numeric.
+  api.wrapFetch(fake, { maxReplayBodySize: '64kb' });
   expectTypeOf(memoryStore()).toEqualTypeOf<Store>();
   api.run(
     (ctx) => {
