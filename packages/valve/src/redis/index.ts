@@ -90,26 +90,7 @@ export function redisStore(options: RedisStoreOptions): Store {
     acquire: async (request) => {
       let rules = prepared.get(request.rules);
       if (!rules) {
-        rules = {
-          args: request.rules.flatMap((rule) => [
-            rule.algorithm === 'gcra' ? '0' : '1',
-            String(rule.intervalMs),
-            String(rule.limit),
-            String(rule.burst),
-          ]),
-          // Canonical, collision-free encoding; rule order does not affect admission.
-          fingerprint: `v1:[${request.rules
-            .map((rule) =>
-              JSON.stringify([
-                rule.algorithm,
-                rule.intervalMs,
-                rule.limit,
-                rule.burst,
-              ]),
-            )
-            .sort()
-            .join(',')}]`,
-        };
+        rules = prepareRules(request.rules);
         prepared.set(request.rules, rules);
       }
       const base = `${prefix}:{${request.id}}`;
@@ -202,5 +183,28 @@ export function redisStore(options: RedisStoreOptions): Store {
       ) === 1,
     ...(notices ? { subscribe: notices.subscribe } : {}),
     close: () => notices?.close() ?? Promise.resolve(),
+  };
+}
+
+function prepareRules(rules: AcquireRequest['rules']) {
+  return {
+    args: rules.flatMap((rule) => [
+      rule.algorithm === 'gcra' ? '0' : '1',
+      String(rule.intervalMs),
+      String(rule.limit),
+      String(rule.burst),
+    ]),
+    // Canonical, collision-free encoding; rule order does not affect admission.
+    fingerprint: `v1:[${rules
+      .map((rule) =>
+        JSON.stringify([
+          rule.algorithm,
+          rule.intervalMs,
+          rule.limit,
+          rule.burst,
+        ]),
+      )
+      .sort()
+      .join(',')}]`,
   };
 }
