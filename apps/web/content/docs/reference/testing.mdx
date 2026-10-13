@@ -39,7 +39,14 @@ REDIS_URL=redis://127.0.0.1:6379 pnpm test:integration
 
 The integration suite covers Lua parity with the memory store, ioredis and
 node-redis clients, script-cache recovery, shared pauses, timeouts, server
-restarts, and bounds across eight child processes. CI runs it against Redis
+restarts, post-timeout offline replay, and bounds across eight child processes.
+The replay suite uses a local TCP proxy and a separate healthy observer. It
+holds reconnection until after the store timeout, compares enabled/disabled
+offline queues with ioredis 5 and node-redis 4/5, and checks all mutating
+operations and `wait`/`throw`/`open` policies with ioredis. It checks server rate
+state, lease timestamps and expiry, single-client pause/resume order, and
+callback counts. These probes do not cover every network partition, cluster
+failover, or cross-client control race. CI runs it against Redis
 6.2, 7.4, and 8, and Valkey 7.2 and 8. Set `REDIS_CLUSTER_URL` to include
 Redis Cluster checks.
 

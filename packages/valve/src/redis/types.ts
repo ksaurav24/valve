@@ -86,7 +86,7 @@ export type RedisStoreOptions = {
   prefix?: string;
   /** Optional dedicated connection for immediate shared pause/resume/release notifications. Never disconnected by valve. */
   subscriber?: NodeRedisSubscriber | IoredisSubscriber;
-  /** Max time for one store call before it counts as a store error. Default `"2s"`. */
+  /** Max wait for one store call. Does not cancel the client command; a timeout has an unknown outcome. Default `"2s"`. */
   timeout?: Duration;
 } & (
   | { client: IoredisLike | NodeRedisLike; adapter?: never }
