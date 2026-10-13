@@ -113,16 +113,18 @@ by default. See [Respect provider feedback](/docs/guides/respect-retry-after/#wi
 
 #### WrapFetchOptions
 
-| Option               | Type                            | Default         | Description                                                                        |
-| -------------------- | ------------------------------- | --------------- | ---------------------------------------------------------------------------------- |
-| `retries`            | `number`                        | `2`             | Retries after a 429, or a 503 with a valid `Retry-After`. `0` disables.            |
-| `retryUnsafeMethods` | `boolean`                       | `false`         | Opt in to retries for other methods after verifying provider-specific idempotency. |
-| `cost`               | `number \| (...args) => number` | `1`             | Cost per request, or a function of the fetch arguments.                            |
-| `priority`           | `number \| (...args) => number` | `0`             | Priority per request, or a function of the fetch arguments.                        |
-| `maxWait`            | `Duration`                      | Valve `maxWait` | Queue deadline for each attempt.                                                   |
+| Option               | Type                            | Default         | Description                                                                             |
+| -------------------- | ------------------------------- | --------------- | --------------------------------------------------------------------------------------- |
+| `retries`            | `number`                        | `2`             | Retries after a 429, or a 503 with a valid `Retry-After`. `0` disables.                 |
+| `retryUnsafeMethods` | `boolean`                       | `false`         | Opt in to retries for other methods after verifying provider-specific idempotency.      |
+| `maxReplayBodySize`  | `number`                        | `65536`         | Finite integer byte limit for inherited Request replay. `0` sends once without probing. |
+| `cost`               | `number \| (...args) => number` | `1`             | Cost per request, or a function of the fetch arguments.                                 |
+| `priority`           | `number \| (...args) => number` | `0`             | Priority per request, or a function of the fetch arguments.                             |
+| `maxWait`            | `Duration`                      | Valve `maxWait` | Queue deadline for each attempt.                                                        |
 
 The request's abort signal, from `init.signal` or the `Request`, cancels queued
 attempts and is passed to `fetchImpl` for running ones.
+It also cancels a running Request body probe before fetch begins.
 
 `retries` counts additional attempts after the initial request. The default of
 `2` permits up to three total requests. Once the retry limit is exhausted, the
@@ -134,6 +136,15 @@ GET. POST, PATCH and unrecognized methods do not retry unless
 All responses still update shared cooldowns. Streamed `init.body` requests
 never retry, including with the opt-in enabled. Use a dedicated wrapper for
 verified operations; see the [compatibility notes](/docs/guides/respect-retry-after/#requests-with-side-effects).
+
+Inherited `Request` bodies retry only if a probe clone fits within
+`maxReplayBodySize`. Probing occurs after admission, holds the concurrency
+slot, and delays upload until the body ends or exceeds the limit. Larger
+bodies and bodies exceeding 1,024 chunks are sent once. Empty chunks count
+toward this second limit. The probe can retain the limit plus one source chunk
+and stream prefetch. Set `maxReplayBodySize: 0` to skip probing and send
+Request bodies once. Explicit `init.body` overrides bypass probing of the
+unused body. See [Request bodies](/docs/guides/respect-retry-after/#request-bodies).
 
 ### observe
 

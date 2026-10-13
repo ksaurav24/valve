@@ -7,7 +7,8 @@ const require = createRequire(
 const { build } = require('esbuild');
 const base = new URL('../packages/valve/', import.meta.url);
 for (const [entry, budget] of [
-  ['index', 8704],
+  // Bounded Request replay adds 252 gzip bytes over the 8590-byte baseline.
+  ['index', 8960],
   ['redis/index', 4096],
   ['headers/index', 2048],
 ]) {

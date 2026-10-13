@@ -195,15 +195,26 @@ export interface WrapFetchOptions<F extends FetchLike = typeof fetch> {
    * Default `2`, permitting up to three total requests.
    * Only GET, HEAD, OPTIONS, PUT and DELETE retry by default.
    * Requests with a stream passed as `init.body` are never retried.
+   * Inherited Request bodies retry only within `maxReplayBodySize`.
    */
   retries?: number;
   /**
    * Allow retries for other methods, including POST and PATCH. Default `false`.
    * Use a dedicated wrapper only after verifying the provider's idempotency
    * contract. An idempotency key alone does not enable retries.
-   * Does not override `retries: 0` or the `init.body` stream restriction.
+   * Does not override `retries: 0` or either body replay restriction.
    */
   retryUnsafeMethods?: boolean;
+  /**
+   * Maximum bytes in an inherited Request body eligible for replay. Default
+   * `65536` (64 KiB). Integer, `0` or more; Infinity is not allowed. Zero sends
+   * Request bodies once without probing. A bounded clone is read inside the
+   * admitted job before fetch starts. Bodies exceeding the byte limit or
+   * 1024 chunks (including empty chunks) are sent once; the probe
+   * can retain up to this limit plus one source chunk and stream prefetch.
+   * Does not apply when `init.body` replaces the Request body.
+   */
+  maxReplayBodySize?: number;
   /** Cost per request. A number or a function of the fetch arguments. Default `1`. */
   cost?: number | ((...args: Parameters<F>) => number);
   /** Priority per request. A number or a function of the fetch arguments. Default `0`. */

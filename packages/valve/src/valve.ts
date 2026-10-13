@@ -2,6 +2,7 @@
 import { duration, integer } from './duration.js';
 import { emitter } from './emitter.js';
 import { failure, invalid } from './errors.js';
+import { canReplayBody } from './fetch-body.js';
 import type { ValveErrorCode } from './errors.js';
 import { defaultFeedback } from './headers/index.js';
 import { retryAfterMs } from './headers/parse.js';
@@ -601,13 +602,18 @@ export function createValve(options: ValveOptions): Valve {
         'Pass a fetch implementation',
       );
     const retries = fetchOptions.retries ?? 2;
-    if (!Number.isSafeInteger(retries) || retries < 0)
-      invalid(
-        id,
-        'retries must be a nonnegative integer',
-        retries,
-        'Use zero to disable retries',
-      );
+    const maxReplayBodySize = fetchOptions.maxReplayBodySize ?? 64 * 1024;
+    for (const [name, value] of [
+      ['retries', retries],
+      ['maxReplayBodySize', maxReplayBodySize],
+    ] as const)
+      if (!Number.isSafeInteger(value) || value < 0)
+        invalid(
+          id,
+          `${name} must be a nonnegative integer`,
+          value,
+          'Use zero to disable replay',
+        );
     if (fetchOptions.maxWait !== undefined)
       duration(fetchOptions.maxWait, id, 'wrapFetch.maxWait');
     const limited = async (...args: Parameters<F>): Promise<ResponseLike> => {
@@ -628,7 +634,11 @@ export function createValve(options: ValveOptions): Valve {
       const retryable =
         fetchOptions.retryUnsafeMethods === true ||
         ['GET', 'HEAD', 'OPTIONS', 'PUT', 'DELETE'].includes(method);
-      const attempts = stream || !retryable ? 0 : retries;
+      const inheritedBody = request?.body && init?.body == null;
+      let attempts =
+        stream || !retryable || (inheritedBody && maxReplayBodySize === 0)
+          ? 0
+          : retries;
       const cost =
         typeof fetchOptions.cost === 'function'
           ? fetchOptions.cost(...args)
@@ -649,18 +659,21 @@ export function createValve(options: ValveOptions): Valve {
       };
       for (let attempt = 0; ; attempt++) {
         const callArgs = [...args] as Parameters<F>;
-        if (request?.body && attempts > 0)
-          (callArgs as unknown[])[0] = request.clone();
         const response = await submit(
-          (ctx) => {
+          async (ctx) => {
+            if (inheritedBody && attempts > 0) {
+              if (
+                attempt === 0 &&
+                !(await canReplayBody(request!, maxReplayBodySize, ctx.signal))
+              )
+                attempts = 0;
+              if (attempts > 0) (callArgs as unknown[])[0] = request!.clone();
+            }
             if (config.global)
               (callArgs as unknown[])[1] = { ...init, signal: ctx.signal };
-            return Promise.resolve(impl(...(callArgs as never[]))).then(
-              (res) => {
-                observe(res);
-                return res;
-              },
-            );
+            const res = await impl(...(callArgs as never[]));
+            observe(res);
+            return res;
           },
           runOptions,
           originalSeq,

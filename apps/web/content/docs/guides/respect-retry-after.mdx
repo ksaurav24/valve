@@ -74,7 +74,7 @@ The caller must ensure replaying the operation is safe, including reusing the
 same key and payload if the provider requires them. PUT and DELETE also need
 provider-specific review despite their HTTP idempotent semantics. This option
 applies to every request through that wrapper; keep it scoped to operations
-you have verified. It does not override `retries: 0` or streamed `init.body`.
+you have verified. It does not override `retries: 0` or body replay restrictions.
 
 **Compatibility change:** earlier versions retried all methods automatically.
 POST and PATCH callers now receive the first response unless they explicitly
@@ -82,8 +82,45 @@ opt in. Setting only `retries` no longer enables retries for these methods.
 
 ### Request bodies
 
-A `Request` object's body is cloned for each attempt. A `ReadableStream`
-passed as `init.body` can only be sent once, so that request is never retried.
+A `ReadableStream` passed as `init.body` is sent once and never retried.
+Strings, byte buffers and other replayable `init.body` values keep their usual
+retry behavior.
+
+Every `Request` body is exposed as a stream, even when constructed from a
+string or bytes. Before retrying an inherited `Request` body, valve reads a
+probe clone inside the admitted job. Bodies up to `maxReplayBodySize`
+(default 65,536 bytes, or 64 KiB) are cloned for each attempt. Larger bodies
+are sent once, and their first response is returned with its body available.
+Probing also stops after 1,024 chunks, including empty chunks, to bound queued
+chunk objects. Bodies exceeding either limit are sent once.
+All responses still update provider feedback and shared cooldowns.
+
+The probe stops and cancels its branch when it crosses the byte limit, before
+fetch starts. It can retain the limit plus one source chunk and stream
+prefetch; source chunk backing storage and fetch's own buffers are outside valve's
+control. A small, slow body must finish probing before upload begins. Probing
+holds the concurrency slot and honors the running request's abort signal.
+The queue deadline `maxWait` ends at admission, so use an abort signal to
+bound running time. Stream sources should also honor that signal themselves.
+
+For streaming uploads that must start immediately, disable probing:
+
+```ts
+const uploadFetch = partner.wrapFetch(fetch, { maxReplayBodySize: 0 });
+const res = await uploadFetch(uploadRequest);
+```
+
+This sends inherited `Request` bodies once without cloning. Bodyless requests
+can still retry. `retries: 0` disables retries and probing for every request.
+You can raise `maxReplayBodySize` to a finite integer byte limit for known
+payloads; consider the per-request memory cost and concurrency together.
+`Infinity` is rejected. An explicit non-null `init.body` replaces the
+inherited body, so valve does not probe or clone the unused `Request` body.
+
+**Compatibility change:** inherited `Request` bodies larger than the limit
+previously retried through unbounded cloning. They now return the first
+response. Retried small bodies leave the original `Request` unconsumed;
+oversized bodies and bodies sent without probing are consumed by fetch.
 
 ## With any other client
 
