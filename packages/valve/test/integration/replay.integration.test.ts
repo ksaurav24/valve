@@ -180,11 +180,16 @@ suite('post-timeout offline replay', () => {
   it('creates an abandoned lease at replay time and expires it without release', async () => {
     const f = await fixture();
     const key = `${f.prefix}:{quota}:leases`;
+    const leaseRules = normalize({
+      id: 'quota',
+      rate: { limit: 2, interval: 3_600_000, algorithm: 'fixed-window' },
+    }).rules;
     try {
       await f.interrupt();
       await timeout(
         f.store.acquire({
           ...request('quota'),
+          rules: leaseRules,
           lease: { limit: 1, ttlMs: 1000, owner: 'abandoned' },
         }),
       );
@@ -199,7 +204,7 @@ suite('post-timeout offline replay', () => {
         (
           await f.online.acquire({
             id: 'quota',
-            rules: [],
+            rules: leaseRules,
             costs: [1],
             lease: { limit: 1, ttlMs: 1000, owner: 'next' },
           })
@@ -285,14 +290,16 @@ suite('post-timeout offline replay', () => {
           lease: { limit: 1, ttlMs, owner },
         });
       try {
-        const old = await acquire('old', 200);
+        const old = await acquire('old', 5000);
         await f.interrupt();
         await timeout(
           operation === 'renew'
             ? f.store.renew!('lease', old.leases!, 5000)
             : f.store.release!('lease', old.leases!),
         );
-        await expect.poll(() => f.observer.exists(key)).toBe(0);
+        await expect
+          .poll(() => f.observer.exists(key), { timeout: 10000 })
+          .toBe(0);
         const healthy = redisStore({ client: f.observer, prefix: f.prefix });
         const replacement = await healthy.acquire({
           id: 'lease',

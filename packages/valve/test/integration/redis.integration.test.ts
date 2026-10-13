@@ -99,11 +99,13 @@ suite('real Redis/Valkey', () => {
       const keys = [
         `${prefix}:{${id}}:pause`,
         ...rules.map((r) => `${prefix}:{${id}}:r:${r.key}`),
+        `${prefix}:{${id}}:config`,
       ];
       for (const gap of data.gaps) {
         now += gap;
         const expected = memory.acquireSync!({ id, rules, costs: data.costs });
         const args = [
+          `parity-${caseIndex}`,
           ...rules.flatMap((r) => [
             r.algorithm === 'gcra' ? 0 : 1,
             r.intervalMs,

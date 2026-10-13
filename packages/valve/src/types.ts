@@ -60,7 +60,8 @@ export interface RateRule {
   algorithm?: 'gcra' | 'fixed-window';
 }
 
-/** What a valve does when its store throws or times out.
+/** What a valve does when its store throws or times out. Configuration failures
+ * (`INVALID_OPTIONS`) always reject affected jobs under every policy.
  * @example const policy: StoreErrorPolicy = 'wait';
  */
 export type StoreErrorPolicy =
@@ -290,7 +291,7 @@ export interface Valve extends AsyncDisposable {
    * `fn` is never called synchronously inside `run`.
    *
    * @throws never synchronously. The returned promise rejects with
-   * `ValveError` codes `COST_EXCEEDS_LIMIT`, `QUEUE_FULL`,
+   * `ValveError` codes `INVALID_OPTIONS`, `COST_EXCEEDS_LIMIT`, `QUEUE_FULL`,
    * `MAX_WAIT_EXCEEDED`, `ABORTED`, `CLOSED`, `STORE_UNAVAILABLE`,
    * or with the error thrown by `fn`.
    *

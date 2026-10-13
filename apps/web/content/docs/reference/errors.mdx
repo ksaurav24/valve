@@ -47,3 +47,8 @@ if (isValveError(error, 'QUEUE_FULL')) return res.status(503).end();
 | `LEASE_LOST`         | `run`, `wrap`, `wrapFetch`                               | A global concurrency lease expired or could not be renewed.                   |
 
 For how to respond to each code, see [Handle errors](/docs/guides/error-handling/).
+
+`INVALID_OPTIONS` also rejects jobs when Redis reports that their quota
+fingerprint does not match the pinned rate or global concurrency configuration.
+Its `cause` contains the store's mismatch error. This is a configuration failure under every
+`onStoreError` policy. See [Configuration drift](/docs/guides/share-a-quota/#configuration-drift).

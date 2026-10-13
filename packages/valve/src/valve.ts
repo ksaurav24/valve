@@ -338,7 +338,23 @@ export function createValve(options: ValveOptions): Valve {
   }
   function storeError(heads: Job[], error: unknown) {
     reportStore(error);
-    if (config.policy === 'open') {
+    if (
+      typeof error === 'object' &&
+      error !== null &&
+      'code' in error &&
+      error.code === 'INVALID_OPTIONS'
+    ) {
+      // Store errors can cross ESM/CJS or package-copy boundaries. Configuration
+      // failures must never fail open, regardless of the error's class identity.
+      for (const job of heads)
+        rejectJob(
+          job,
+          'INVALID_OPTIONS',
+          'store rejected the shared quota configuration. Use identical settings on every worker or follow the shared quota migration procedure.',
+          error,
+        );
+      schedule();
+    } else if (config.policy === 'open') {
       for (const job of heads) start(job);
       schedule();
     } else if (config.policy === 'throw') {

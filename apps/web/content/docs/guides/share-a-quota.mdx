@@ -100,6 +100,71 @@ Use a different `prefix` to separate environments that share a Redis server:
 redisStore({ client: redis, prefix: `valve:${process.env.NODE_ENV}` });
 ```
 
+## Configuration drift
+
+The first store admission pins a versioned configuration fingerprint at
+`PREFIX:{ID}:config`. Every later admission checks it atomically before spending
+rate budget or creating leases, including while the quota is paused.
+
+The fingerprint covers each normalized rule's algorithm, interval, limit, and
+burst, plus global concurrency scope, limit, and lease TTL. Rule order and
+equivalent durations such as `'1s'` and `1000` match. Local concurrency, queue
+settings, and lease owners can differ between workers.
+
+When Redis reports a mismatch, the incompatible worker's jobs reject with
+`INVALID_OPTIONS`; its callbacks do not run. This applies to all `onStoreError`
+policies, including `'open'` and `'wait'`. Restore the pinned configuration to
+resume that worker. Compatible workers keep using the same budget during a
+rolling deployment.
+
+An outage or timeout can hide Redis's mismatch response. With `'open'`, jobs then
+run without shared admission checks, so configuration compatibility and rate
+bounds are not guaranteed. Use `'wait'` or `'throw'` when these checks must hold.
+
+The config key has no TTL. Expired rate state, released leases, `resume()`, and
+`close()` do not clear it. One config key remains per quota id until an operator
+removes it. Keep it while that quota is in use, including during idle periods.
+
+### Changing a shared quota
+
+Intentional changes to rate rules or global concurrency require a coordinated
+migration. Before resetting the fingerprint:
+
+1. Stop producers and drain **every** worker using this Redis database, prefix,
+   and id with `await valve.close({ drain: true })`. Disable restarts of old
+   workers and ensure all outbound jobs have actually finished, including jobs
+   whose leases expired. A store pause alone does not stop already-issued grants.
+2. Let outstanding Redis commands settle and close the old clients. Account for
+   timed-out commands and offline queues as described in
+   [Timeouts and reconnection](/docs/reference/redis-store/#timeouts-and-reconnection).
+3. Wait until all old `PREFIX:{ID}:r:*` keys have expired and the provider's quota
+   has fully recovered. GCRA debt can exceed one interval when `burst > limit`.
+   Confirm that `PREFIX:{ID}:leases` is empty or expired and that no old jobs can
+   start or continue. Leave any provider cooldown in place.
+4. Delete only `PREFIX:{ID}:config`, using an administrative Redis connection.
+   For example, with the default prefix and the id above:
+
+   ```sh
+   redis-cli -u "$REDIS_URL" DEL 'valve:{hubspot:portal-123}:config'
+   ```
+
+5. Start all workers with the same new settings. The first admission pins the
+   new fingerprint. Verify it by running a job and checking for `INVALID_OPTIONS`.
+
+Do not delete the config key while workers are active. Changing the prefix or id
+creates an independent budget: old and new workers can exceed a provider quota
+when they overlap. A namespace change requires the same drain and recovery
+steps, or an external mechanism that enforces a common budget during migration.
+
+### Upgrading older Valve workers
+
+Older versions do not check the fingerprint. A rolling library upgrade with
+unchanged quota settings can retain existing counters and leases, but detection
+is complete only after all workers run a version with this guard. The first
+guarded admission pins its caller's configuration; it cannot infer the settings
+that older workers used. Keep settings identical throughout that upgrade. Use
+the coordinated migration above before changing them.
+
 ## Redis Cluster
 
 Pass an ioredis `Cluster` instance, or a node-redis cluster client, as

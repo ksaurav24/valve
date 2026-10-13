@@ -136,8 +136,20 @@ const store = redisStore({ adapter });
   not matter.
 - Keys have the form `PREFIX:{ID}:...`. The hash tag keeps one valve's keys in
   one cluster slot.
-- Rule keys expire on their own after twice their interval of inactivity.
-  Lease keys expire with their last lease.
+- GCRA keys expire when their stored theoretical arrival time is reached;
+  fixed-window keys expire after twice their interval. Lease keys expire with
+  their last lease.
+- `PREFIX:{ID}:config` pins a versioned fingerprint of normalized rate and global
+  concurrency settings. It has no TTL and is checked in the admission script on
+  every call, without an additional round trip.
+
+When Redis reports an incompatible admission, it rejects with `INVALID_OPTIONS`
+rather than a transient store error. Jobs reject under every `onStoreError`
+policy, including `'open'`. An outage or timeout can hide this response; `'open'`
+then runs jobs without shared admission checks.
+Rule order, equivalent duration syntax, local settings, and lease owners do not
+cause mismatches. See [Configuration drift and quota migrations](/docs/guides/share-a-quota/#configuration-drift)
+before changing rules, resetting the config key, or upgrading older workers.
 
 ## Lifecycle
 
