@@ -141,7 +141,10 @@ const store = redisStore({ adapter });
   their last lease.
 - `PREFIX:{ID}:config` pins a versioned fingerprint of normalized rate and global
   concurrency settings. It has no TTL and is checked in the admission script on
-  every call, without an additional round trip.
+  every call, without an additional round trip. Reliable shared quotas and mismatch
+  detection require a non-evicting deployment, such as `maxmemory-policy noeviction`.
+  An `allkeys-*` policy can evict this key and allow a different configuration to
+  be pinned; eviction of rate or lease keys can also reset active budget state.
 
 When Redis reports an incompatible admission, it rejects with `INVALID_OPTIONS`
 rather than a transient store error. Jobs reject under every `onStoreError`

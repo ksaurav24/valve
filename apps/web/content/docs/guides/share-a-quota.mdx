@@ -122,8 +122,16 @@ run without shared admission checks, so configuration compatibility and rate
 bounds are not guaranteed. Use `'wait'` or `'throw'` when these checks must hold.
 
 The config key has no TTL. Expired rate state, released leases, `resume()`, and
-`close()` do not clear it. One config key remains per quota id until an operator
-removes it. Keep it while that quota is in use, including during idle periods.
+`close()` do not clear it. Valve leaves one config key per quota id. Keep it while
+that quota is in use, including during idle periods.
+
+Reliable shared quota enforcement and mismatch detection require preserving
+Redis state. Use a non-evicting deployment, such as `maxmemory-policy noeviction`.
+An `allkeys-*` [eviction policy](https://redis.io/docs/latest/develop/reference/eviction/)
+can remove the config key despite its lack of a TTL. The next admission then pins
+its caller's fingerprint, allowing a worker with different settings to admit
+jobs without a mismatch error. Eviction can also remove active rate and lease
+state; `volatile-*` policies protect the config key but can evict those TTL keys.
 
 ### Changing a shared quota
 
