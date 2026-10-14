@@ -1,4 +1,4 @@
-# valve
+# ValveJS
 
 [![CI](https://github.com/ksaurav24/valve/actions/workflows/ci.yml/badge.svg?branch=master)](https://github.com/ksaurav24/valve/actions/workflows/ci.yml)
 [![License: Apache-2.0](https://img.shields.io/badge/license-Apache--2.0-blue.svg)](LICENSE)
@@ -7,9 +7,15 @@
 
 **One rate limit for every worker that calls an API.**
 
+> **Experimental / pre-1.0:** ValveJS is under active development. APIs and behavior may change before 1.0.0. Evaluate failure modes and test against your workload before production use.
+
 valve queues outbound API calls under one budget shared by your workers,
 stored in Redis or Valkey. When the provider asks you to slow down, every
 worker sharing that budget pauses. A memory store supports single-process use.
+
+## Beta release
+
+A public npm beta release is being prepared. **No npm publication is confirmed yet.** The intended first beta is `0.3.0-beta.1`, published with the `beta` dist-tag so it does not become the default `latest` release. After publication, verify the package name and install command against the npm registry before using them. The proposed unscoped name `valvejs` has not yet been confirmed available; the existing package remains `@ksaurav24/valve` until the naming decision is verified.
 
 ## Quickstart
 
