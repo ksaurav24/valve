@@ -50,6 +50,31 @@ failover, or cross-client control race. CI runs it against Redis
 6.2, 7.4, and 8, and Valkey 7.2 and 8. Set `REDIS_CLUSTER_URL` to include
 Redis Cluster checks.
 
+### Fault injection for state loss
+
+The integration suite deletes valve's keys to check that a lost state starts a
+fresh budget. Server faults are manual probes. Run them only against a
+disposable instance:
+
+```sh
+docker run -d --rm --name valve-fault -p 16400:6379 redis:7.4 --save '' --appendonly no
+```
+
+Use a fixed-window rule `{ limit: 1, interval: '1m' }`. Acquire once, confirm a
+second acquire returns `granted: 0`, inject one fault, then acquire again with
+the same prefix and id.
+
+| Fault       | Inject                                                                                                                                                | Expected after the fault                       |
+| ----------- | ----------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------- |
+| Flush       | `redis-cli FLUSHDB`                                                                                                                                   | Granted 1                                      |
+| Restart     | `docker restart valve-fault`                                                                                                                          | Granted 1                                      |
+| Eviction    | `CONFIG SET maxmemory-policy volatile-ttl`, lower `maxmemory` below `used_memory`, write until `evicted_keys` rises, then set `maxmemory` back to `0` | Granted 1                                      |
+| No eviction | `CONFIG SET maxmemory-policy noeviction`, lower `maxmemory` below `used_memory`, then acquire with a new id                                           | Acquire rejects with `OOM`. The rule key stays |
+| Failover    | Start a replica, cut its replication link, acquire on the primary, then `REPLICAOF NO ONE` on the replica and acquire there                           | Granted 1                                      |
+
+Every row except "No eviction" shows silent loss. See
+[Durability](/docs/reference/redis-store/#durability).
+
 ## Benchmarks
 
 ```sh

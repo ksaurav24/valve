@@ -101,9 +101,22 @@ Without a subscriber, global-slot waiters poll at most every 50ms plus jitter.
 | `'throw'`          | Affected jobs reject with `STORE_UNAVAILABLE`.                                                           |
 | `'open'`           | Jobs start without the shared rate rules. **Rate bounds do not hold.** Rejected with global concurrency. |
 
+## Store state loss
+
+Rate bounds hold only while the store keeps its state. If Redis loses valve's
+keys (a flush, a restart without persistence, eviction, or failover to a replica
+that missed recent writes), the rate budget starts fresh and the shared pause
+ends. The provider's window has not reset, so valve can admit more than its
+limit before that window ends.
+
+valve cannot detect lost rate history. A Redis that has lost keys answers
+normally, so no `onStoreError` mode applies. Lost global leases are detected at
+the next renewal, which rejects their jobs with `LEASE_LOST`. Until then, new
+jobs can take the freed slots. See [Durability](/docs/reference/redis-store/#durability)
+for settings that reduce exposure. When exceeding an external quota is costly,
+rely on the provider's own enforcement as the hard limit.
+
 ## Process failures
 
-Queued jobs live in memory and are lost when the process exits. If the store
-restarts and loses state, the budget starts fresh; configure Redis
-persistence if that matters. Use a durable job queue when work must survive a
-restart, and call valve from its workers.
+Queued jobs live in memory and are lost when the process exits. Use a durable
+job queue when work must survive a restart, and call valve from its workers.
