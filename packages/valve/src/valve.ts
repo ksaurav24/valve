@@ -151,6 +151,7 @@ export function createValve(options: ValveOptions): Valve {
         });
     }
   }
+  /** Reject only queued work, removing it from either queue and releasing its timers/listeners. */
   function rejectJob(
     job: Job,
     code: ValveErrorCode,
@@ -341,6 +342,11 @@ export function createValve(options: ValveOptions): Valve {
     else if (waiting.size) schedule();
     finishIdle();
   }
+  /**
+   * Validate a complete partition of grants and denials before starting any job.
+   * Granted jobs reuse the lease/lifecycle handler; denied jobs wait on eligibility
+   * hints unless a newer store notification requires immediate reconsideration.
+   */
   function handleScoped(
     heads: Job[],
     result: ScopedAcquireResult,
@@ -348,6 +354,7 @@ export function createValve(options: ValveOptions): Valve {
     version: number,
   ) {
     const indexes = new Set<number>();
+    /** Accept each in-range job index once across both grants and denials. */
     const validIndex = (index: number) =>
       Number.isInteger(index) &&
       index >= 0 &&
@@ -482,6 +489,11 @@ export function createValve(options: ValveOptions): Valve {
     }
     finishIdle();
   }
+  /**
+   * Advance bounded scheduler work with at most one asynchronous admission in flight.
+   * Promote all due scoped jobs before selecting by priority, then acquire only
+   * live jobs that fit the available concurrency and configured batch size.
+   */
   function pump() {
     scheduled = false;
     if (inFlight) return;
@@ -612,6 +624,11 @@ export function createValve(options: ValveOptions): Valve {
       },
     );
   }
+  /**
+   * Validate and snapshot one submission before enqueueing it with cancellation and a deadline.
+   * @param originalSeq Reuse the logical request's submission order for fetch retries.
+   * @returns The job result, or a rejection for invalid options, cancellation, or execution failure.
+   */
   function submit<R>(
     fn: (ctx: JobContext) => R,
     jobOptions: RunOptions<Awaited<R>> = {},
@@ -766,6 +783,10 @@ export function createValve(options: ValveOptions): Valve {
     }
     if (ms > 0) void sharedPause(ms, reason).catch(reportStore);
   }
+  /**
+   * Wrap a fetch implementation with admission, provider feedback, and bounded safe retries.
+   * Each logical call snapshots resolved identities once; every retry reacquires its budgets.
+   */
   function wrapFetch<F extends FetchLike = typeof fetch>(
     fetchImpl?: F,
     fetchOptions: WrapFetchOptions<F> = {},
@@ -793,6 +814,7 @@ export function createValve(options: ValveOptions): Valve {
         );
     if (fetchOptions.maxWait !== undefined)
       duration(fetchOptions.maxWait, id, 'wrapFetch.maxWait');
+    /** Resolve per-call options once and retry only when method and request-body replay allow it. */
     const limited = async (...args: Parameters<F>): Promise<ResponseLike> => {
       const values = args as unknown as [
         RequestInfo | URL,
@@ -901,6 +923,7 @@ export function createValve(options: ValveOptions): Valve {
     return closePromise;
   }
   if (store.subscribe) {
+    /** Invalidate pending admission hints and wake scheduling when shared pause or lease state changes. */
     const listener: Parameters<NonNullable<typeof store.subscribe>>[1] = (
       notice,
     ) => {

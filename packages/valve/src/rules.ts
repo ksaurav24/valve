@@ -3,6 +3,11 @@ import { duration, integer } from './duration.js';
 import { failure, invalid } from './errors.js';
 import type { NormalizedRule } from './store.js';
 import type { ValveOptions } from './types.js';
+/**
+ * Validate options before creating a queue and resolve defaults, durations and rule keys.
+ * Scoped policies also require bounded batches and a store with scoped admission support.
+ * @throws {ValveError} INVALID_OPTIONS when the policy cannot be enforced as configured.
+ */
 export function normalize(options: ValveOptions) {
   const id = options?.id;
   if (
