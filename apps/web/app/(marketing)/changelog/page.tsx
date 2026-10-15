@@ -23,14 +23,15 @@ export default function ChangelogPage() {
         aside={<VersionBadge />}
       >
         <p>
-          Every recorded package change, generated from{' '}
+          Changes for plain-numbered versions, generated from{' '}
           <a
             className="text-foreground underline decoration-ring underline-offset-4 hover:decoration-foreground"
             href={`${site.source}/packages/valve/CHANGELOG.md`}
           >
             packages/valve/CHANGELOG.md
           </a>
-          . Versions npm does not list are development versions.
+          . Versions npm does not list are development versions. Historical
+          prerelease notes remain in the full package changelog linked above.
         </p>
       </PageHeader>
       <div className="mx-auto max-w-5xl px-4 py-12 sm:px-6">

@@ -9,7 +9,7 @@ default theme.
 | ----------------- | ---------------------------------------- | --------------------------------------- |
 | `/`               | Install, features, usage, recent changes | `app/(marketing)/page.tsx`              |
 | `/docs`           | Guides and reference                     | `content/docs/*.mdx` and subdirectories |
-| `/changelog`      | Every recorded package change            | `packages/valve/CHANGELOG.md`           |
+| `/changelog`      | Changes for plain-numbered versions      | `packages/valve/CHANGELOG.md`           |
 | `/releases`       | Versions npm lists, with release notes   | CHANGELOG + npm + GitHub Releases       |
 | `/contributors`   | Contributors and the contribution guide  | GitHub API + root `CONTRIBUTING.md`     |
 | `/api/index.html` | Generated TypeDoc declarations           | Generated during the build              |
@@ -35,8 +35,8 @@ Nothing in this app hardcodes a version, star count, download count, or contribu
 
 - `scripts/sync-content.mjs` copies the version from
   `packages/valve/package.json` into `.generated/release.json`, the package
-  changelog into `content/changelog/` (and parsed entries into
-  `.generated/changelog.json`), and the root `CONTRIBUTING.md` into
+  changelog’s plain-version entries into `content/changelog/` (and parsed
+  entries into `.generated/changelog.json`), and the root `CONTRIBUTING.md` into
   `content/contributing/`. All outputs are gitignored. Edit the sources.
 - `scripts/sync-metadata.mjs` fetches the npm packument, download count, stars, contributors,
   and GitHub Releases into `.generated/metadata.json`. Set `GITHUB_TOKEN` to
@@ -71,7 +71,9 @@ npm trusted publishing, then the git tag and GitHub Release. Versions use
 plain `x.y.z` numbers and npm's default `latest` channel. GitHub releases are
 named `valvejs@x.y.z` and are ordinary releases; beta is the project's maturity
 label until 1.0, rather than a prerelease suffix or separate install channel.
-Historical prerelease versions retain their original names and links. If the
+The website omits historical prerelease entries from `/changelog`, `/releases`,
+and the homepage changelog. Their original notes remain in the full package
+changelog, and their published versions and GitHub releases remain available. If the
 `VERCEL_DEPLOY_HOOK` secret exists, the workflow then triggers a rebuild so
 `/releases` picks up the new npm data. Pushes to `master` rebuild through the
 host's Git integration.

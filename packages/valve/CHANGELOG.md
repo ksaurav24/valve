@@ -14,7 +14,7 @@
 
 ### Patch Changes
 
-- Publish plain version numbers through npm's default channel, starting with 0.4.0. Install with `npm install valvejs`; Valve remains beta until 1.0, as stated in the READMEs and website. Remove prerelease mode and custom beta-channel publishing from release automation, and keep historical prerelease versions in the changelog. Update installation, contribution, release, and migration guidance to match.
+- Publish plain version numbers through npm's default channel, starting with 0.4.0. Install with `npm install valvejs`; Valve remains beta until 1.0, as stated in the READMEs and website. Remove prerelease mode and custom beta-channel publishing from release automation, and keep historical prerelease versions in the full package changelog. Website changelog and release lists show only plain-numbered versions. Update installation, contribution, release, and migration guidance to match.
 - 52a3e0a: Remove hardcoded release numbers and planned-release wording from the repository and npm READMEs. Use an automatically updated npm badge and links to release history so installation guidance stays accurate across releases.
 
 ## 0.4.0-beta.0

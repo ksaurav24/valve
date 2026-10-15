@@ -149,6 +149,9 @@ test('home page leads with install, usage, and documentation', async ({
       .getByRole('heading', { level: 2 })
       .getByRole('link', { name: release.version, exact: true }),
   ).toBeVisible();
+  await expect(page.getByRole('heading', { level: 2 })).not.toContainText([
+    '-beta',
+  ]);
 });
 
 test('releases list only published versions', async ({ page }) => {
@@ -159,12 +162,12 @@ test('releases list only published versions', async ({ page }) => {
   );
   if (published.length === 0) {
     await expect(
-      page.getByRole('heading', { name: 'No published releases yet' }),
+      page.getByRole('heading', { name: 'No plain-version releases yet' }),
     ).toBeVisible();
     await expect(page.locator('main')).not.toContainText('latest');
   } else {
     await expect(
-      page.getByRole('heading', { name: 'No published releases yet' }),
+      page.getByRole('heading', { name: 'No plain-version releases yet' }),
     ).toHaveCount(0);
     for (const entry of published) {
       await expect(
