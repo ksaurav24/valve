@@ -79,9 +79,11 @@ jobs:
           node-version-file: .node-version
           cache: pnpm
       - run: pnpm install --frozen-lockfile
+      - run: pnpm --filter valvejs build
       - run: pnpm bench
         if: github.event_name != 'pull_request'
         env:
+          VALVE_BENCH_LIBRARY: ${{ github.workspace }}/packages/valve/dist/index.js
           VALVE_BENCH_OUT: /tmp/current.json
           VALVE_BENCH_SKIP_BOTTLENECK: '1'
       - name: Compare with the PR base on the same runner
@@ -91,10 +93,12 @@ jobs:
         run: |
           if git cat-file -e "$BASE_SHA:packages/valve/src/index.ts" 2>/dev/null; then
             git worktree add --detach /tmp/valve-baseline "$BASE_SHA"
-            node scripts/paired-benchmarks.mjs /tmp/valve-baseline/packages/valve/src/index.ts /tmp/base.json /tmp/current.json
+            pnpm --dir /tmp/valve-baseline install --frozen-lockfile
+            pnpm --dir /tmp/valve-baseline --filter valvejs build
+            node scripts/paired-benchmarks.mjs /tmp/valve-baseline/packages/valve/dist/index.js /tmp/base.json /tmp/current.json
             node scripts/compare-benchmarks.mjs /tmp/base.json /tmp/current.json
           else
-            VALVE_BENCH_SKIP_BOTTLENECK=1 VALVE_BENCH_OUT=/tmp/current.json pnpm bench
+            VALVE_BENCH_LIBRARY="$PWD/packages/valve/dist/index.js" VALVE_BENCH_SKIP_BOTTLENECK=1 VALVE_BENCH_OUT=/tmp/current.json pnpm bench
             echo 'First implementation establishes the benchmark baseline.'
           fi
   redis:

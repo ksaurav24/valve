@@ -8,7 +8,10 @@ Lua execution per batch. No runtime dependencies were added.
 ## Measurement protocol
 
 The baseline is commit `83e40e2` (v0.3.0-beta.1). Its built `dist` directory was
-saved before implementation. The final static comparison uses the repository's
+saved before implementation. Both variants load their built `dist/index.js`
+artifacts; the CI runner builds both checkouts before comparing them. This
+replaces the earlier source-versus-build comparison, which was not equivalent.
+The final static comparison uses the repository's
 paired runner: three alternating cold-process pairs, 100,000 no-op jobs per
 throughput sample, and 2,000 paced jobs per timing sample. Every sample is
 retained. No tests or builds ran alongside the final measurements. These are
@@ -38,12 +41,12 @@ not model a remote network or a production Redis Cluster's other workloads.
 
 ## Results
 
-The final static medians were **106.51 ms before and 101.32 ms after** for
-100,000 jobs. Median p99 per-start delay was **1.457 ms before and 1.154 ms
+The final static medians were **114.27 ms before and 106.22 ms after** for
+100,000 jobs. Median p99 per-start delay was **1.382 ms before and 1.312 ms
 after**. Both pass the unchanged 15% regression gate. This run found no static
 throughput or per-start-delay regression; the small throughput difference does
 not establish a general speedup. Accumulated pacing drift remains: median
-p99 ideal-sequence delay was 560.72 ms before and 482.82 ms after, so the original
+p99 ideal-sequence delay was 506.32 ms before and 491.78 ms after, so the original
 5 ms ideal-sequence target remains unmet.
 
 At the default batch of 32 with two rules:
@@ -87,18 +90,16 @@ at 2,048. This is a bundle-size regression, not a footprint improvement. Static
 throughput is measured independently; scoped code remains reachable through
 the existing factory and store entry points.
 
-The timing run preceded a final scoped-only priority fix that promotes overdue
-delayed jobs in bounded batches before selection. That fix does not change the
-static admission branch or the store-only matrix workloads. Bundle measurements
-include the fix. A subsequent missing-identity diagnostic change brings current
-core/Redis sizes to **11,834 / 6,088 bytes**, still within those ceilings. The
-retained size JSON describes the original measurement; these follow-up sizes
-come from `pnpm check:size`. The diagnostic revision does not change algorithms,
-Lua, or the static admission path; the timings above were not remeasured for it.
+The current built-artifact timing run includes the scoped priority fix and
+persistent static-policy ownership guard. Current core/Redis sizes are
+**11,843 / 6,088 bytes**, still within the existing ceilings. The retained
+`size.json` describes the original measurement; these follow-up sizes come
+from `pnpm check:size`. The scoped store matrix is unchanged and was not rerun;
+its workloads do not exercise static ownership or changed test helpers.
 
 ## Correctness checks
 
-The unit suite passes 330 tests with 98.32% line coverage and the existing
+The unit suite passes 331 tests with 98.49% line coverage and the existing
 coverage thresholds. Integration checks
 run against Redis 7, Valkey 8, and a three-master Redis Cluster. Tests cover:
 
@@ -127,6 +128,7 @@ Build a separate baseline checkout at `83e40e2` with the pinned pnpm version,
 then run from the implementation checkout:
 
 ```sh
+pnpm --filter valvejs build
 node scripts/paired-benchmarks.mjs \
   /absolute/path/to/baseline/packages/valve/dist/index.js \
   /tmp/static-baseline.json /tmp/static-current.json

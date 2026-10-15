@@ -77,7 +77,7 @@
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
     "test:coverage": "vitest run --coverage",
-    "test:integration": "vitest run --config vitest.integration.config.ts",
+    "test:integration": "pnpm build && vitest run --config vitest.integration.config.ts",
     "test:types": "vitest run --typecheck.only",
     "check:package": "publint && node ../../scripts/check-package.mjs",
     "check:size": "node ../../scripts/check-size.mjs",

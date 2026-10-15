@@ -90,13 +90,32 @@ suite('scoped Redis/Valkey admission', () => {
     expect((await store.acquireScoped!(req)).grantedIndexes).toEqual([0]);
     const pacing = `${prefix}:{${id}}:s:named:pacing:A`;
     const window = `${prefix}:{${id}}:s:named:window:A`;
-    expect(Number(await io.call('PEXPIRETIME', pacing))).toBe(
-      Math.ceil(Number(await io.get(pacing))),
-    );
-    const windowIndex = Number(await io.hget(window, 'w'));
-    expect(Number(await io.call('PEXPIRETIME', window))).toBe(
-      (windowIndex + 1) * 500,
-    );
+    // Read time, TTL and state together: no network latency in the expiry comparison.
+    // TIME + PTTL works on Redis 6.2; PEXPIRETIME requires Redis 7.
+    const snapshot = (await io.eval(
+      `
+      local t = redis.call('TIME')
+      return {tonumber(t[1]) * 1000 + math.floor(tonumber(t[2]) / 1000),
+        redis.call('PTTL', KEYS[1]), redis.call('GET', KEYS[1]),
+        redis.call('PTTL', KEYS[2]), redis.call('HGET', KEYS[2], 'w')}
+    `,
+      2,
+      pacing,
+      window,
+    )) as [number, number, string, number, string | null];
+    const [now, pacingTtl, tat, windowTtl, windowIndex] = snapshot;
+    expect(pacingTtl).toBeGreaterThan(0);
+    expect(
+      Math.abs(now + pacingTtl - Math.ceil(Number(tat))),
+    ).toBeLessThanOrEqual(1);
+    // The fixed window may have ended between admission and this snapshot.
+    if (windowIndex === null) expect(windowTtl).toBe(-2);
+    else {
+      expect(windowTtl).toBeGreaterThanOrEqual(0);
+      expect(
+        Math.abs(now + windowTtl - (Number(windowIndex) + 1) * 500),
+      ).toBeLessThanOrEqual(1);
+    }
     await expect
       .poll(() => io.exists(pacing, window), { timeout: 3000 })
       .toBe(0);

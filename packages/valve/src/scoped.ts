@@ -2,6 +2,7 @@
 import { failure } from './errors.js';
 import type { NormalizedRule, ScopedAcquireRequest } from './store.js';
 
+/** Validate every required identity and return a frozen copy for queued work and retries. */
 export function scopeSnapshot(
   id: string,
   dimensions: readonly string[],
@@ -46,6 +47,7 @@ const compiled = new WeakMap<
   }
 >();
 
+/** Validate a bounded admission and compile deduplicated keys plus per-job rule references. */
 export function prepareScoped(request: ScopedAcquireRequest) {
   const bad = (message: string): never => {
     throw failure(request?.id, 'INVALID_OPTIONS', message);

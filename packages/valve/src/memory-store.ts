@@ -25,6 +25,8 @@ export function memoryStore(options: MemoryStoreOptions = {}): Store {
   const states = new Map<string, Map<string, RuleState>>();
   const scopedStates = new Map<string, Map<string, RuleState>>();
   const policies = new Map<string, string>();
+  // Ownership outlives rate state and zero-grant admissions; close releases it.
+  const staticIds = new Set<string>();
   const pauses = new Map<string, number>();
   const leases = new Map<string, Map<string, number>>();
   const listeners = new Map<string, Set<(notice: StoreNotification) => void>>();
@@ -35,6 +37,7 @@ export function memoryStore(options: MemoryStoreOptions = {}): Store {
       });
   }
   let acquires = 0;
+  /** Admit a static prefix, retaining policy ownership even during a pause. */
   function acquireSync(request: AcquireRequest) {
     if (policies.has(request.id))
       throw failure(
@@ -42,6 +45,7 @@ export function memoryStore(options: MemoryStoreOptions = {}): Store {
         'INVALID_OPTIONS',
         'Cannot mix static and scoped policies under one Valve id.',
       );
+    staticIds.add(request.id);
     const now = clock();
     if (++acquires % 1024 === 0) {
       for (const [id, entries] of states) {
@@ -115,6 +119,7 @@ export function memoryStore(options: MemoryStoreOptions = {}): Store {
     }
     return returnResult ?? result;
   }
+  /** Iterate all domains so each admission can sweep a bounded amount of expired state. */
   function* scopedEntries(): Generator<
     [string, Map<string, RuleState>, string]
   > {
@@ -122,11 +127,12 @@ export function memoryStore(options: MemoryStoreOptions = {}): Store {
       for (const key of entries.keys()) yield [domain, entries, key];
   }
   let sweep: ReturnType<typeof scopedEntries> | undefined;
+  /** Commit each job only when all its budgets and any global lease allow admission. */
   function acquireScopedSync(
     request: ScopedAcquireRequest,
   ): ScopedAcquireResult {
     const plan = prepareScoped(request);
-    if (states.has(request.id))
+    if (staticIds.has(request.id))
       throw failure(
         request.id,
         'INVALID_OPTIONS',
@@ -260,6 +266,7 @@ export function memoryStore(options: MemoryStoreOptions = {}): Store {
     },
     close: () => {
       states.clear();
+      staticIds.clear();
       policies.clear();
       scopedStates.clear();
       sweep = undefined;

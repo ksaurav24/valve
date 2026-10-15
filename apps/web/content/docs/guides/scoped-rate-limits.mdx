@@ -148,7 +148,9 @@ const getContact = messages.wrap((url: string) => fetch(url), {
 });
 ```
 
-For fetch arguments that carry a stable application identity, use a resolver:
+For fetch arguments that carry a stable application identity, use a resolver.
+This example requires absolute URLs. In a browser, resolve relative strings
+against `document.baseURI` by passing it as the second argument to `new URL`:
 
 ```ts
 const limitedFetch = messages.wrapFetch(fetch, {

@@ -666,3 +666,24 @@ it('skips high-priority delayed identities across batches and cancels all their 
   await api.close();
   expect(vi.getTimerCount()).toBe(0);
 });
+
+it('retains static policy ownership through pause, counter cleanup and close', async () => {
+  let now = 0;
+  const store = memoryStore({ clock: () => now });
+  const id = 'static-owner';
+  const rules = normalize({ id, rate: { limit: 1, interval: 10 } }).rules;
+  const scoped = { ...request([job('A')]), id };
+  await store.pause(id, 100);
+  expect(store.acquireSync!({ id, rules, costs: [1] }).granted).toBe(0);
+  expect(() => store.acquireScopedSync!(scoped)).toThrow(/Cannot mix/);
+  now = 100;
+  expect(store.acquireSync!({ id, rules, costs: [1] }).granted).toBe(1);
+  now = 1000;
+  // Trigger the static sweeper after the original rate state has expired.
+  for (let i = 0; i < 1024; i++)
+    store.acquireSync!({ id: 'sweep', rules: [], costs: [1] });
+  expect(() => store.acquireScopedSync!(scoped)).toThrow(/Cannot mix/);
+  await store.close();
+  expect(store.acquireScopedSync!(scoped).grantedIndexes).toEqual([0]);
+  await store.close();
+});

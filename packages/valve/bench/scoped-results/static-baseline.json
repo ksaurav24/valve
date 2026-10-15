@@ -4,12 +4,12 @@
   "jobs": 100000,
   "accuracyJobs": 2000,
   "results": {
-    "accumulatedDelayMs": 565.4644179999996,
-    "p-limit": 121.36629299999998,
-    "p-queue": 117.95472800000005,
-    "p99DelayMs": 1.4566829999998845,
-    "p99IdealDelayMs": 560.7176739999995,
-    "valve": 106.508996
+    "accumulatedDelayMs": 508.80492500000037,
+    "p-limit": 136.199284,
+    "p-queue": 121.09558499999997,
+    "p99DelayMs": 1.3820699999996577,
+    "p99IdealDelayMs": 506.3158370000019,
+    "valve": 114.273906
   },
   "samples": [
     {
@@ -18,12 +18,12 @@
       "jobs": 100000,
       "accuracyJobs": 2000,
       "results": {
-        "valve": 130.51637899999997,
-        "p-limit": 133.63467300000002,
-        "p-queue": 117.95472800000005,
-        "p99DelayMs": 0.6029319999997824,
-        "p99IdealDelayMs": 451.20236900000236,
-        "accumulatedDelayMs": 455.84679400000095
+        "valve": 114.273906,
+        "p-limit": 136.199284,
+        "p-queue": 141.34051599999998,
+        "p99DelayMs": 1.3820699999996577,
+        "p99IdealDelayMs": 473.79199799999697,
+        "accumulatedDelayMs": 478.5781539999989
       }
     },
     {
@@ -32,12 +32,12 @@
       "jobs": 100000,
       "accuracyJobs": 2000,
       "results": {
-        "valve": 103.303359,
-        "p-limit": 117.21415099999999,
-        "p-queue": 123.288837,
-        "p99DelayMs": 1.5181320000001506,
-        "p99IdealDelayMs": 719.8022109999984,
-        "accumulatedDelayMs": 723.9828259999995
+        "valve": 107.490044,
+        "p-limit": 127.43259600000002,
+        "p-queue": 115.904539,
+        "p99DelayMs": 1.381059000001187,
+        "p99IdealDelayMs": 506.3158370000019,
+        "accumulatedDelayMs": 508.80492500000037
       }
     },
     {
@@ -46,12 +46,12 @@
       "jobs": 100000,
       "accuracyJobs": 2000,
       "results": {
-        "valve": 106.508996,
-        "p-limit": 121.36629299999998,
-        "p-queue": 109.37106500000004,
-        "p99DelayMs": 1.4566829999998845,
-        "p99IdealDelayMs": 560.7176739999995,
-        "accumulatedDelayMs": 565.4644179999996
+        "valve": 120.900196,
+        "p-limit": 141.10854100000003,
+        "p-queue": 121.09558499999997,
+        "p99DelayMs": 1.3862330000010843,
+        "p99IdealDelayMs": 517.5491249999977,
+        "accumulatedDelayMs": 521.6527959999985
       }
     }
   ]

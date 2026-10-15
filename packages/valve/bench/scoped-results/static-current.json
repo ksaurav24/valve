@@ -4,54 +4,54 @@
   "jobs": 100000,
   "accuracyJobs": 2000,
   "results": {
-    "accumulatedDelayMs": 490.9262459999991,
-    "p-limit": 111.75664,
-    "p-queue": 110.33612500000004,
-    "p99DelayMs": 1.1540339999992284,
-    "p99IdealDelayMs": 482.81942999999956,
-    "valve": 101.31636699999999
+    "accumulatedDelayMs": 495.8459189999994,
+    "p-limit": 110.53575000000001,
+    "p-queue": 116.97128299999997,
+    "p99DelayMs": 1.3123930000001565,
+    "p99IdealDelayMs": 491.7812249999988,
+    "valve": 106.223532
   },
   "samples": [
     {
       "pair": 0,
-      "library": "/home/xlr8/code/valve/packages/valve/src/index.ts",
+      "library": "/home/xlr8/code/valve/packages/valve/dist/index.js",
       "jobs": 100000,
       "accuracyJobs": 2000,
       "results": {
-        "valve": 102.242174,
-        "p-limit": 106.23644599999997,
-        "p-queue": 117.730411,
-        "p99DelayMs": 1.1540339999992284,
-        "p99IdealDelayMs": 482.81942999999956,
-        "accumulatedDelayMs": 490.9262459999991
+        "valve": 126.714528,
+        "p-limit": 110.53575000000001,
+        "p-queue": 117.23062399999998,
+        "p99DelayMs": 1.3123930000001565,
+        "p99IdealDelayMs": 469.3664869999993,
+        "accumulatedDelayMs": 473.22470800000156
       }
     },
     {
       "pair": 1,
-      "library": "/home/xlr8/code/valve/packages/valve/src/index.ts",
+      "library": "/home/xlr8/code/valve/packages/valve/dist/index.js",
       "jobs": 100000,
       "accuracyJobs": 2000,
       "results": {
-        "valve": 101.31636699999999,
-        "p-limit": 111.75664,
-        "p-queue": 110.33612500000004,
-        "p99DelayMs": 1.521799000000101,
-        "p99IdealDelayMs": 832.3602109999993,
-        "accumulatedDelayMs": 839.9176539999971
+        "valve": 106.223532,
+        "p-limit": 112.301355,
+        "p-queue": 116.97128299999997,
+        "p99DelayMs": 1.3961880000024394,
+        "p99IdealDelayMs": 491.7812249999988,
+        "accumulatedDelayMs": 495.8459189999994
       }
     },
     {
       "pair": 2,
-      "library": "/home/xlr8/code/valve/packages/valve/src/index.ts",
+      "library": "/home/xlr8/code/valve/packages/valve/dist/index.js",
       "jobs": 100000,
       "accuracyJobs": 2000,
       "results": {
-        "valve": 100.83512899999998,
-        "p-limit": 115.19322499999998,
-        "p-queue": 109.96605900000003,
-        "p99DelayMs": 0.37935100000049715,
-        "p99IdealDelayMs": 470.7196299999996,
-        "accumulatedDelayMs": 474.9880919999996
+        "valve": 102.83175800000001,
+        "p-limit": 105.79504600000001,
+        "p-queue": 112.06649699999997,
+        "p99DelayMs": 1.3068490000000565,
+        "p99IdealDelayMs": 520.1936100000021,
+        "accumulatedDelayMs": 525.1094860000012
       }
     }
   ]
