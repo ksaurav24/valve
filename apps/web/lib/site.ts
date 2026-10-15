@@ -10,10 +10,7 @@ export const site = {
   /** From packages/valve/package.json, copied by scripts/sync-content.mjs. */
   version: release.version,
   packageName,
-  installPackage:
-    release.channel === 'latest'
-      ? packageName
-      : `${packageName}@${release.channel}`,
+  installPackage: packageName,
   repo: 'ksaurav24/valve',
   repository: 'https://github.com/ksaurav24/valve',
   source: 'https://github.com/ksaurav24/valve/blob/master',

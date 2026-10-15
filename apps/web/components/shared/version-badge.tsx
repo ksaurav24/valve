@@ -1,11 +1,11 @@
 import Link from 'next/link';
 import { current, versionState, type VersionState } from '@/lib/releases';
 import { cn } from '@/lib/utils';
+import { isBetaVersion } from '@/lib/release-state.mjs';
 
 const labels: Record<VersionState, string> = {
   latest: 'latest',
   published: 'published',
-  beta: 'beta',
   dev: 'dev · unreleased',
 };
 
@@ -18,6 +18,7 @@ export function VersionBadge({
   className?: string;
 }) {
   const state = versionState(version);
+  const beta = isBetaVersion(version);
   return (
     <Link
       href={state === 'dev' ? '/changelog' : '/releases'}
@@ -26,11 +27,10 @@ export function VersionBadge({
         className,
       )}
       title={
-        state === 'dev'
+        (state === 'dev'
           ? 'Development version: not published to npm yet'
-          : state === 'beta'
-            ? 'Beta prerelease published on npm'
-            : 'Published on npm'
+          : 'Published on npm') +
+        (beta ? '. Beta: APIs may change before 1.0.' : '')
       }
     >
       <span
@@ -42,6 +42,7 @@ export function VersionBadge({
       />
       <span className="text-foreground">v{version}</span>
       <span>{labels[state]}</span>
+      {beta && <span>· beta</span>}
     </Link>
   );
 }

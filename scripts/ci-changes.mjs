@@ -13,9 +13,7 @@ export function isReleaseOnlyChange(before, after) {
   if (isDeepStrictEqual(previous, current)) return true;
   const tag = after.publishConfig?.tag ?? 'latest';
   const validChannel =
-    tag === 'beta'
-      ? /^\d+\.\d+\.\d+-beta\.\d+$/.test(after.version)
-      : tag === 'latest' && /^\d+\.\d+\.\d+$/.test(after.version);
+    tag === 'latest' && /^\d+\.\d+\.\d+$/.test(after.version);
   if (
     !validChannel ||
     !['latest', 'beta'].includes(before.publishConfig?.tag ?? 'latest')

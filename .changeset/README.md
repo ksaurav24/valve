@@ -15,14 +15,26 @@ live website metadata or format unrelated files. Version-only changes do not
 require another changeset. Merging that PR publishes `valvejs` through npm
 trusted publishing and creates the git tag and GitHub Release.
 
-The repository is in prerelease mode with tag `beta`. The current release target
-is `0.4.0-beta.0`, following the published v0.3.0 beta series.
-Add changesets for subsequent package changes, then run `pnpm version-packages`
-for the next beta version and changelog. Install published betas with `npm install valvejs@beta`. The packed
-publish plan enforces the `beta` npm tag, and GitHub marks the matching
-`valvejs@0.4.0-beta.0` release as a prerelease. The npm trusted publisher must
-target `version.yml` in `ksaurav24/valve`.
+Releases use plain `x.y.z` versions and npm's default `latest` channel.
+Install with `npm install valvejs`; there is no separate beta install channel.
+The project is **beta until 1.0**, which describes API maturity rather than
+version syntax. Keep that notice in the READMEs and website.
 
-To prepare a stable release, run `pnpm changeset pre exit`, remove
-`publishConfig.tag` (or set it to `latest`), update beta installation
-instructions, then run `pnpm version-packages` and review the version PR.
+Run `pnpm version-packages` to consume changesets and generate the next version
+and changelog. The publish-plan guard rejects prerelease versions, Changesets
+prerelease mode, and custom npm channels. Git tags and GitHub releases use
+`valvejs@x.y.z`; new GitHub releases are not marked as prereleases. The npm
+trusted publisher must target `version.yml` in `ksaurav24/valve`.
+
+After versioning, run `pnpm --filter @valve/web sync` and review the website
+changelog. After publication, verify `npm view valvejs dist-tags`, refresh the
+committed fallback with `pnpm --filter @valve/web sync:snapshot`, and rebuild
+the website. Published versions and release dates must come from npm.
+
+For the one-time migration from numbered betas, publish the prepared plain
+version before removing the obsolete npm channel with
+`npm dist-tag rm valvejs beta` from an authenticated maintainer session.
+Verify `latest` points to the new version first. Existing prerelease versions,
+Git tags, GitHub releases, and full package changelog entries remain available.
+The website omits historical prereleases from its version lists; users who
+installed with `@beta` should switch to `npm install valvejs`.

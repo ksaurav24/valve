@@ -1,35 +1,20 @@
 import { readFileSync, writeFileSync } from 'node:fs';
 import { pathToFileURL } from 'node:url';
 
-/** Keep npm's channel consistent with the manifest and Changesets prerelease state. */
+/** Publish plain versions through npm's default channel. */
 export function releaseTag(pkg, preState) {
   const number = '(?:0|[1-9][0-9]*)';
-  const stable = new RegExp(`^${number}\\.${number}\\.${number}$`);
-  const beta = new RegExp(
-    `^${number}\\.${number}\\.${number}-beta\\.${number}$`,
-  );
+  const version = new RegExp(`^${number}\\.${number}\\.${number}$`);
   if (pkg.name !== 'valvejs') throw new Error('Expected the valvejs package');
-  if (beta.test(pkg.version)) {
-    if (
-      preState?.mode !== 'pre' ||
-      preState.tag !== 'beta' ||
-      pkg.publishConfig?.tag !== 'beta'
-    ) {
-      throw new Error(
-        'Beta releases require Changesets beta mode and publishConfig.tag=beta',
-      );
-    }
-    return 'beta';
-  }
-  if (!stable.test(pkg.version))
-    throw new Error(`Unsupported release version: ${pkg.version}`);
-  if (preState?.mode === 'pre')
+  if (!version.test(pkg.version))
+    throw new Error(`Expected a plain x.y.z release version: ${pkg.version}`);
+  if (preState)
     throw new Error(
-      'Run pnpm version-packages to generate a beta version before publishing',
+      'Finish exiting Changesets prerelease mode before publishing.',
     );
   if (pkg.publishConfig?.tag && pkg.publishConfig.tag !== 'latest') {
     throw new Error(
-      'Stable releases require publishConfig.tag=latest (or no explicit tag)',
+      'Releases use the default npm channel; remove publishConfig.tag.',
     );
   }
   return 'latest';

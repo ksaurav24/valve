@@ -72,24 +72,28 @@ It explicitly dispatches CI for bot-created PRs so required checks can run.
 Version PRs update package versions, changelogs, and the lockfile as needed.
 They do not refresh live website metadata or format unrelated files.
 Merging a version PR publishes to npm through trusted publishing, then creates
-the git tag and GitHub Release. The first public beta is
-`0.3.0-beta.0`, installed with `npm install valvejs@beta`.
+the git tag and GitHub Release.
 
-CI and package-name maintenance uses an empty changeset and does not add a
-separate version bump. It ships alongside the existing v0.3.0 feature changes.
+Releases use plain `x.y.z` versions and npm's default `latest` channel. Users
+install with `npm install valvejs`. Valve is **beta until 1.0**: its APIs may
+change between releases. This maturity notice belongs in the READMEs and
+website, rather than in version suffixes or a separate npm channel. Review
+release notes before upgrading a 0.x version.
 
-The repository is in Changesets prerelease mode (`.changeset/pre.json`, tag
-`beta`). Run `pnpm version-packages` to bump versions and generate the changelog;
-the first beta is `0.3.0-beta.0`. Keep the `-beta.N` suffix in
-`package.json`; beta is a prerelease version as well as an npm tag. Later beta
-releases increment the suffix. The workflow validates and sets the packed npm
-publish plan to `beta`, including retries, and creates the
-`valvejs@0.3.0-beta.0` Git tag and GitHub release marked **Pre-release**.
+Run `pnpm version-packages` to consume changesets and generate the next version
+and changelog. Run `pnpm --filter @valve/web sync` afterward to regenerate the
+website changelog. The release guard requires a plain version and rejects
+Changesets prerelease mode or custom npm channels. The workflow publishes to
+`latest` and creates a `valvejs@x.y.z` Git tag and ordinary GitHub release.
 
-For a stable release, run `pnpm changeset pre exit`, remove `publishConfig.tag`
-(or set it to `latest`), update beta installation instructions, and then run
-`pnpm version-packages`. Review and merge the stable version PR before publishing.
-The release guard rejects a stable version while beta mode is still active.
+Already-published prerelease versions keep their original names and history
+in npm and the full package changelog. The website lists only plain versions.
+After the first plain release, maintainers can remove the old npm `beta` tag;
+see the [release migration instructions](.changeset/README.md). Users who
+previously installed `valvejs@beta` should switch to `npm install valvejs`.
+After publication, verify the npm version and `latest` tag, run
+`pnpm --filter @valve/web sync:snapshot`, and commit the refreshed website
+fallback metadata. Rebuild the website so `/releases` includes the new version.
 
 The npm trusted publisher must be configured for `valvejs`, the GitHub repository
 `ksaurav24/valve`, and the workflow filename `version.yml`.

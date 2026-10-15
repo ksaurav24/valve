@@ -1,6 +1,6 @@
 # valvejs
 
-[![npm beta version](https://img.shields.io/npm/v/valvejs/beta.svg?label=npm%20beta)](https://www.npmjs.com/package/valvejs?activeTab=versions)
+[![npm version](https://img.shields.io/npm/v/valvejs.svg)](https://www.npmjs.com/package/valvejs)
 [![npm downloads per month](https://img.shields.io/npm/dm/valvejs.svg)](https://www.npmjs.com/package/valvejs)
 [![CI](https://github.com/ksaurav24/valve/actions/workflows/ci.yml/badge.svg?branch=master)](https://github.com/ksaurav24/valve/actions/workflows/ci.yml)
 [![License: Apache-2.0](https://img.shields.io/badge/license-Apache--2.0-blue.svg)](LICENSE)
@@ -17,17 +17,16 @@ worker sharing that budget pauses. A memory store supports single-process use.
 
 ## Quickstart
 
-The next release is `0.4.0-beta.0`, the first beta with atomic scoped rate
-limits. Beta APIs may change before a stable release. Once published, install
-it from the npm `beta` channel:
+**Beta until 1.0.** APIs may change between releases. Published versions use
+plain version numbers and install through npm’s default channel.
 
 ```sh
-npm install valvejs@beta
+npm install valvejs
 ```
 
-To pin this release after publication, use `npm install valvejs@0.4.0-beta.0`.
-Until then, `valvejs@beta` selects the previous published beta. Build this
-branch from source to try scoped limits before publication.
+The npm badge above follows the current release automatically. See the
+[release history](https://valvejs.vercel.app/releases/) for published versions
+and release notes.
 
 ```ts
 import { createValve } from 'valvejs';
@@ -96,7 +95,7 @@ store is unavailable. Rate bounds do not survive
 [loss of Redis state](apps/web/content/docs/guarantees.mdx#store-state-loss) from a flush, eviction, or
 failover. Read the [full guarantees](apps/web/content/docs/guarantees.mdx).
 
-## Scoped budgets (0.4.0 beta)
+## Scoped budgets
 
 A job can spend shared and per-recipient budgets atomically:
 

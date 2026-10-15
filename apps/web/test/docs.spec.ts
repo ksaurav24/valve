@@ -109,12 +109,15 @@ test('home page leads with install, usage, and documentation', async ({
     page.getByRole('tab', { name: published ? 'pnpm' : 'source', exact: true }),
   ).toHaveAttribute('aria-selected', 'true');
   if (published) {
-    const target =
-      release.channel === 'latest' ? 'valvejs' : `valvejs@${release.channel}`;
     await expect(page.getByRole('tabpanel').first()).toContainText(
-      `pnpm add ${target}`,
+      'pnpm add valvejs',
     );
   }
+  await expect(
+    page.getByText('Beta until 1.0. APIs may change between releases.', {
+      exact: true,
+    }),
+  ).toBeVisible();
   await page.getByRole('tab', { name: 'shared.ts' }).click();
   await expect(page.getByRole('tabpanel', { name: 'shared.ts' })).toContainText(
     'redisStore',
@@ -146,6 +149,9 @@ test('home page leads with install, usage, and documentation', async ({
       .getByRole('heading', { level: 2 })
       .getByRole('link', { name: release.version, exact: true }),
   ).toBeVisible();
+  await expect(page.getByRole('heading', { level: 2 })).not.toContainText([
+    '-beta',
+  ]);
 });
 
 test('releases list only published versions', async ({ page }) => {
@@ -156,12 +162,12 @@ test('releases list only published versions', async ({ page }) => {
   );
   if (published.length === 0) {
     await expect(
-      page.getByRole('heading', { name: 'No published releases yet' }),
+      page.getByRole('heading', { name: 'No plain-version releases yet' }),
     ).toBeVisible();
     await expect(page.locator('main')).not.toContainText('latest');
   } else {
     await expect(
-      page.getByRole('heading', { name: 'No published releases yet' }),
+      page.getByRole('heading', { name: 'No plain-version releases yet' }),
     ).toHaveCount(0);
     for (const entry of published) {
       await expect(
@@ -169,6 +175,9 @@ test('releases list only published versions', async ({ page }) => {
       ).toBeVisible();
     }
   }
+  await expect(page.locator('main article h2')).toHaveText(
+    published.map((entry) => `v${entry.version}`),
+  );
 });
 
 test('npm downloads render beside GitHub and accept a zero count', async ({

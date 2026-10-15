@@ -10,7 +10,6 @@ import {
 const snapshot = {
   npm: {
     latest: '1.0.0',
-    beta: null,
     versions: { '1.0.0': '2026-01-01T00:00:00Z' },
   },
   downloads: 42,
@@ -104,7 +103,7 @@ test('an npm 404 with no snapshot means nothing is published', () => {
       releases: failed,
     },
   );
-  assert.deepEqual(data.npm, { latest: null, beta: null, versions: {} });
+  assert.deepEqual(data.npm, { latest: null, versions: {} });
   assert.equal(data.repo.stars, 0);
 });
 
@@ -117,7 +116,6 @@ test('packuments map versions to publish times', () => {
     }),
     {
       latest: '1.0.0',
-      beta: null,
       versions: { '1.0.0': '2026-01-01T00:00:00Z' },
     },
   );
@@ -140,18 +138,18 @@ test('bots are not listed as contributors', () => {
   );
 });
 
-test('beta tags and stable latest tags stay distinct', () => {
+test('only the default channel selects latest; historical prereleases remain available', () => {
   const parsed = parsePackument({
-    'dist-tags': { latest: '0.2.0', beta: '0.3.0-beta.0' },
-    versions: { '0.2.0': {}, '0.3.0-beta.0': {} },
+    'dist-tags': { latest: '0.4.0', beta: '0.4.0-beta.0' },
+    versions: { '0.4.0': {}, '0.4.0-beta.0': {} },
   });
-  assert.equal(parsed.latest, '0.2.0');
-  assert.equal(parsed.beta, '0.3.0-beta.0');
-  assert.ok(Object.hasOwn(parsed.versions, '0.3.0-beta.0'));
+  assert.equal(parsed.latest, '0.4.0');
+  assert.equal(Object.hasOwn(parsed, 'beta'), false);
+  assert.ok(Object.hasOwn(parsed.versions, '0.4.0-beta.0'));
   assert.equal(
     parsePackument({
-      'dist-tags': { beta: '0.3.0-beta.0' },
-      versions: { '0.3.0-beta.0': {} },
+      'dist-tags': { beta: '0.4.0-beta.0' },
+      versions: { '0.4.0-beta.0': {} },
     }).latest,
     null,
   );
@@ -164,7 +162,6 @@ test('an npm tombstone is treated as unpublished', () => {
     }),
     {
       latest: null,
-      beta: null,
       versions: {},
     },
   );

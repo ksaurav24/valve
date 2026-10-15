@@ -12,7 +12,7 @@ function pick(fresh, cached, isEmpty) {
 }
 
 export const emptyMetadata = {
-  npm: { latest: null, beta: null, versions: {} },
+  npm: { latest: null, versions: {} },
   downloads: null,
   repo: { stars: 0, forks: 0 },
   contributors: [],
@@ -50,10 +50,10 @@ export function mergeMetadata(snapshot, fresh) {
   return { data, status };
 }
 
-/** Preserve stable and beta tags separately; a 404 or tombstone has no releases. */
+/** Read the default npm channel and all versions, including historical prereleases. */
 export function parsePackument(json) {
   if (json === null || json?.time?.unpublished)
-    return { latest: null, beta: null, versions: {} };
+    return { latest: null, versions: {} };
   if (typeof json !== 'object' || typeof json.versions !== 'object')
     throw new Error('malformed packument');
   const versions = {};
@@ -61,7 +61,6 @@ export function parsePackument(json) {
     versions[version] = json.time?.[version] ?? null;
   return {
     latest: json['dist-tags']?.latest ?? null,
-    beta: json['dist-tags']?.beta ?? null,
     versions,
   };
 }

@@ -1,4 +1,5 @@
 import { mkdir, readFile, writeFile } from 'node:fs/promises';
+import { plainVersionChangelog } from './changelog.mjs';
 
 // Changesets owns the package changelog and package.json owns the version.
 // Never maintain a second copy by hand; everything here is generated.
@@ -10,12 +11,12 @@ const contributing = new URL(
   import.meta.url,
 );
 
-const { version, publishConfig } = JSON.parse(
+const { version } = JSON.parse(
   await readFile(new URL('package.json', packageDir), 'utf8'),
 );
 if (!version) throw new Error('packages/valve/package.json has no version.');
 const markdown = await readFile(new URL('CHANGELOG.md', packageDir), 'utf8');
-const body = markdown.replace(/^# [^\n]+\n\s*/, '');
+const body = plainVersionChangelog(markdown.replace(/^# [^\n]+\n\s*/, ''));
 
 /** Splits `## x.y.z` entries into `### Section` lists of change text. */
 function parse(text) {
@@ -82,5 +83,5 @@ await writeFile(
 );
 await writeFile(
   new URL('release.json', generated),
-  JSON.stringify({ version, channel: publishConfig?.tag ?? 'latest' }) + '\n',
+  JSON.stringify({ version }) + '\n',
 );

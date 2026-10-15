@@ -66,6 +66,21 @@ test('Changesets validation works in a detached CI checkout without local master
     git('config', 'user.name', 'CI regression');
     git('config', 'user.email', 'ci@example.com');
     mkdirSync(join(cwd, '.changeset'));
+    mkdirSync(join(cwd, 'scripts'));
+    mkdirSync(join(cwd, 'node_modules'));
+    symlinkSync(
+      fileURLToPath(new URL('../node_modules/semver', import.meta.url)),
+      join(cwd, 'node_modules/semver'),
+      'dir',
+    );
+    for (const name of [
+      'prepare-release-plan.mjs',
+      'validate-versioned-release.mjs',
+    ])
+      write(
+        `scripts/${name}`,
+        readFileSync(new URL(name, import.meta.url), 'utf8'),
+      );
     mkdirSync(join(cwd, 'packages/valve'), { recursive: true });
     write(
       'package.json',
@@ -88,6 +103,7 @@ test('Changesets validation works in a detached CI checkout without local master
       JSON.stringify({ name: 'valvejs', version: '0.2.0' }),
     );
     write('packages/valve/index.js', 'export {};\n');
+    write('packages/valve/CHANGELOG.md', '# valvejs\n\n## 0.2.0\n');
     commit();
     const base = git('rev-parse', 'HEAD');
     git('update-ref', 'refs/remotes/origin/master', base);
@@ -121,6 +137,10 @@ test('Changesets validation works in a detached CI checkout without local master
     // Maintenance and version PRs can legitimately have no new changesets.
     git('reset', '--hard', base);
     write('packages/valve/README.md', 'Documentation update.\n');
+    write(
+      'packages/valve/CHANGELOG.md',
+      '# valvejs\n\n## 0.3.0\n\n- Update documentation.\n',
+    );
     commit();
     assert.equal(validate(base).status, 0);
     write(
@@ -146,53 +166,36 @@ test('Changesets validation works in a detached CI checkout without local master
     assert.notEqual(invalid.status, 0);
     assert.match(invalid.stdout + invalid.stderr, /unknown-package/);
 
-    // A feature PR can consume its beta changeset before merging. Exercise the
-    // workflow's archived-note branch and keep it from accepting notes alone.
+    // A prepared release consumes its notes instead of leaving active changesets.
+    // The workflow must still reject missing release notes and version downgrades.
     git('reset', '--hard', base);
-    mkdirSync(join(cwd, '.changeset/pre'));
-    mkdirSync(join(cwd, 'scripts'));
-    mkdirSync(join(cwd, 'node_modules'));
-    symlinkSync(
-      fileURLToPath(new URL('../node_modules/semver', import.meta.url)),
-      join(cwd, 'node_modules/semver'),
-      'dir',
-    );
-    for (const name of [
-      'prepare-release-plan.mjs',
-      'validate-versioned-release.mjs',
-    ])
-      write(
-        `scripts/${name}`,
-        readFileSync(new URL(name, import.meta.url), 'utf8'),
-      );
-    write('.changeset/pre.json', JSON.stringify({ mode: 'pre', tag: 'beta' }));
-    write(
-      '.changeset/pre/change.md',
-      "---\n'valvejs': minor\n---\n\nAtomic scoped limits.\n",
-    );
-    write(
-      'packages/valve/CHANGELOG.md',
-      '# valvejs\n\n## 0.4.0-beta.0\n\n- Atomic scoped limits.\n',
-    );
-    commit();
-    const unversioned = validate(base);
-    assert.notEqual(unversioned.status, 0);
-    assert.match(
-      unversioned.stdout + unversioned.stderr,
-      /new package version/,
-    );
     write(
       'packages/valve/package.json',
-      JSON.stringify({
-        name: 'valvejs',
-        version: '0.4.0-beta.0',
-        publishConfig: { tag: 'beta' },
-      }),
+      JSON.stringify({ name: 'valvejs', version: '0.4.0' }),
     );
     commit();
-    const archived = validate(base);
-    assert.equal(archived.status, 0, archived.stdout + archived.stderr);
-    assert.match(archived.stdout, /Validated prepared beta release/);
+    const missingNotes = validate(base);
+    assert.notEqual(missingNotes.status, 0);
+    assert.match(missingNotes.stdout + missingNotes.stderr, /newest changelog/);
+    write(
+      'packages/valve/CHANGELOG.md',
+      '# valvejs\n\n## 0.4.0\n\n- Atomic scoped limits.\n',
+    );
+    commit();
+    const prepared = validate(base);
+    assert.equal(prepared.status, 0, prepared.stdout + prepared.stderr);
+    assert.match(prepared.stdout, /Validated prepared release/);
+    write(
+      'packages/valve/package.json',
+      JSON.stringify({ name: 'valvejs', version: '0.1.0' }),
+    );
+    commit();
+    const downgrade = validate(base);
+    assert.notEqual(downgrade.status, 0);
+    assert.match(
+      downgrade.stdout + downgrade.stderr,
+      /greater than the previous version/,
+    );
   } finally {
     rmSync(cwd, { recursive: true, force: true });
   }

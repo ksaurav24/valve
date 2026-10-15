@@ -113,6 +113,9 @@ export default async function HomePage() {
               same credential. valve shares the rate budget and provider pauses
               across every worker.
             </p>
+            <p className="max-w-md text-sm text-muted-foreground">
+              Beta until 1.0. APIs may change between releases.
+            </p>
             <HeroActions />
           </div>
           <dl className="grid max-w-md grid-cols-3 gap-4 border-t border-border pt-6 font-mono text-xs">
