@@ -1,0 +1,37 @@
+name: Classify changes
+
+on:
+  workflow_call:
+    outputs:
+      library:
+        value: ${{ jobs.changes.outputs.library }}
+      package:
+        value: ${{ jobs.changes.outputs.package }}
+      website:
+        value: ${{ jobs.changes.outputs.website }}
+      benchmarks:
+        value: ${{ jobs.changes.outputs.benchmarks }}
+
+permissions:
+  contents: read
+
+jobs:
+  changes:
+    runs-on: ubuntu-latest
+    outputs:
+      library: ${{ steps.changes.outputs.library }}
+      package: ${{ steps.changes.outputs.package }}
+      website: ${{ steps.changes.outputs.website }}
+      benchmarks: ${{ steps.changes.outputs.benchmarks }}
+    steps:
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - name: Select relevant checks
+        id: changes
+        env:
+          CI_EVENT_NAME: ${{ github.event_name }}
+          CI_BASE_SHA: ${{ github.event.pull_request.base.sha }}
+          CI_REF_NAME: ${{ github.ref_name }}
+        run: node scripts/ci-changes.mjs

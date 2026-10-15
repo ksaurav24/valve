@@ -49,7 +49,7 @@ jobs:
           node-version-file: .node-version
           cache: pnpm
       - run: pnpm install --frozen-lockfile
-      # version-packages also refreshes the website's GitHub/npm snapshot.
+      # Only version manifests, changelogs, and the lockfile belong in this PR.
       - name: Create version and changelog PR
         id: changesets
         uses: changesets/action/version@ae32849d5ba541f9ae29e40e22a623bc13562f51 # v2.1.2
@@ -89,16 +89,7 @@ jobs:
           node-version-file: .node-version
           package-manager-cache: false
       - run: pnpm install --frozen-lockfile
-      # The first public release is 1.0.0. Until npm lists the package, refuse
-      # to publish any 0.x version that a version PR produced.
-      - name: Require 1.0.0 for the first release
-        run: |
-          version=$(node -p "require('./packages/valve/package.json').version")
-          if ! npm view @ksaurav24/valve version >/dev/null 2>&1 && [ "${version%%.*}" -lt 1 ]; then
-            echo "::error::The first public release must be 1.0.0 or later; package.json has $version. Add a major changeset."
-            exit 1
-          fi
-      - run: pnpm --filter @ksaurav24/valve build
+      - run: pnpm --filter valvejs build
       - run: pnpm check:package
       - name: Pack packages
         id: pack

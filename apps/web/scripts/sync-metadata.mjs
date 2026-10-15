@@ -9,9 +9,9 @@ import {
 
 // Fetches npm and GitHub data for the static build. Network and API failures
 // never fail the build: each field falls back to the committed snapshot.
-// Pass --write-snapshot to refresh the snapshot itself (version PRs do this).
+// Pass --write-snapshot to explicitly refresh the committed fallback snapshot.
 const repo = 'ksaurav24/valve';
-const pkg = '@ksaurav24/valve';
+const pkg = 'valvejs';
 const snapshotFile = new URL('../content/data/metadata.json', import.meta.url);
 const outputFile = new URL('../.generated/metadata.json', import.meta.url);
 

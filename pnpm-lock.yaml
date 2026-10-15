@@ -126,7 +126,7 @@ importers:
 
   examples/feedback:
     dependencies:
-      '@ksaurav24/valve':
+      'valvejs':
         specifier: workspace:*
         version: link:../../packages/valve
       ioredis:
@@ -139,7 +139,7 @@ importers:
 
   examples/memory:
     dependencies:
-      '@ksaurav24/valve':
+      'valvejs':
         specifier: workspace:*
         version: link:../../packages/valve
     devDependencies:
@@ -149,7 +149,7 @@ importers:
 
   examples/observe:
     dependencies:
-      '@ksaurav24/valve':
+      'valvejs':
         specifier: workspace:*
         version: link:../../packages/valve
     devDependencies:
@@ -159,7 +159,7 @@ importers:
 
   examples/priorities:
     dependencies:
-      '@ksaurav24/valve':
+      'valvejs':
         specifier: workspace:*
         version: link:../../packages/valve
     devDependencies:
@@ -169,7 +169,7 @@ importers:
 
   examples/shared:
     dependencies:
-      '@ksaurav24/valve':
+      'valvejs':
         specifier: workspace:*
         version: link:../../packages/valve
       ioredis:
@@ -182,7 +182,7 @@ importers:
 
   examples/shutdown:
     dependencies:
-      '@ksaurav24/valve':
+      'valvejs':
         specifier: workspace:*
         version: link:../../packages/valve
     devDependencies:

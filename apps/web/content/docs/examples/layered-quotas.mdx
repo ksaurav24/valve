@@ -8,8 +8,8 @@ servers and a daily or monthly allowance tied to your plan. Some also charge
 certain endpoints more than one unit.
 
 ```ts title="search.ts"
-import { createValve } from '@ksaurav24/valve';
-import { redisStore } from '@ksaurav24/valve/redis';
+import { createValve } from 'valvejs';
+import { redisStore } from 'valvejs/redis';
 
 const search = createValve({
   id: 'search-api:key-5',

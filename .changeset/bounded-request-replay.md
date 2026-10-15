@@ -1,5 +1,5 @@
 ---
-'@ksaurav24/valve': patch
+'valvejs': patch
 ---
 
 Bound automatic replay of inherited Request bodies to 64 KiB by default.

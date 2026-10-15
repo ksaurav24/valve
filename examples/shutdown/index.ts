@@ -1,6 +1,6 @@
 // UC5: stop accepting work, reject queued calls, and drain a running call.
 import assert from 'node:assert/strict';
-import { createValve, isValveError } from '@ksaurav24/valve';
+import { createValve, isValveError } from 'valvejs';
 const api = createValve({ id: 'service', concurrency: 1 });
 let started!: () => void;
 const ready = new Promise<void>((resolve) => {

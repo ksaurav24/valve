@@ -198,12 +198,12 @@ Run these sequentially from the repository root. Redis and Valkey must be availa
 
 ```sh
 REDIS_URL=redis://127.0.0.1:6379 VALKEY_URL=redis://127.0.0.1:6380 pnpm bench:compare
-pnpm --filter @ksaurav24/valve exec tsx bench/headers.ts
+pnpm --filter valvejs exec tsx bench/headers.ts
 REDIS_URL=redis://127.0.0.1:6379 VALVE_BENCH_OUT=bench/paced.json pnpm bench:paced
 VALVE_BENCH_OUT=bench/local.json pnpm bench
-REDIS_URL=redis://127.0.0.1:6379 pnpm --filter @ksaurav24/valve exec tsx bench/redis.ts
-REDIS_URL=redis://127.0.0.1:6380 pnpm --filter @ksaurav24/valve exec tsx bench/redis.ts
-pnpm --filter @ksaurav24/valve exec tsx bench/mitata.ts
+REDIS_URL=redis://127.0.0.1:6379 pnpm --filter valvejs exec tsx bench/redis.ts
+REDIS_URL=redis://127.0.0.1:6380 pnpm --filter valvejs exec tsx bench/redis.ts
+pnpm --filter valvejs exec tsx bench/mitata.ts
 pnpm check:size
 ```
 

@@ -14,8 +14,8 @@ any queue.
 ```ts title="worker.ts"
 import { Worker } from 'bullmq';
 import { Redis } from 'ioredis';
-import { createValve, isValveError } from '@ksaurav24/valve';
-import { redisStore } from '@ksaurav24/valve/redis';
+import { createValve, isValveError } from 'valvejs';
+import { redisStore } from 'valvejs/redis';
 
 // valve and BullMQ can share a server, but BullMQ workers need their own
 // connection with maxRetriesPerRequest set to null.

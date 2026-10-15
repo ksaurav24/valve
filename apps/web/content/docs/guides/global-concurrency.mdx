@@ -16,8 +16,8 @@ Set up a shared Redis store as described in
 
 ```ts
 import { Redis } from 'ioredis';
-import { createValve } from '@ksaurav24/valve';
-import { redisStore } from '@ksaurav24/valve/redis';
+import { createValve } from 'valvejs';
+import { redisStore } from 'valvejs/redis';
 
 const client = new Redis(process.env.REDIS_URL!);
 const subscriber = client.duplicate();

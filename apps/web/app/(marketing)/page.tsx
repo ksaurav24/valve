@@ -22,7 +22,7 @@ export const metadata: Metadata = {
 const samples = [
   {
     file: 'local.ts',
-    code: `import { createValve } from '@ksaurav24/valve';
+    code: `import { createValve } from 'valvejs';
 
 const api = createValve({
   id: 'partner:credential-42',
@@ -36,8 +36,8 @@ await api.close({ drain: true });`,
   },
   {
     file: 'shared.ts',
-    code: `import { createValve } from '@ksaurav24/valve';
-import { redisStore } from '@ksaurav24/valve/redis';
+    code: `import { createValve } from 'valvejs';
+import { redisStore } from 'valvejs/redis';
 
 // Every worker using this credential shares one budget.
 const api = createValve({
@@ -51,7 +51,7 @@ await limitedFetch('https://api.example.com/contacts');`,
   },
   {
     file: 'queue.ts',
-    code: `import { createValve } from '@ksaurav24/valve';
+    code: `import { createValve } from 'valvejs';
 
 const github = createValve({
   id: 'github:app-42',

@@ -8,4 +8,4 @@ Describe the checks performed.
 
 - [ ] PR title follows Conventional Commits.
 - [ ] Lint, typecheck, and build pass.
-- [ ] Changeset added (use `pnpm changeset --empty` for tooling or docs).
+- [ ] Changeset added for user-facing package changes (not required for CI, tooling, or docs).

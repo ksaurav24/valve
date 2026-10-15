@@ -1,6 +1,6 @@
 // UC2: space a single-process script without an external store.
 import assert from 'node:assert/strict';
-import { createValve } from '@ksaurav24/valve';
+import { createValve } from 'valvejs';
 const api = createValve({
   id: 'github:script',
   rate: { limit: 100, interval: '1s' },

@@ -8,8 +8,8 @@ the provider meters each account separately. Give every credential its own
 valve id, created the first time it is needed.
 
 ```ts title="valves.ts"
-import { createValve, type Valve } from '@ksaurav24/valve';
-import { redisStore } from '@ksaurav24/valve/redis';
+import { createValve, type Valve } from 'valvejs';
+import { redisStore } from 'valvejs/redis';
 
 const store = redisStore({ client: redis }); // One store for every tenant.
 const valves = new Map<string, Valve>();

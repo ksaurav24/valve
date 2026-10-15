@@ -20,7 +20,7 @@ A valve is a named budget plus a local queue. This one allows 5 calls per
 second and at most 2 running at once.
 
 ```ts title="quickstart.ts"
-import { createValve } from '@ksaurav24/valve';
+import { createValve } from 'valvejs';
 
 const github = createValve({
   id: 'github:my-script',

@@ -53,6 +53,8 @@ jobs:
           node-version-file: .node-version
           cache: pnpm
       - run: pnpm install --frozen-lockfile
+      - name: Test CI scripts
+        run: node --test scripts/*.test.mjs
       - name: Validate PR title
         if: github.event_name == 'pull_request'
         env:
@@ -61,13 +63,27 @@ jobs:
       - name: Validate commit subject
         if: github.event_name != 'pull_request'
         run: git log -1 --format=%B | pnpm exec commitlint
-      - name: Require a changeset
-        if: github.event_name == 'pull_request' && github.head_ref != 'changeset-release/master'
+      - name: Classify package changes
+        id: changes
+        env:
+          CI_EVENT_NAME: ${{ github.event_name }}
+          CI_BASE_SHA: ${{ github.event.pull_request.base.sha }}
+          CI_REF_NAME: ${{ github.ref_name }}
+        run: node scripts/ci-changes.mjs
+      - name: Validate changesets
+        env:
+          BASE_REF: ${{ github.event.pull_request.base.sha || 'origin/master' }}
+        run: |
+          if git diff --name-only --no-renames --diff-filter=AM "$BASE_REF"...HEAD -- .changeset | grep -Ev '^\.changeset/README\.md$' | grep -Eq '^\.changeset/[^/]+\.md$'; then
+            pnpm exec changeset status --since "$BASE_REF"
+          fi
+      - name: Require a changeset for package changes
+        if: github.event_name == 'pull_request' && steps.changes.outputs.changeset == 'true'
         env:
           BASE_SHA: ${{ github.event.pull_request.base.sha }}
         run: |
-          if ! git diff --name-only "$BASE_SHA"...HEAD -- .changeset | grep -Eq '^\.changeset/[^/]+\.md$'; then
-            echo 'Add a changeset; use pnpm changeset --empty for tooling or documentation.'
+          if ! git diff --name-only --diff-filter=A "$BASE_SHA"...HEAD -- .changeset | grep -Ev '^\.changeset/README\.md$' | grep -Eq '^\.changeset/[^/]+\.md$'; then
+            echo 'Add a changeset with pnpm changeset for user-facing package changes.'
             exit 1
           fi
           pnpm exec changeset status --since "$BASE_SHA"
