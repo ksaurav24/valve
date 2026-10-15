@@ -59,7 +59,7 @@ Nothing in this app hardcodes a version, star count, download count, or contribu
   available days. It refreshes with SWR against npm's public downloads API,
   with requests deduplicated for an hour. Failed requests keep the build value;
   a valid zero replaces an older count. npm updates statistics daily, so a new
-  package may show `—` until data is available. No count is invented for a 404.
+  package may show `-` until data is available. No count is invented for a 404.
 
 Run both syncs with `pnpm --filter @valve/web sync`. The merge rules live in
 `scripts/merge-metadata.mjs` and are covered by `pnpm --filter @valve/web test`.

@@ -40,7 +40,7 @@ export function NpmDownloads({ initial }: { initial: number | null }) {
       </span>
       <span className="flex h-full items-center gap-1 border-l border-border bg-muted/60 px-2 tabular-nums group-hover:bg-accent sm:px-2.5">
         <Download className="hidden size-3 sm:block" />
-        {downloads === null ? '—' : compact.format(downloads)}
+        {downloads === null ? '-' : compact.format(downloads)}
         <span className="hidden sm:inline">/mo</span>
       </span>
     </a>
