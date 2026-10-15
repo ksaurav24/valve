@@ -15,13 +15,12 @@ live website metadata or format unrelated files. Version-only changes do not
 require another changeset. Merging that PR publishes `valvejs` through npm
 trusted publishing and creates the git tag and GitHub Release.
 
-The repository is in prerelease mode with tag `beta`. The current release target
-is `0.4.0-beta.0`, following the published v0.3.0 beta series.
-Add changesets for subsequent package changes, then run `pnpm version-packages`
-for the next beta version and changelog. Install published betas with `npm install valvejs@beta`. The packed
-publish plan enforces the `beta` npm tag, and GitHub marks the matching
-`valvejs@0.4.0-beta.0` release as a prerelease. The npm trusted publisher must
-target `version.yml` in `ksaurav24/valve`.
+The repository is in prerelease mode with tag `beta`. Add changesets for
+package changes, then run `pnpm version-packages` for the next beta version
+and changelog. Install published betas with `npm install valvejs@beta`.
+The packed publish plan enforces the `beta` npm tag, and GitHub marks the
+matching release as a prerelease. The npm trusted publisher must target
+`version.yml` in `ksaurav24/valve`.
 
 To prepare a stable release, run `pnpm changeset pre exit`, remove
 `publishConfig.tag` (or set it to `latest`), update beta installation

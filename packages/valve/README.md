@@ -13,17 +13,16 @@ worker sharing that budget pauses. A memory store supports single-process use.
 
 ## Quickstart
 
-The next release is `0.4.0-beta.0`, the first beta with atomic scoped rate
-limits. Beta APIs may change before a stable release. Once published, install
-it from the npm `beta` channel:
+Install from the npm `beta` channel. Beta APIs may change before a stable
+release.
 
 ```sh
 npm install valvejs@beta
 ```
 
-To pin this release after publication, use `npm install valvejs@0.4.0-beta.0`.
-Until then, `valvejs@beta` selects the previous published beta. Build this
-branch from source to try scoped limits before publication.
+The beta badge above follows the current beta automatically. See the
+[release history](https://valvejs.vercel.app/releases/) for published versions
+and release notes.
 
 ```ts
 import { createValve } from 'valvejs';
@@ -92,7 +91,7 @@ store is unavailable. Rate bounds do not survive
 [loss of Redis state](https://valvejs.vercel.app/docs/guarantees/#store-state-loss) from a flush, eviction, or
 failover. Read the [full guarantees](https://valvejs.vercel.app/docs/guarantees/).
 
-## Scoped budgets (0.4.0 beta)
+## Scoped budgets
 
 A job can spend shared and per-recipient budgets atomically:
 
