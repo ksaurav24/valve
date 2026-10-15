@@ -13,6 +13,7 @@ After changesets reach `master`, automation opens or updates a version PR with
 package versions, changelogs, and the lockfile as needed. It does not refresh
 live website metadata or format unrelated files. Version-only changes do not
 require another changeset. Merging that PR publishes `valvejs` through npm
-trusted publishing and creates the git tag and GitHub Release. The first public
-release is 1.0.0; the npm trusted publisher must target `version.yml` in
+trusted publishing and creates the git tag and GitHub Release. CI and package-name
+maintenance uses an empty changeset and ships with the planned v0.3.0 release.
+The npm trusted publisher must target `version.yml` in
 `ksaurav24/valve`.

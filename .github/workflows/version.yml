@@ -89,15 +89,6 @@ jobs:
           node-version-file: .node-version
           package-manager-cache: false
       - run: pnpm install --frozen-lockfile
-      # The first public release is 1.0.0. Until npm lists the package, refuse
-      # to publish any 0.x version that a version PR produced.
-      - name: Require 1.0.0 for the first release
-        run: |
-          version=$(node -p "require('./packages/valve/package.json').version")
-          if ! npm view valvejs version >/dev/null 2>&1 && [ "${version%%.*}" -lt 1 ]; then
-            echo "::error::The first public release must be 1.0.0 or later; package.json has $version. Add a major changeset."
-            exit 1
-          fi
       - run: pnpm --filter valvejs build
       - run: pnpm check:package
       - name: Pack packages

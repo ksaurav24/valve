@@ -53,8 +53,8 @@ jobs:
           node-version-file: .node-version
           cache: pnpm
       - run: pnpm install --frozen-lockfile
-      - name: Test CI change selection
-        run: node --test scripts/ci-changes.test.mjs
+      - name: Test CI scripts
+        run: node --test scripts/*.test.mjs
       - name: Validate PR title
         if: github.event_name == 'pull_request'
         env:
@@ -71,7 +71,12 @@ jobs:
           CI_REF_NAME: ${{ github.ref_name }}
         run: node scripts/ci-changes.mjs
       - name: Validate changesets
-        run: pnpm exec changeset status
+        env:
+          BASE_REF: ${{ github.event.pull_request.base.sha || 'origin/master' }}
+        run: |
+          if git diff --name-only --no-renames --diff-filter=AM "$BASE_REF"...HEAD -- .changeset | grep -Ev '^\.changeset/README\.md$' | grep -Eq '^\.changeset/[^/]+\.md$'; then
+            pnpm exec changeset status --since "$BASE_REF"
+          fi
       - name: Require a changeset for package changes
         if: github.event_name == 'pull_request' && steps.changes.outputs.changeset == 'true'
         env:

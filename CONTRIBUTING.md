@@ -72,7 +72,8 @@ It explicitly dispatches CI for bot-created PRs so required checks can run.
 Version PRs update package versions, changelogs, and the lockfile as needed.
 They do not refresh live website metadata or format unrelated files.
 Merging a version PR publishes to npm through trusted publishing, then creates
-the git tag and GitHub Release. The first public release is 1.0.0.
+the git tag and GitHub Release. CI and package-name maintenance does not request
+a separate version bump; it ships with the planned v0.3.0 release.
 
 The npm trusted publisher must be configured for `valvejs`, the GitHub repository
 `ksaurav24/valve`, and the workflow filename `version.yml`.
