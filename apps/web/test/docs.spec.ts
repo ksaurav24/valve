@@ -152,6 +152,25 @@ test('home page leads with install, usage, and documentation', async ({
   await expect(page.getByRole('heading', { level: 2 })).not.toContainText([
     '-beta',
   ]);
+  await expect(
+    page
+      .getByRole('heading', { level: 2 })
+      .getByRole('link', { name: '0.3.0', exact: true }),
+  ).toBeVisible();
+  await expect(
+    page
+      .getByText('Keep admitting jobs through a healthy store', {
+        exact: false,
+      })
+      .first(),
+  ).toBeVisible();
+  await expect(
+    page
+      .getByText('Detect incompatible shared Redis/Valkey quota settings', {
+        exact: false,
+      })
+      .first(),
+  ).toBeVisible();
 });
 
 test('releases list only published versions', async ({ page }) => {

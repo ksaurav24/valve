@@ -1,5 +1,5 @@
 import { mkdir, readFile, writeFile } from 'node:fs/promises';
-import { plainVersionChangelog } from './changelog.mjs';
+import { websiteChangelog } from './changelog.mjs';
 
 // Changesets owns the package changelog and package.json owns the version.
 // Never maintain a second copy by hand; everything here is generated.
@@ -16,7 +16,9 @@ const { version } = JSON.parse(
 );
 if (!version) throw new Error('packages/valve/package.json has no version.');
 const markdown = await readFile(new URL('CHANGELOG.md', packageDir), 'utf8');
-const body = plainVersionChangelog(markdown.replace(/^# [^\n]+\n\s*/, ''));
+const { body, historicalVersions } = websiteChangelog(
+  markdown.replace(/^# [^\n]+\n\s*/, ''),
+);
 
 /** Splits `## x.y.z` entries into `### Section` lists of change text. */
 function parse(text) {
@@ -46,6 +48,9 @@ function parse(text) {
       }
       return {
         version: heading.trim(),
+        ...(historicalVersions[heading.trim()]
+          ? { sourceVersions: historicalVersions[heading.trim()] }
+          : {}),
         sections: sections.filter((section) => section.items.length),
       };
     })

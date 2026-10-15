@@ -87,7 +87,9 @@ Changesets prerelease mode or custom npm channels. The workflow publishes to
 `latest` and creates a `valvejs@x.y.z` Git tag and ordinary GitHub release.
 
 Already-published prerelease versions keep their original names and history
-in npm and the full package changelog. The website lists only plain versions.
+in npm and the full package changelog. The website uses plain headings and
+groups preview-only series as historical notes; only actual npm versions
+appear on `/releases`.
 After the first plain release, maintainers can remove the old npm `beta` tag;
 see the [release migration instructions](.changeset/README.md). Users who
 previously installed `valvejs@beta` should switch to `npm install valvejs`.

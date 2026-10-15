@@ -6,6 +6,7 @@ import { isBetaVersion } from '@/lib/release-state.mjs';
 const labels: Record<VersionState, string> = {
   latest: 'latest',
   published: 'published',
+  historical: 'historical notes',
   dev: 'dev · unreleased',
 };
 
@@ -21,15 +22,19 @@ export function VersionBadge({
   const beta = isBetaVersion(version);
   return (
     <Link
-      href={state === 'dev' ? '/changelog' : '/releases'}
+      href={
+        state === 'dev' || state === 'historical' ? '/changelog' : '/releases'
+      }
       className={cn(
         'inline-flex h-7 items-center gap-2 rounded-full border border-border bg-card px-3 font-mono text-xs text-muted-foreground hover:border-ring hover:text-foreground',
         className,
       )}
       title={
-        (state === 'dev'
-          ? 'Development version: not published to npm yet'
-          : 'Published on npm') +
+        (state === 'historical'
+          ? 'Historical preview notes grouped under a plain version heading'
+          : state === 'dev'
+            ? 'Development version: not published to npm yet'
+            : 'Published on npm') +
         (beta ? '. Beta: APIs may change before 1.0.' : '')
       }
     >

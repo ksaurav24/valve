@@ -12,6 +12,7 @@ export interface ChangelogSection {
 export interface ChangelogEntry {
   version: string;
   sections: ChangelogSection[];
+  sourceVersions?: string[];
 }
 
 export interface Release extends ChangelogEntry {
@@ -20,7 +21,7 @@ export interface Release extends ChangelogEntry {
   githubUrl: string | null;
 }
 
-export type VersionState = 'latest' | 'published' | 'dev';
+export type VersionState = 'latest' | 'published' | 'historical' | 'dev';
 
 const npm = metadata.npm as {
   latest: string | null;
@@ -50,7 +51,11 @@ export const releases: Release[] = changelogEntries
 export const latestPublished = npm.latest;
 
 export function versionState(version: string): VersionState {
-  return npmVersionState(version, npm);
+  return npmVersionState(
+    version,
+    npm,
+    changelogEntries.find((entry) => entry.version === version)?.sourceVersions,
+  );
 }
 
 export const current = {
