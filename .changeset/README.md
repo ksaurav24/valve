@@ -13,7 +13,15 @@ After changesets reach `master`, automation opens or updates a version PR with
 package versions, changelogs, and the lockfile as needed. It does not refresh
 live website metadata or format unrelated files. Version-only changes do not
 require another changeset. Merging that PR publishes `valvejs` through npm
-trusted publishing and creates the git tag and GitHub Release. CI and package-name
-maintenance uses an empty changeset and ships with the planned v0.3.0 release.
-The npm trusted publisher must target `version.yml` in
-`ksaurav24/valve`.
+trusted publishing and creates the git tag and GitHub Release.
+
+The repository is in prerelease mode with tag `beta`. The first beta is `0.3.0-beta.0`.
+Add changesets for subsequent package changes, then run `pnpm version-packages`
+for the next beta version and changelog. Install published betas with `npm install valvejs@beta`. The packed
+publish plan enforces the `beta` npm tag, and GitHub marks the matching
+`valvejs@0.3.0-beta.0` release as a prerelease. The npm trusted publisher must
+target `version.yml` in `ksaurav24/valve`.
+
+To prepare a stable release, run `pnpm changeset pre exit`, remove
+`publishConfig.tag` (or set it to `latest`), update beta installation
+instructions, then run `pnpm version-packages` and review the version PR.

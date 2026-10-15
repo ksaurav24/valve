@@ -43,11 +43,15 @@ Nothing in this app hardcodes a version, star count, or contributor list.
   raise the API limit. Failed or suspicious answers (errors, rate limits, a
   zero or empty answer when the snapshot has data) keep the committed
   snapshot in `content/data/metadata.json`, so API failures never break a
-  build. `pnpm version-packages` refreshes the snapshot in every version PR.
+  build. Refresh the committed fallback explicitly with
+  `pnpm --filter @valve/web sync:snapshot`; version PRs do not refresh it.
 - `lib/releases.ts` treats a version as released only when npm lists it.
   Other changelog entries are development versions: they appear on
   `/changelog`, never on `/releases`. In MDX, wrap text in `<Unpublished>` or
-  `<Published>` when it depends on that state.
+  `<Published>` when it depends on that state. Published beta versions display a
+  `beta` badge even if npm's `latest` tag happens to point at a prerelease. Stable
+  `latest` and `beta` metadata remain separate; install commands follow the
+  package's configured npm tag (`valvejs@beta` during the beta series).
 - The navigation star count refreshes in the browser with SWR against the
   public GitHub API, cached for an hour in `localStorage`, falling back to the
   build value. No token reaches the browser.
@@ -58,7 +62,9 @@ Run both syncs with `pnpm --filter @valve/web sync`. The merge rules live in
 ## Releases and rebuilds
 
 Merging a version PR runs the publish jobs in `.github/workflows/version.yml`:
-npm trusted publishing, then the git tag and GitHub Release. If the
+npm trusted publishing, then the git tag and GitHub Release. Beta versions use
+`0.3.0-beta.N`, the npm `beta` tag, and GitHub prereleases named
+`valvejs@0.3.0-beta.N`. If the
 `VERCEL_DEPLOY_HOOK` secret exists, the workflow then triggers a rebuild so
 `/releases` picks up the new npm data. Pushes to `master` rebuild through the
 host's Git integration.

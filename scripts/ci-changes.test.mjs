@@ -4,7 +4,45 @@ import { mkdtempSync, mkdirSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import test from 'node:test';
-import { classifyChanges } from './ci-changes.mjs';
+import { classifyChanges, isReleaseOnlyChange } from './ci-changes.mjs';
+
+test('beta channel transitions do not require another version bump', () => {
+  const before = {
+    name: 'valvejs',
+    version: '0.2.0',
+    publishConfig: { access: 'public' },
+  };
+  const after = {
+    ...before,
+    version: '0.3.0-beta.0',
+    publishConfig: { access: 'public', tag: 'beta' },
+  };
+  assert.equal(isReleaseOnlyChange(before, after), true);
+  assert.equal(
+    isReleaseOnlyChange(after, { ...before, version: '0.3.0' }),
+    true,
+  );
+  assert.equal(
+    isReleaseOnlyChange(before, { ...after, name: 'another-package' }),
+    false,
+  );
+  assert.equal(
+    isReleaseOnlyChange(before, { ...after, dependencies: { dep: '1.0.0' } }),
+    false,
+  );
+  assert.equal(
+    isReleaseOnlyChange(before, {
+      ...after,
+      publishConfig: { access: 'restricted', tag: 'beta' },
+    }),
+    false,
+  );
+  assert.equal(
+    isReleaseOnlyChange(before, { ...after, version: '0.3.0' }),
+    false,
+  );
+  assert.equal(before.version, '0.2.0');
+});
 
 test('CI and chore maintenance does not require release notes or library tests', () => {
   assert.deepEqual(
@@ -36,6 +74,8 @@ test('version-only release PRs keep package and website validation', () => {
         'packages/valve/package.json',
         'packages/valve/CHANGELOG.md',
         '.changeset/fix.md',
+        '.changeset/pre/fix.md',
+        '.changeset/pre.json',
       ],
       true,
     ),

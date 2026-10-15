@@ -1,6 +1,8 @@
 // Verify the MDX site, navigation, search, and layout.
 import { expect, test } from '@playwright/test';
 import release from '../.generated/release.json' with { type: 'json' };
+import metadata from '../.generated/metadata.json' with { type: 'json' };
+import changelog from '../.generated/changelog.json' with { type: 'json' };
 test('introduction renders without horizontal overflow', async ({
   page,
 }, info) => {
@@ -98,11 +100,17 @@ test('home page leads with install, usage, and documentation', async ({
   await expect(
     page.getByRole('link', { name: /^v\d+\.\d+\.\d+/ }).first(),
   ).toContainText(release.version);
-  // Unpublished packages default to the source install, never a registry claim.
-  await expect(page.getByRole('tab', { name: 'source' })).toHaveAttribute(
-    'aria-selected',
-    'true',
-  );
+  const published = Object.hasOwn(metadata.npm.versions, release.version);
+  await expect(
+    page.getByRole('tab', { name: published ? 'pnpm' : 'source', exact: true }),
+  ).toHaveAttribute('aria-selected', 'true');
+  if (published) {
+    const target =
+      release.channel === 'latest' ? 'valvejs' : `valvejs@${release.channel}`;
+    await expect(page.getByRole('tabpanel').first()).toContainText(
+      `pnpm add ${target}`,
+    );
+  }
   await page.getByRole('tab', { name: 'shared.ts' }).click();
   await expect(page.getByRole('tabpanel', { name: 'shared.ts' })).toContainText(
     'redisStore',
@@ -132,10 +140,24 @@ test('home page leads with install, usage, and documentation', async ({
 test('releases list only published versions', async ({ page }) => {
   await page.goto('/releases/');
   await expect(page.getByRole('heading', { level: 1 })).toHaveText('Releases');
-  await expect(
-    page.getByRole('heading', { name: 'No published releases yet' }),
-  ).toBeVisible();
-  await expect(page.locator('main')).not.toContainText('latest');
+  const published = changelog.filter((entry) =>
+    Object.hasOwn(metadata.npm.versions, entry.version),
+  );
+  if (published.length === 0) {
+    await expect(
+      page.getByRole('heading', { name: 'No published releases yet' }),
+    ).toBeVisible();
+    await expect(page.locator('main')).not.toContainText('latest');
+  } else {
+    await expect(
+      page.getByRole('heading', { name: 'No published releases yet' }),
+    ).toHaveCount(0);
+    for (const entry of published) {
+      await expect(
+        page.getByRole('heading', { name: `v${entry.version}`, exact: true }),
+      ).toBeVisible();
+    }
+  }
 });
 
 test('contributors page renders people and the root guide', async ({

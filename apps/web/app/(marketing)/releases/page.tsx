@@ -42,7 +42,7 @@ export default function ReleasesPage() {
               <span className="font-mono text-foreground">
                 v{current.version}
               </span>
-              . The first public release will be 1.0.0.
+              . The first public release is planned for the v0.3.0 beta series.
             </p>
             <Link
               href="/changelog"

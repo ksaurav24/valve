@@ -126,12 +126,12 @@ importers:
 
   examples/feedback:
     dependencies:
-      'valvejs':
-        specifier: workspace:*
-        version: link:../../packages/valve
       ioredis:
         specifier: 5.11.1
         version: 5.11.1(supports-color@7.2.0)
+      valvejs:
+        specifier: workspace:*
+        version: link:../../packages/valve
     devDependencies:
       tsx:
         specifier: 4.23.15
@@ -139,7 +139,7 @@ importers:
 
   examples/memory:
     dependencies:
-      'valvejs':
+      valvejs:
         specifier: workspace:*
         version: link:../../packages/valve
     devDependencies:
@@ -149,7 +149,7 @@ importers:
 
   examples/observe:
     dependencies:
-      'valvejs':
+      valvejs:
         specifier: workspace:*
         version: link:../../packages/valve
     devDependencies:
@@ -159,7 +159,7 @@ importers:
 
   examples/priorities:
     dependencies:
-      'valvejs':
+      valvejs:
         specifier: workspace:*
         version: link:../../packages/valve
     devDependencies:
@@ -169,12 +169,12 @@ importers:
 
   examples/shared:
     dependencies:
-      'valvejs':
-        specifier: workspace:*
-        version: link:../../packages/valve
       ioredis:
         specifier: 5.11.1
         version: 5.11.1(supports-color@7.2.0)
+      valvejs:
+        specifier: workspace:*
+        version: link:../../packages/valve
     devDependencies:
       tsx:
         specifier: 4.23.15
@@ -182,7 +182,7 @@ importers:
 
   examples/shutdown:
     dependencies:
-      'valvejs':
+      valvejs:
         specifier: workspace:*
         version: link:../../packages/valve
     devDependencies:

@@ -10,7 +10,7 @@
     "preview": "python3 -m http.server 4321 --bind 127.0.0.1 --directory out",
     "typecheck": "pnpm sync && fumadocs-mdx && next typegen && tsc --noEmit",
     "postinstall": "node scripts/sync-content.mjs && fumadocs-mdx",
-    "test": "node --test scripts/merge-metadata.test.mjs",
+    "test": "node --test scripts/*.test.mjs",
     "test:browser": "playwright test"
   },
   "dependencies": {

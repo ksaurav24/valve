@@ -53,7 +53,7 @@ jobs:
           node-version-file: .node-version
           cache: pnpm
       - run: pnpm install --frozen-lockfile
-      - name: Test CI scripts
+      - name: Test CI and release scripts
         run: node --test scripts/*.test.mjs
       - name: Validate PR title
         if: github.event_name == 'pull_request'

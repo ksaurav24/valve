@@ -78,7 +78,7 @@ jobs:
     permissions:
       contents: read
     outputs:
-      pack-dir-artifact-id: ${{ steps.pack.outputs.pack-dir-artifact-id }}
+      pack-dir-artifact-id: ${{ steps.pack.outputs.artifact-id }}
     steps:
       - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
         with:
@@ -89,13 +89,28 @@ jobs:
           node-version-file: .node-version
           package-manager-cache: false
       - run: pnpm install --frozen-lockfile
+      - name: Download publish plan
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          artifact-ids: ${{ needs.select-mode.outputs.publish-plan-artifact-id }}
+          path: ${{ runner.temp }}/valve-publish-plan
+          merge-multiple: true
+      # Changesets may select latest for a first prerelease. The packed plan
+      # must explicitly use beta, including when retrying a partially completed release.
+      - name: Validate release version and npm channel
+        run: node scripts/prepare-release-plan.mjs "$RUNNER_TEMP/valve-publish-plan/publish-plan.json"
       - run: pnpm --filter valvejs build
       - run: pnpm check:package
       - name: Pack packages
+        run: pnpm exec changeset pack --from-publish-plan "$RUNNER_TEMP/valve-publish-plan/publish-plan.json" --out-dir "$RUNNER_TEMP/valve-pack"
+      - name: Upload packed packages
         id: pack
-        uses: changesets/action/pack@ae32849d5ba541f9ae29e40e22a623bc13562f51 # v2.1.2
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         with:
-          publish-plan-artifact-id: ${{ needs.select-mode.outputs.publish-plan-artifact-id }}
+          name: valve-packed-release
+          overwrite: true
+          path: ${{ runner.temp }}/valve-pack
+          if-no-files-found: error
 
   publish:
     needs: pack
@@ -122,6 +137,8 @@ jobs:
         uses: changesets/action/publish@ae32849d5ba541f9ae29e40e22a623bc13562f51 # v2.1.2
         with:
           pack-dir-artifact-id: ${{ needs.pack.outputs.pack-dir-artifact-id }}
+          create-github-releases: true
+          push-git-tags: true
 
   # The website reads npm and GitHub at build time, so a rebuild is the only
   # metadata sync a release needs. Skipped until the hook secret exists.

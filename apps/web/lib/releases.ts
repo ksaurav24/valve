@@ -2,6 +2,7 @@ import changelog from '../.generated/changelog.json';
 import metadata from '../.generated/metadata.json';
 import { githubReleases } from './github';
 import { site } from './site';
+import { npmVersionState } from './release-state.mjs';
 
 export interface ChangelogSection {
   title: string | null;
@@ -19,10 +20,11 @@ export interface Release extends ChangelogEntry {
   githubUrl: string | null;
 }
 
-export type VersionState = 'latest' | 'published' | 'dev';
+export type VersionState = 'latest' | 'published' | 'beta' | 'dev';
 
 const npm = metadata.npm as {
   latest: string | null;
+  beta?: string | null;
   versions: Record<string, string | null>;
 };
 const entries = changelog as ChangelogEntry[];
@@ -50,11 +52,13 @@ export const unreleased: ChangelogEntry[] = entries.filter(
   (entry) => !isPublished(entry.version),
 );
 
-export const latestPublished = npm.latest;
+export const latestPublished =
+  npm.latest && !npm.latest.includes('-')
+    ? npm.latest
+    : (npm.beta ?? npm.latest);
 
 export function versionState(version: string): VersionState {
-  if (version === npm.latest) return 'latest';
-  return isPublished(version) ? 'published' : 'dev';
+  return npmVersionState(version, npm);
 }
 
 export const current = {

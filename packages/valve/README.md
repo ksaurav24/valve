@@ -8,9 +8,15 @@ worker sharing that budget pauses. A memory store supports single-process use.
 
 ## Quickstart
 
-The package will be published as `valvejs`. It is **not published to npm yet**. Build it locally with
-`pnpm install && pnpm build`, then run a workspace example or install a packed
-tarball in another project.
+The `valvejs` v0.3.0 beta series starts at `0.3.0-beta.0` and uses the npm
+`beta` tag. Install the beta with:
+
+```sh
+npm install valvejs@beta
+```
+
+To pin the first beta, use `npm install valvejs@0.3.0-beta.0`. Beta APIs may
+change before a stable release.
 
 ```ts
 import { createValve } from 'valvejs';
@@ -85,7 +91,7 @@ pnpm check
 pnpm docs:dev
 ```
 
-The Next.js and Fumadocs MDX documentation site lives in `docs/`. Build it with `pnpm docs:build`.
+The Next.js and Fumadocs MDX documentation site lives in `apps/web/`. Build it with `pnpm docs:build`.
 
 - [Quickstart](https://github.com/ksaurav24/valve/blob/master/apps/web/content/docs/quickstart.mdx)
 - [Share a quota](https://github.com/ksaurav24/valve/blob/master/apps/web/content/docs/guides/share-a-quota.mdx)
@@ -101,8 +107,8 @@ Run `pnpm test` for unit and property tests, `pnpm test:coverage` for coverage,
 and `pnpm test:types` for inference checks. With Redis running, use
 `REDIS_URL=redis://127.0.0.1:6379 pnpm test:integration` for real-store tests.
 
-Postgres, global concurrency, provider presets, and Bottleneck compatibility
-are planned for later versions. Publishing remains to be configured.
+Postgres stores, provider presets, and Bottleneck compatibility are planned for
+later versions. Shared global concurrency is supported by Redis and Valkey.
 
 ## License
 

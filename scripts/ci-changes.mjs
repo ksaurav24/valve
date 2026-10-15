@@ -5,6 +5,31 @@ import { pathToFileURL } from 'node:url';
 
 const all = { library: true, package: true, website: true, benchmarks: true };
 
+export function isReleaseOnlyChange(before, after) {
+  const previous = structuredClone(before);
+  const current = structuredClone(after);
+  delete previous.version;
+  delete current.version;
+  if (isDeepStrictEqual(previous, current)) return true;
+  const tag = after.publishConfig?.tag ?? 'latest';
+  const validChannel =
+    tag === 'beta'
+      ? /^\d+\.\d+\.\d+-beta\.\d+$/.test(after.version)
+      : tag === 'latest' && /^\d+\.\d+\.\d+$/.test(after.version);
+  if (
+    !validChannel ||
+    !['latest', 'beta'].includes(before.publishConfig?.tag ?? 'latest')
+  )
+    return false;
+  for (const pkg of [previous, current]) {
+    if (pkg.publishConfig) {
+      delete pkg.publishConfig.tag;
+      if (Object.keys(pkg.publishConfig).length === 0) delete pkg.publishConfig;
+    }
+  }
+  return isDeepStrictEqual(previous, current);
+}
+
 /** Classify actual files, never PR titles or labels that could hide code changes. */
 export function classifyChanges(paths, versionOnly = false) {
   const checks = {
@@ -17,6 +42,8 @@ export function classifyChanges(paths, versionOnly = false) {
   for (const path of paths) {
     if (path === 'packages/valve/package.json' && versionOnly) {
       checks.package = checks.website = true;
+    } else if (path === '.changeset/pre.json') {
+      checks.package = true;
     } else if (
       /^packages\/valve\/(README\.md|CHANGELOG\.md|LICENSE|NOTICE)$/.test(path)
     ) {
@@ -46,7 +73,7 @@ export function classifyChanges(paths, versionOnly = false) {
       Object.assign(checks, all);
     } else if (
       path.startsWith('.github/') ||
-      /^\.changeset\/[^/]+\.md$/.test(path) ||
+      /^\.changeset\/(?:pre\/)?[^/]+\.md$/.test(path) ||
       /\.(md|txt)$/.test(path) ||
       /^(LICENSE|NOTICE)$/.test(path)
     ) {
@@ -94,9 +121,7 @@ export function detectChanges(eventName, baseSha, refName) {
     const after = JSON.parse(
       readFileSync('packages/valve/package.json', 'utf8'),
     );
-    delete before.version;
-    delete after.version;
-    versionOnly = isDeepStrictEqual(before, after);
+    versionOnly = isReleaseOnlyChange(before, after);
   }
   return classifyChanges(paths, versionOnly);
 }
