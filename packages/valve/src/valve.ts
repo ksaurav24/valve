@@ -336,9 +336,29 @@ export function createValve(options: ValveOptions): Valve {
     else if (waiting.size) schedule();
     finishIdle();
   }
+  /** Reject configuration failures; apply the outage policy to other store errors.
+   * Error codes also identify configuration failures across ESM/CJS and package
+   * copies, where ValveError class identities can differ.
+   * @param heads Jobs included in the failed admission request.
+   * @param error Store rejection reported to listeners and used as the cause when rejecting jobs.
+   */
   function storeError(heads: Job[], error: unknown) {
     reportStore(error);
-    if (config.policy === 'open') {
+    if (
+      typeof error === 'object' &&
+      error !== null &&
+      'code' in error &&
+      error.code === 'INVALID_OPTIONS'
+    ) {
+      for (const job of heads)
+        rejectJob(
+          job,
+          'INVALID_OPTIONS',
+          'store rejected the shared quota configuration. Use identical settings on every worker or follow the shared quota migration procedure.',
+          error,
+        );
+      schedule();
+    } else if (config.policy === 'open') {
       for (const job of heads) start(job);
       schedule();
     } else if (config.policy === 'throw') {

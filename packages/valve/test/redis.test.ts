@@ -2,6 +2,7 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { redisStore } from '../src/redis/index.js';
 import type { RedisStoreOptions } from '../src/redis/index.js';
+import { createValve } from '../src/index.js';
 import { normalize } from '../src/rules.js';
 const rules = normalize({ id: 'x', rate: { limit: 10, interval: '1s' } }).rules;
 const request = { id: 'x', rules, costs: [1, 1] };
@@ -38,8 +39,17 @@ describe('redis store', () => {
     expect(client.evalSha.mock.calls[0]).toEqual([
       expect.any(String),
       {
-        keys: ['p:{x}:pause', 'p:{x}:r:gcra:1000'],
-        arguments: ['0', '1000', '10', '1', '2', '1', '1'],
+        keys: ['p:{x}:pause', 'p:{x}:r:gcra:1000', 'p:{x}:config'],
+        arguments: [
+          'v1:[["gcra",1000,10,1]]:local',
+          '0',
+          '1000',
+          '10',
+          '1',
+          '2',
+          '1',
+          '1',
+        ],
       },
     ]);
     await store.pause('x', 10);
@@ -59,9 +69,11 @@ describe('redis store', () => {
     expect(evalsha).toHaveBeenCalledTimes(2);
     expect(evalScript).toHaveBeenCalledTimes(1);
     expect(evalScript.mock.calls[0]?.slice(1)).toEqual([
-      2,
+      3,
       'valve:{x}:pause',
       'valve:{x}:r:gcra:1000',
+      'valve:{x}:config',
+      'v1:[["gcra",1000,10,1]]:local',
       '0',
       '1000',
       '10',
@@ -81,10 +93,57 @@ describe('redis store', () => {
     expect(client.eval).toHaveBeenCalledWith(
       expect.any(String),
       expect.objectContaining({
-        keys: ['valve:{x}:pause', 'valve:{x}:r:gcra:1000'],
+        keys: ['valve:{x}:pause', 'valve:{x}:r:gcra:1000', 'valve:{x}:config'],
       }),
     );
   });
+  it.each(['wait', 'throw', 'open'] as const)(
+    'rejects incompatible configuration without running jobs under %s',
+    async (onStoreError) => {
+      const adapter = {
+        evalsha: vi.fn().mockResolvedValue('CONFIG_MISMATCH'),
+        eval: vi.fn(),
+      };
+      const store = redisStore({ adapter });
+      await expect(store.acquire(request)).rejects.toMatchObject({
+        code: 'INVALID_OPTIONS',
+        valveId: 'x',
+        message: expect.stringContaining('shared quota configuration'),
+      });
+      const api = createValve({
+        id: 'x',
+        rate: { limit: 10, interval: '1s' },
+        store,
+        onStoreError,
+        batch: 1,
+      });
+      const job = vi.fn();
+      const reject = vi.fn();
+      api.on('reject', reject);
+      try {
+        const results = await Promise.allSettled([api.run(job), api.run(job)]);
+        for (const result of results)
+          expect(result).toMatchObject({
+            status: 'rejected',
+            reason: {
+              code: 'INVALID_OPTIONS',
+              valveId: 'x',
+              cause: { code: 'INVALID_OPTIONS' },
+            },
+          });
+        expect(job).not.toHaveBeenCalled();
+        expect(reject).toHaveBeenCalledTimes(2);
+        expect(api.stats()).toMatchObject({
+          queued: 0,
+          totals: { started: 0, rejected: 2 },
+        });
+        expect(adapter.evalsha).toHaveBeenCalledTimes(3);
+      } finally {
+        await api.close();
+        await store.close();
+      }
+    },
+  );
   it('propagates unrelated and non-error failures and rejects invalid results', async () => {
     const adapter = {
       evalsha: vi
@@ -122,5 +181,38 @@ describe('redis store', () => {
     resolve([2, 0, 0]);
     await vi.advanceTimersByTimeAsync(0);
     expect(vi.getTimerCount()).toBe(0);
+  });
+  it('preserves open outage behavior when a timeout hides the mismatch response', async () => {
+    vi.useFakeTimers();
+    let respond!: (value: unknown) => void;
+    const store = redisStore({
+      adapter: {
+        evalsha: () =>
+          new Promise((resolve) => {
+            respond = resolve;
+          }),
+        eval: vi.fn(),
+      },
+      timeout: 20,
+    });
+    const api = createValve({
+      id: 'x',
+      concurrency: 1,
+      store,
+      onStoreError: 'open',
+    });
+    const job = vi.fn(() => 42);
+    try {
+      const result = api.run(job);
+      await vi.advanceTimersByTimeAsync(21);
+      await expect(result).resolves.toBe(42);
+      respond('CONFIG_MISMATCH');
+      await vi.advanceTimersByTimeAsync(0);
+      expect(job).toHaveBeenCalledTimes(1);
+      expect(vi.getTimerCount()).toBe(0);
+    } finally {
+      await api.close();
+      await store.close();
+    }
   });
 });
