@@ -60,17 +60,25 @@ disposable instance:
 docker run -d --rm --name valve-fault -p 16400:6379 redis:7.4 --save '' --appendonly no
 ```
 
-Use a fixed-window rule `{ limit: 1, interval: '1m' }`. Acquire once, confirm a
-second acquire returns `granted: 0`, inject one fault, then acquire again with
-the same prefix and id.
+Connect the test client to `redis://127.0.0.1:16400`. Run Redis commands against
+that instance with `redis-cli -p 16400`. Use a fixed-window rule
+`{ limit: 1, interval: '1m' }`. Call `store.acquire` once, confirm a second call
+returns `granted: 0`, inject one fault, then acquire again with the same prefix
+and id. The no-eviction and failover probes use fresh ids as described below.
 
-| Fault       | Inject                                                                                                                                                | Expected after the fault                       |
-| ----------- | ----------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------- |
-| Flush       | `redis-cli FLUSHDB`                                                                                                                                   | Granted 1                                      |
-| Restart     | `docker restart valve-fault`                                                                                                                          | Granted 1                                      |
-| Eviction    | `CONFIG SET maxmemory-policy volatile-ttl`, lower `maxmemory` below `used_memory`, write until `evicted_keys` rises, then set `maxmemory` back to `0` | Granted 1                                      |
-| No eviction | `CONFIG SET maxmemory-policy noeviction`, lower `maxmemory` below `used_memory`, then acquire with a new id                                           | Acquire rejects with `OOM`. The rule key stays |
-| Failover    | Start a replica, cut its replication link, acquire on the primary, then `REPLICAOF NO ONE` on the replica and acquire there                           | Granted 1                                      |
+| Fault       | Inject                                                                                                                                                                                                        | Expected after the fault                                          |
+| ----------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------- |
+| Flush       | `redis-cli -p 16400 FLUSHDB`                                                                                                                                                                                  | Granted 1                                                         |
+| Restart     | `docker restart valve-fault`                                                                                                                                                                                  | Granted 1                                                         |
+| Eviction    | `CONFIG SET maxmemory-policy volatile-ttl`, lower `maxmemory` below `used_memory`, write until `evicted_keys` rises, then set `maxmemory` back to `0`                                                         | Granted 1                                                         |
+| No eviction | `CONFIG SET maxmemory-policy noeviction`, lower `maxmemory` below `used_memory`, then acquire with a fresh id; inspect that id's rule key                                                                     | `store.acquire` rejects with `OOM`; the new rule key stays absent |
+| Failover    | Start a replica and wait for it to sync, cut its replication link, acquire on the primary with a fresh id and confirm `granted: 1`, then run `REPLICAOF NO ONE` on the replica and acquire there with that id | Granted 1                                                         |
+
+The no-eviction row calls the store directly. Through valve, the `OOM` follows
+the configured `onStoreError` behavior: `throw` rejects with `STORE_UNAVAILABLE`,
+`wait` retries, and `open` admits jobs without shared rate rules. Restore
+`maxmemory` to `0` before running another probe. For failover, target the replica
+explicitly when promoting it and when making the final acquire.
 
 Every row except "No eviction" shows silent loss. See
 [Durability](/docs/reference/redis-store/#durability).
