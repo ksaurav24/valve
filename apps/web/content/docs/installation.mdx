@@ -15,8 +15,10 @@ uses the one you pass in.
 
 ## Install the package
 
-The v0.3.0 beta series uses the npm `beta` tag, starting at `0.3.0-beta.0`.
-Use `valvejs@beta` to opt in. Beta APIs may change before a stable release.
+The 0.4.0 beta series adds [atomic scoped limits](/docs/guides/scoped-rate-limits/).
+The series starts at `0.4.0-beta.0` and uses the npm `beta` tag. Beta APIs
+may change before a stable release. Until this version is published,
+`valvejs@beta` still selects the previous published beta.
 
 <Published>
 
@@ -56,8 +58,9 @@ bun add valvejs@beta
 <Unpublished>
 
 <Callout type="warn" title="Not on npm yet">
-  `valvejs` has not been published. Until it is, build a tarball from this
-  repository and install that.
+  This version of `valvejs` is not on npm yet. To try its scoped-limit API,
+  build a tarball from this branch and install that. The npm `beta` tag may
+  still point to an earlier version.
 </Callout>
 
 <Steps>

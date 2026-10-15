@@ -35,7 +35,7 @@ Check the [changelog](/changelog/) for version history and
 - ESM and CommonJS entry points with TypeScript declarations, and zero
   runtime or peer dependencies. Applications supply their own Redis client.
 
-## Scoped admission for v0.4.0
+## Scoped admission in 0.4.0 beta
 
 Named rules with `scope` and per-job `scopes` support atomic shared and
 per-identity admission in memory and Redis/Valkey. Eligible identities can
@@ -68,7 +68,9 @@ for the measurement settings, regression controls, and build-time tradeoffs.
 - Syncing a provider's reported `remaining` count into the shared budget.
   Feedback produces pauses; it does not replace the configured rate rules.
 - Cross-process fairness or queue ordering.
-- Runtime changes to rate rules. Create a new valve instead.
+- Runtime changes to rate rules. Use a
+  [coordinated policy migration](/docs/guides/share-a-quota/#changing-a-shared-quota);
+  a new instance with the same Valve ID must use the pinned policy.
 
 ## Known limitations
 
