@@ -11,7 +11,7 @@ import { InstallCli } from '@/components/marketing/install-cli';
 import { highlight } from '@/components/shared/highlight';
 import { VersionBadge } from '@/components/shared/version-badge';
 import { contributors } from '@/lib/github';
-import { current, releases, unreleased, versionState } from '@/lib/releases';
+import { changelogEntries, current, versionState } from '@/lib/releases';
 
 export const metadata: Metadata = {
   title: { absolute: 'valve: Shared rate limits for outbound API calls' },
@@ -75,7 +75,7 @@ export default async function HomePage() {
       html: await highlight(sample.code),
     })),
   );
-  const recent = [...unreleased, ...releases].slice(0, 3);
+  const recent = changelogEntries.slice(0, 3);
 
   return (
     <div className="mx-auto grid max-w-[90rem] lg:grid-cols-[minmax(0,5fr)_minmax(0,7fr)]">
