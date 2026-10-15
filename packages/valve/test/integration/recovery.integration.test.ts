@@ -9,9 +9,13 @@ import { redisStore } from '../../src/redis/index.js';
 const binary = process.env.REDIS_SERVER_BIN;
 const suite = binary ? describe : describe.skip;
 suite('server restart', () => {
-  it.each(['wait', 'open', 'throw'] as const)(
-    'handles a stopped server with %s and reconnects',
-    async (policy) => {
+  it.each(
+    (['wait', 'open', 'throw'] as const).flatMap((policy) =>
+      [false, true].map((scoped) => ({ policy, scoped })),
+    ),
+  )(
+    'handles a stopped server with $policy (scoped=$scoped) and reconnects',
+    async ({ policy, scoped }) => {
       const port = 19000 + (process.pid % 1000);
       let server: ChildProcess | undefined;
       const client = new Redis({
@@ -56,15 +60,21 @@ suite('server restart', () => {
       await client.connect();
       const api = createValve({
         id: `restart-${policy}`,
-        rate: { limit: 10, interval: 1000, burst: 10 },
+        rate: {
+          limit: 10,
+          interval: 1000,
+          burst: 10,
+          ...(scoped ? { name: 'recipient', scope: 'recipient' } : {}),
+        },
         store: redisStore({ client, timeout: 50 }),
         onStoreError: policy,
         maxWait: 5000,
       });
+      const options = scoped ? { scopes: { recipient: 'A' } } : {};
       try {
-        expect(await api.run(() => 1)).toBe(1);
+        expect(await api.run(() => 1, options)).toBe(1);
         await stop();
-        const task = api.run(() => 2);
+        const task = api.run(() => 2, options);
         const result =
           policy === 'throw'
             ? expect(task).rejects.toMatchObject({ code: 'STORE_UNAVAILABLE' })
@@ -79,7 +89,7 @@ suite('server restart', () => {
         )
           await new Promise((resolve) => setTimeout(resolve, 20));
         await result;
-        expect(await api.run(() => 3)).toBe(3);
+        expect(await api.run(() => 3, options)).toBe(3);
       } finally {
         await api.close();
         client.disconnect();

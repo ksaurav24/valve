@@ -52,6 +52,46 @@ suite('Redis Cluster', () => {
     await b.resume(id);
     expect((await a.acquire({ id, rules, costs: [1] })).granted).toBe(1);
   });
+  it('admits scoped jobs atomically across client families on one slot', async () => {
+    const id = `scoped-cluster-${crypto.randomUUID()}`;
+    const rules = normalize({
+      id,
+      rate: [
+        {
+          name: 'shared',
+          limit: 3,
+          interval: 60000,
+          algorithm: 'fixed-window',
+        },
+        { name: 'r', scope: 'recipient', limit: 1, interval: 60000 },
+      ],
+    }).rules;
+    const a = redisStore({ client: io });
+    const b = redisStore({ client: node });
+    const req = {
+      id,
+      rules,
+      jobs: ['A', 'A', 'B', 'C'].map((recipient) => ({
+        cost: 1,
+        scopes: { recipient },
+      })),
+    };
+    expect((await a.acquireScoped!(req)).grantedIndexes).toEqual([0, 2, 3]);
+    expect((await b.acquireScoped!(req)).grantedIndexes).toEqual([]);
+    const keys = [
+      'config',
+      'pause',
+      'leases',
+      'r:named:shared',
+      's:named:r:A',
+      's:named:r:B',
+    ].map((key) => `valve:{${id}}:${key}`);
+    expect(
+      new Set(await Promise.all(keys.map((key) => io.cluster('KEYSLOT', key))))
+        .size,
+    ).toBe(1);
+    await io.del(...keys, `valve:{${id}}:s:named:r:C`);
+  });
   it('shares global leases and pub/sub wakeups across client families', async () => {
     const ioSubscriber = io.duplicate();
     const nodeSubscriber = node.duplicate();

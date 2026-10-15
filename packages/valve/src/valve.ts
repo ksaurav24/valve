@@ -1,4 +1,6 @@
 // Valve scheduler, shared pauses, lifecycle, and provider-aware fetch retries.
+import { DelayedQueue } from './delayed.js';
+import { scopeSnapshot } from './scoped.js';
 import { duration, integer } from './duration.js';
 import { emitter } from './emitter.js';
 import { failure, invalid } from './errors.js';
@@ -11,7 +13,7 @@ import { leaseManager } from './leases.js';
 import { memoryStore } from './memory-store.js';
 import { JobQueue } from './queue.js';
 import { normalize } from './rules.js';
-import type { AcquireResult } from './store.js';
+import type { AcquireResult, ScopedAcquireResult } from './store.js';
 import type {
   FetchLike,
   JobContext,
@@ -37,7 +39,8 @@ interface Job {
   waitMs: number;
   lease?: string;
   leaseSignal?: AbortSignal;
-  location: 'queue' | 'acquire' | null;
+  scopes?: Readonly<Record<string, string>>;
+  location: 'queue' | 'acquire' | 'delayed' | null;
 }
 
 /** Create a named outbound queue with shared rate rules and local or leased concurrency.
@@ -52,6 +55,7 @@ export function createValve(options: ValveOptions): Valve {
   const store = options.store ?? memoryStore();
   const events = emitter();
   const queue = new JobQueue<Job>();
+  const delayed = config.scoped ? new DelayedQueue<Job>() : undefined;
   const waiting = new Set<Job>();
   const feedback =
     options.feedback === false
@@ -154,6 +158,7 @@ export function createValve(options: ValveOptions): Valve {
     cause?: unknown,
   ) {
     if (job.state !== 'queued') return;
+    if (job.location === 'delayed') delayed!.remove(job);
     if (job.location === 'queue') queue.cancel(job);
     else job.state = 'cancelled';
     job.location = null;
@@ -336,6 +341,99 @@ export function createValve(options: ValveOptions): Valve {
     else if (waiting.size) schedule();
     finishIdle();
   }
+  function handleScoped(
+    heads: Job[],
+    result: ScopedAcquireResult,
+    acquiredAt: number,
+    version: number,
+  ) {
+    const indexes = new Set<number>();
+    const validIndex = (index: number) =>
+      Number.isInteger(index) &&
+      index >= 0 &&
+      index < heads.length &&
+      !indexes.has(index) &&
+      !!indexes.add(index);
+    if (
+      !result ||
+      !Array.isArray(result.grantedIndexes) ||
+      !Array.isArray(result.blocked) ||
+      !result.grantedIndexes.every(validIndex) ||
+      !result.blocked.every(
+        (entry) =>
+          entry &&
+          validIndex(entry.index) &&
+          Number.isSafeInteger(entry.retryAfterMs) &&
+          entry.retryAfterMs > 0,
+      ) ||
+      indexes.size !== heads.length ||
+      (config.global &&
+        (!Array.isArray(result.leases) ||
+          result.leases.length !== result.grantedIndexes.length ||
+          !result.leases.every(
+            (entry) =>
+              entry &&
+              Number.isInteger(entry.index) &&
+              typeof entry.token === 'string',
+          ) ||
+          new Set(result.leases.map((entry) => entry.token)).size !==
+            result.leases.length ||
+          new Set(result.leases.map((entry) => entry.index)).size !==
+            result.leases.length ||
+          !result.leases.every(
+            (entry) =>
+              result.grantedIndexes.includes(entry.index) &&
+              typeof entry.token === 'string' &&
+              entry.token.length > 0,
+          )))
+    ) {
+      storeError(
+        heads,
+        new Error('Store returned invalid scoped grants or lease tokens'),
+      );
+      return;
+    }
+    storeFailures = 0;
+    const now = Date.now();
+    const tokens = new Map(
+      result.leases?.map((entry) => [entry.index, entry.token]),
+    );
+    for (const index of result.grantedIndexes) {
+      const job = heads[index]!;
+      handle(
+        [job],
+        {
+          granted: 1,
+          retryAfterMs: 0,
+          pausedMs: 0,
+          ...(config.global ? { leases: [tokens.get(index)!] } : {}),
+        },
+        acquiredAt,
+        version,
+      );
+    }
+    for (const entry of result.blocked) {
+      const job = heads[entry.index]!;
+      if (job.state !== 'queued') continue;
+      if (version !== noticeVersion) enqueueAgain(job);
+      else {
+        job.location = 'delayed';
+        delayed!.add(
+          job,
+          now +
+            Math.max(
+              1,
+              config.global
+                ? Math.min(50, entry.retryAfterMs)
+                : entry.retryAfterMs,
+            ),
+        );
+      }
+    }
+    arm(delayed!.next);
+    if (queue.size) schedule();
+    finishIdle();
+  }
   /** Reject configuration failures; apply the outage policy to other store errors.
    * Error codes also identify configuration failures across ESM/CJS and package
    * copies, where ValveError class identities can differ.
@@ -371,9 +469,16 @@ export function createValve(options: ValveOptions): Valve {
         );
       schedule();
     } else {
-      for (const job of heads) enqueueAgain(job);
       const delay = Math.min(5000, 100 * 2 ** Math.min(storeFailures++, 6));
-      arm(Date.now() + delay + jitter(delay));
+      const at = Date.now() + delay + jitter(delay);
+      for (const job of heads) {
+        if (delayed && job.state === 'queued') {
+          job.location = 'delayed';
+          delayed.add(job, at);
+        } else enqueueAgain(job);
+      }
+      arm(at);
+      if (delayed && queue.size) schedule();
     }
     finishIdle();
   }
@@ -393,7 +498,16 @@ export function createValve(options: ValveOptions): Valve {
       arm(pausedUntil);
       return;
     }
-    if (wakeAt > now && wakeAt !== Infinity) return;
+    if (delayed) {
+      for (const job of delayed.take(now, config.batch)) enqueueAgain(job);
+      // Promote all currently eligible jobs before choosing by priority. Each
+      // pump does bounded heap work, including after a long event-loop stall.
+      if (delayed.next <= now) {
+        schedule();
+        return;
+      }
+      arm(delayed.next);
+    } else if (wakeAt > now && wakeAt !== Infinity) return;
     const free = config.concurrency - running;
     if (free <= 0 || queue.size === 0) return;
     const heads = queue.take(Math.min(free, config.batch));
@@ -431,6 +545,44 @@ export function createValve(options: ValveOptions): Valve {
     };
     const acquiredAt = Date.now();
     const version = noticeVersion;
+    if (config.scoped) {
+      const scopedRequest = {
+        id,
+        rules,
+        jobs: live.map((job) => ({ cost: job.cost, scopes: job.scopes! })),
+        ...(request.lease ? { lease: request.lease } : {}),
+      };
+      if (store.acquireScopedSync) {
+        try {
+          handleScoped(
+            live,
+            store.acquireScopedSync(scopedRequest),
+            acquiredAt,
+            version,
+          );
+        } catch (error) {
+          storeError(live, error);
+        }
+      } else {
+        inFlight = true;
+        try {
+          store.acquireScoped!(scopedRequest).then(
+            (value) => {
+              inFlight = false;
+              handleScoped(live, value, acquiredAt, version);
+            },
+            (error) => {
+              inFlight = false;
+              storeError(live, error);
+            },
+          );
+        } catch (error) {
+          inFlight = false;
+          storeError(live, error);
+        }
+      }
+      return;
+    }
     if (store.acquireSync) {
       try {
         handle(live, store.acquireSync(request), acquiredAt, version);
@@ -470,6 +622,10 @@ export function createValve(options: ValveOptions): Valve {
         if (closed) throw failure(id, 'CLOSED', 'valve is closed.');
         if (typeof fn !== 'function')
           invalid(id, 'job must be a function', fn, 'Pass a function to run');
+        const scopes =
+          config.scoped || jobOptions.scopes !== undefined
+            ? scopeSnapshot(id, config.scopes, jobOptions.scopes)
+            : undefined;
         const cost = integer(jobOptions.cost ?? 1, id, 'job cost');
         const priority = jobOptions.priority ?? 0;
         if (!Number.isSafeInteger(priority))
@@ -519,6 +675,7 @@ export function createValve(options: ValveOptions): Valve {
           deadline: maxWait === Infinity ? Infinity : Date.now() + maxWait,
           waitMs: maxWait,
           location: 'queue',
+          ...(scopes ? { scopes } : {}),
         };
         waiting.add(job);
         queue.push(job);
@@ -668,8 +825,17 @@ export function createValve(options: ValveOptions): Valve {
           ? fetchOptions.priority(...args)
           : fetchOptions.priority;
       const signal = init?.signal ?? request?.signal;
+      const identities =
+        typeof fetchOptions.scopes === 'function'
+          ? fetchOptions.scopes(...args)
+          : fetchOptions.scopes;
+      const scopes =
+        config.scoped || identities !== undefined
+          ? scopeSnapshot(id, config.scopes, identities)
+          : undefined;
       const originalSeq = seq++;
       const runOptions: RunOptions<ResponseLike> = {
+        ...(scopes ? { scopes } : {}),
         ...(cost === undefined ? {} : { cost }),
         ...(priority === undefined ? {} : { priority }),
         ...(signal == null ? {} : { signal }),
@@ -740,6 +906,7 @@ export function createValve(options: ValveOptions): Valve {
     ) => {
       if (closed && closingStore) return;
       noticeVersion++;
+      if (notice.type === 'resume') delayed?.wake();
       if (notice.type === 'pause') {
         const next = Date.now() + notice.durationMs;
         const extended = next > pausedUntil;
@@ -785,6 +952,7 @@ export function createValve(options: ValveOptions): Valve {
     resume: () =>
       store.resume(id).then(() => {
         pausedUntil = 0;
+        delayed?.wake();
         clearWake();
         events.emit('resume', { reason: 'manual' });
         schedule();

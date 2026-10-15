@@ -1,4 +1,5 @@
 // Shared Redis and Valkey budgets with script-cache recovery and timeouts.
+import { prepareScoped } from '../scoped.js';
 import { duration } from '../duration.js';
 import { failure, invalid } from '../errors.js';
 import type { AcquireRequest, Store } from '../store.js';
@@ -7,6 +8,8 @@ import { adapterFor } from './clients.js';
 import {
   ACQUIRE,
   ACQUIRE_SHA,
+  SCOPED,
+  SCOPED_SHA,
   PAUSE,
   PAUSE_SHA,
   RESUME,
@@ -95,6 +98,51 @@ export function redisStore(options: RedisStoreOptions): Store {
   }
   return {
     kind: 'redis',
+    acquireScoped: async (request) => {
+      const plan = prepareScoped(request);
+      const base = `${prefix}:{${request.id}}`;
+      const raw = await execute(
+        SCOPED,
+        SCOPED_SHA,
+        [
+          `${base}:config`,
+          `${base}:pause`,
+          `${base}:leases`,
+          ...plan.keys.map((key) => `${base}:${key}`),
+        ],
+        [
+          JSON.stringify({
+            rules: plan.rules,
+            jobs: plan.jobs,
+            fingerprint: plan.fingerprint,
+            ...(request.lease ? { lease: request.lease } : {}),
+          }),
+        ],
+      );
+      if (raw === 'CONFIG_MISMATCH')
+        throw failure(
+          request.id,
+          'INVALID_OPTIONS',
+          'Shared scoped quota configuration does not match Redis. Drain workers and follow the shared quota migration procedure.',
+        );
+      if (!Array.isArray(raw) || raw.length !== 3 || !raw.every(Array.isArray))
+        throw new Error('valve: invalid scoped acquire result.');
+      const [granted, blocked, tokens] = raw as [
+        number[],
+        [number, number][],
+        [number, string][],
+      ];
+      return {
+        grantedIndexes: granted,
+        blocked: blocked.map(([index, retryAfterMs]) => ({
+          index,
+          retryAfterMs,
+        })),
+        ...(request.lease
+          ? { leases: tokens.map(([index, token]) => ({ index, token })) }
+          : {}),
+      };
+    },
     /** Check shared configuration and acquire rate budget and leases atomically.
      * @param request Normalized quota rules, job costs, and optional lease settings.
      * @returns Granted job count, retry timing, and any acquired lease tokens.
@@ -211,13 +259,14 @@ function prepareRules(rules: AcquireRequest['rules']) {
       String(rule.limit),
       String(rule.burst),
     ]),
-    fingerprint: `v1:[${rules
+    fingerprint: `${rules.some((rule) => rule.name) ? 'named-v1' : 'v1'}:[${rules
       .map((rule) =>
         JSON.stringify([
           rule.algorithm,
           rule.intervalMs,
           rule.limit,
           rule.burst,
+          ...(rule.name ? [rule.name] : []),
         ]),
       )
       .sort()

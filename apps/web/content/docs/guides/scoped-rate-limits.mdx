@@ -1,0 +1,163 @@
+---
+title: Apply scoped rate limits
+description: Admit each job against shared and per-recipient budgets in one atomic operation.
+---
+
+Use scoped rate limits when each request spends both a shared budget and a
+budget tied to a recipient, tenant, model, or resource. Define the rules once,
+then supply the identities with each job. Valve spends every applicable
+budget together, or spends none when admission is denied.
+
+This API targets v0.4.0. It requires the matching memory or Redis store, or a
+custom store implementing `acquireScoped`.
+
+## Define shared and recipient budgets
+
+```ts
+import { createValve } from 'valvejs';
+
+const messages = createValve({
+  id: 'messaging:business-123',
+  rate: [
+    {
+      name: 'throughput',
+      limit: 80,
+      interval: '1s',
+      algorithm: 'fixed-window',
+    },
+    { name: 'spacing', scope: 'recipient', limit: 1, interval: '6s' },
+    {
+      name: 'daily',
+      scope: 'recipient',
+      limit: 100,
+      interval: '24h',
+      algorithm: 'fixed-window',
+    },
+  ],
+  maxQueue: 1000,
+  maxWait: '30s',
+});
+
+await messages.run(
+  () =>
+    fetch('https://example.com/messages', {
+      method: 'POST',
+      body: JSON.stringify({ recipientId: 'contact-42', text: 'Hello' }),
+    }),
+  { scopes: { recipient: 'contact-42' } },
+);
+
+await messages.close();
+```
+
+The quotas are illustrative. A rule without `scope` applies to the whole
+Valve ID. Both recipient rules use the same identity but maintain distinct
+counters through their names. A different recipient has independent spacing
+and daily allowance while sharing throughput.
+
+The daily rule resets at UTC midnight. It is a fixed 24-hour window, not an
+exact rolling 24-hour limit. The throughput rule can admit bursts around
+window boundaries; choose GCRA when you need paced admissions.
+
+Without `store`, this example has a private in-process budget. To share across
+workers, pass a [Redis store](/docs/reference/redis-store/) with the same
+prefix, Valve ID, and policy on every worker.
+
+## Supply stable identities
+
+`name` and `scope` must start with an ASCII letter and contain only letters,
+digits, underscores, or hyphens, up to 64 characters. Every scoped rule needs
+a unique `name`. Names are optional for static rules; named rules can share
+an algorithm and interval.
+
+Each job must supply exactly the configured scope dimensions as own properties
+of `scopes`. Values must be nonempty strings of at most 256 UTF-16 code units,
+with valid Unicode. Missing identities, extra dimensions, and invalid values
+reject with `INVALID_OPTIONS` before enqueueing. Valve copies identities, so
+later changes to your object do not reroute queued work.
+
+Use stable opaque application IDs. Redis keys encode identity values to avoid
+separator collisions, but encoding does not anonymize them. Never pass raw
+API keys, access tokens, or phone numbers. If you cannot use an opaque ID,
+derive a keyed hash in your application and use the same key on every worker.
+Changing that mapping creates fresh budgets.
+
+`cost` spends the same number of units from every applicable rule. A cost
+above any rule's capacity rejects with `COST_EXCEEDS_LIMIT`.
+
+## Wrap clients and retries
+
+Use fixed identities with `wrap`:
+
+```ts
+const getContact = messages.wrap((url: string) => fetch(url), {
+  scopes: { recipient: 'contact-42' },
+});
+```
+
+For fetch arguments that carry a stable application identity, use a resolver:
+
+```ts
+const limitedFetch = messages.wrapFetch(fetch, {
+  scopes: (input) => {
+    const url = new URL(input instanceof Request ? input.url : String(input));
+    return { recipient: url.searchParams.get('contactId') ?? '' };
+  },
+});
+```
+
+The synchronous resolver runs once per logical request. Valve copies its result
+and reuses it across retries. Each retry reacquires and spends every budget.
+Existing method safety and request-body replay restrictions still apply.
+Resolver errors reject the request before sending it.
+
+## Understand queue ordering and feedback
+
+For submissions A1, A2, B1, C1, recipient A's spacing may block A2 while A1,
+B1, and C1 start. Higher priority runs first among ready jobs; equal priorities
+use submission order. There is no strict FIFO across blocked identities and
+no global scheduling fairness across workers. A high-cost denial does not
+prevent a lower-cost job from being considered.
+
+Denied jobs wait in a delayed queue. Retry times are hints: every start checks
+the authoritative store again. Valve uses one eligibility timer, plus existing
+per-job deadline timers. `maxQueue`, `maxWait`, cancellation, shutdown, and
+[global concurrency leases](/docs/guides/global-concurrency/) still apply.
+Already reserved quota is not refunded if a job is cancelled after admission.
+
+`pause`, `resume`, `observe`, and `wrapFetch` feedback apply to the entire Valve
+ID, including all recipients. `stats().pausedUntil` and pause events describe
+that shared pause; a scoped rate denial does not emit a pause event. Targeted
+pause/resume is not included in this release. Valve does not infer which quota
+a generic 429 refers to.
+
+## Operate and upgrade safely
+
+Scoped configurations support at most 16 rate rules and a batch of at most
+128 jobs; the default batch is 32. One operation touches at most 2,048 unique
+rate keys. Smaller batches reduce individual script work; larger batches can
+reduce round trips. Measure your recipient distribution before tuning.
+
+All Redis keys for one Valve share its hash tag. This allows one atomic Lua
+operation in Redis Cluster, but places that quota domain on one shard. A hot
+business remains a hot slot. Key cardinality grows with active identities and
+scoped rules. Inactive rate keys expire; the policy fingerprint remains until
+an explicit migration. There are no per-recipient subscriptions.
+
+Redis checks an order-independent fingerprint of rule identities, dimensions,
+algorithms, limits, intervals, bursts, and global lease settings. Different
+policies under one ID reject with `INVALID_OPTIONS`, even with fail-open enabled.
+Reordering identical rules is safe. Adding scopes or changing names is a policy
+change: drain old workers and follow the
+[shared quota migration procedure](/docs/guides/share-a-quota/#configuration-drift).
+Do not reset the configuration key during a rolling deployment or change the
+namespace to bypass exhausted budgets.
+
+Admission governs when work may start, not when a provider receives it. Queues
+are local and non-durable. A process crash loses queued jobs; a timeout can leave
+a committed reservation whose response never reached the caller. Valve does
+not start that timed-out attempt under the default `wait` policy, but a later
+attempt may spend quota again. Fail-open permits work without shared rate
+checks. Redis restarts, eviction, or failover that lose state can restore spent
+capacity; atomic Lua does not provide durable or exactly-once reservations.
+See [Guarantees and limits](/docs/guarantees/).

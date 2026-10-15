@@ -62,3 +62,36 @@ test('popular clients fit the public structural types', () => {
   const nodeRedis = createClient();
   expectTypeOf(redisStore({ client: nodeRedis })).toEqualTypeOf<Store>();
 });
+
+test('scoped rules and resolvers preserve public inference', () => {
+  const api = createValve({
+    id: 'scoped-types',
+    rate: [
+      { name: 'shared', limit: 10, interval: '1s' },
+      { name: 'recipient', scope: 'recipient', limit: 1, interval: '6s' },
+    ],
+  });
+  expectTypeOf(api.run(() => 1, { scopes: { recipient: 'A' } })).toEqualTypeOf<
+    Promise<number>
+  >();
+  expectTypeOf(
+    api.wrap((id: number) => String(id), { scopes: { recipient: 'A' } }),
+  ).toEqualTypeOf<(id: number) => Promise<string>>();
+  const fetcher = async (url: string, id: number): Promise<ResponseLike> => ({
+    status: 200,
+    headers: { url, id: String(id) },
+  });
+  expectTypeOf(
+    api.wrapFetch(fetcher, {
+      scopes: (url, id) => {
+        expectTypeOf(url).toEqualTypeOf<string>();
+        expectTypeOf(id).toEqualTypeOf<number>();
+        return { recipient: String(id) };
+      },
+    }),
+  ).toEqualTypeOf<typeof fetcher>();
+  // @ts-expect-error Scope identities must be strings.
+  api.run(() => 1, { scopes: { recipient: 1 } });
+  // @ts-expect-error Scope resolution must be synchronous.
+  api.wrapFetch(fetcher, { scopes: async () => ({ recipient: 'A' }) });
+});

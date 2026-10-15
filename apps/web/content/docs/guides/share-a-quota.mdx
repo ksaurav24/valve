@@ -106,7 +106,8 @@ The first store admission pins a versioned configuration fingerprint at
 `PREFIX:{ID}:config`. Every later admission checks it atomically before spending
 rate budget or creating leases, including while the quota is paused.
 
-The fingerprint covers each normalized rule's algorithm, interval, limit, and
+The fingerprint covers names and scope dimensions when configured, plus each
+normalized rule's algorithm, interval, limit, and
 burst, plus global concurrency scope, limit, and lease TTL. Rule order and
 equivalent durations such as `'1s'` and `1000` match. Local concurrency, queue
 settings, and lease owners can differ between workers.

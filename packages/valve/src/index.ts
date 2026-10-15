@@ -24,6 +24,8 @@ export type {
   StoreNotification,
   AcquireRequest,
   AcquireResult,
+  ScopedAcquireRequest,
+  ScopedAcquireResult,
   NormalizedRule,
 } from './store.js';
 export type {

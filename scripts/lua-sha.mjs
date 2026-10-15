@@ -5,7 +5,14 @@ import { readFile, writeFile } from 'node:fs/promises';
 import luamin from 'luamin';
 const base = new URL('../packages/valve/src/redis/', import.meta.url);
 let output = '// Generated Lua sources and build-time SHA1 digests.\n';
-for (const name of ['acquire', 'pause', 'resume', 'release', 'renew']) {
+for (const name of [
+  'acquire',
+  'scoped',
+  'pause',
+  'resume',
+  'release',
+  'renew',
+]) {
   const source = luamin.minify(
     await readFile(new URL(`${name}.lua`, base), 'utf8'),
   );

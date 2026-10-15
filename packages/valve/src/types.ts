@@ -44,6 +44,10 @@ export type Duration =
  * const bursty: RateRule = { limit: 10, interval: "1s", burst: 20 };
  */
 export interface RateRule {
+  /** Stable rule identity. Required for scoped rules; unique within this Valve. */
+  name?: string;
+  /** Named identity dimension supplied by each job through scopes. */
+  scope?: string;
   /** Cost units allowed per `interval`. Positive integer. */
   limit: number;
   /** Window length. At least 1 ms. */
@@ -146,7 +150,7 @@ export interface ValveOptions {
   /**
    * Advanced. Max jobs asked of the store in one call. Higher values mean
    * fewer round trips under load but coarser fairness between processes.
-   * Positive integer. Default `32`.
+   * Positive integer. Default `32`. Scoped configurations allow at most `128`.
    */
   batch?: number;
 }
@@ -155,6 +159,8 @@ export interface ValveOptions {
  * @example const options: RunOptions = { cost: 1, priority: 10 };
  */
 export interface RunOptions<T = unknown> {
+  /** Opaque identities for every configured scope dimension. Copied on submission. */
+  scopes?: Readonly<Record<string, string>>;
   /** Units this job uses from every rule. Positive integer. Default `1`. */
   cost?: number;
   /** Higher runs first. Integer. Default `0`. Ties run in call order. */
@@ -216,6 +222,10 @@ export interface WrapFetchOptions<F extends FetchLike = typeof fetch> {
    * Does not apply when `init.body` replaces the Request body.
    */
   maxReplayBodySize?: number;
+  /** Fixed identities or a resolver called once per logical request, reused across retries. */
+  scopes?:
+    | Readonly<Record<string, string>>
+    | ((...args: Parameters<F>) => Readonly<Record<string, string>>);
   /** Cost per request. A number or a function of the fetch arguments. Default `1`. */
   cost?: number | ((...args: Parameters<F>) => number);
   /** Priority per request. A number or a function of the fetch arguments. Default `0`. */

@@ -77,11 +77,14 @@ rate: [
 The store checks all rules in one atomic step. If any rule rejects a job,
 none of its cost is spent.
 
-Two rules in one valve cannot share the same algorithm and interval.
+Unnamed rules cannot share the same algorithm and interval. Give each rule a
+unique `name` to distinguish otherwise matching rules.
+[Scoped rules](/docs/guides/scoped-rate-limits/) require names.
 
 ## Changing rules
 
-Rule state is keyed by algorithm and interval. Changing a `limit` keeps the
+Unnamed rule state is keyed by algorithm and interval; named rule state uses
+its name. Scoped rules also include the job identity. Changing a `limit` keeps the
 existing state, so you can raise or lower it with a rolling deploy. During the
 rollout, workers with different limits enforce different bounds on the same
 state. Keep the configuration identical across workers once the deploy

@@ -3,6 +3,7 @@
   "pages": [
     "share-a-quota",
     "provider-quota-scopes",
+    "scoped-rate-limits",
     "global-concurrency",
     "respect-retry-after",
     "priorities-and-shutdown",

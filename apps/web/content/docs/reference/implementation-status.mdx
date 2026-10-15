@@ -35,6 +35,14 @@ Check the [changelog](/changelog/) for version history and
 - ESM and CommonJS entry points with TypeScript declarations, and zero
   runtime or peer dependencies. Applications supply their own Redis client.
 
+## Scoped admission for v0.4.0
+
+Named rules with `scope` and per-job `scopes` support atomic shared and
+per-identity admission in memory and Redis/Valkey. Eligible identities can
+proceed past blocked jobs. This extension preserves the static store path;
+custom stores opt in through `acquireScoped`. Targeted pause/resume is deferred:
+feedback remains Valve-ID-wide. See [Scoped rate limits](/docs/guides/scoped-rate-limits/).
+
 ## Changes in 0.1.2
 
 The footprint update minifies embedded Redis Lua at build time and lets
@@ -91,9 +99,12 @@ entry sizes, using Node.js 24.21.0 and esbuild 0.28.2:
 | Redis   |   3,151 bytes |     3,072 bytes | Above target  |
 | Headers |   1,130 bytes |     2,048 bytes | Within target |
 
-All three source-entry measurements pass the existing CI ceilings of
-8,704, 4,096, and 2,048 bytes respectively. Those ceilings are larger than
-the original core and Redis targets. Consumer sizes depend on which exports
+Those historical measurements predate scoped admission. The scoped extension
+uses source-entry CI ceilings of 12,000 bytes for core, 6,200 for Redis, and
+2,048 for headers. It adds identity validation, a delayed queue, and a second
+Lua script; it does not meet the original core or Redis size targets. See the
+[scoped benchmark report](https://github.com/ksaurav24/valve/blob/master/packages/valve/bench/SCOPED.md)
+for current sizes and measured growth. Consumer sizes depend on which exports
 remain reachable after bundling; the full headers entry is larger than a
 consumer importing only `retryAfter()`.
 

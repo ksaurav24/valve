@@ -4,12 +4,14 @@
  * @example const rule: NormalizedRule = { algorithm: 'gcra', limit: 10, intervalMs: 1000, burst: 1, key: 'gcra:1000' };
  */
 export interface NormalizedRule {
+  readonly name?: string;
+  readonly scope?: string;
   readonly algorithm: 'gcra' | 'fixed-window';
   readonly limit: number;
   readonly intervalMs: number;
   /** Always set. `1` for fixed window rules. */
   readonly burst: number;
-  /** Stable key part for this rule: `${algorithm}:${intervalMs}`. */
+  /** Stable rule key: `named:${name}` when named, otherwise `${algorithm}:${intervalMs}`. */
   readonly key: string;
 }
 
@@ -64,6 +66,10 @@ export interface Store {
   acquire(request: AcquireRequest): Promise<AcquireResult>;
   /** Optional synchronous version, used on the hot path when present. */
   acquireSync?(request: AcquireRequest): AcquireResult;
+  /** Atomic all-or-none admission per job; denials do not block later jobs. */
+  acquireScoped?(request: ScopedAcquireRequest): Promise<ScopedAcquireResult>;
+  /** Optional synchronous scoped path. */
+  acquireScopedSync?(request: ScopedAcquireRequest): ScopedAcquireResult;
   /** Extends the pause to at least `durationMs` from now. */
   pause(id: string, durationMs: number): Promise<void>;
   /** Removes the pause. */
@@ -83,4 +89,28 @@ export interface Store {
   ): (() => void) | Promise<() => void>;
   /** Frees resources owned by the store. Never closes user provided clients. */
   close(): Promise<void>;
+}
+
+/** Bounded multi-identity admission. All jobs use the same immutable policy. */
+export interface ScopedAcquireRequest {
+  readonly id: string;
+  readonly rules: readonly NormalizedRule[];
+  readonly jobs: readonly {
+    readonly cost: number;
+    readonly scopes: Readonly<Record<string, string>>;
+  }[];
+  readonly lease?: AcquireRequest['lease'];
+}
+
+/** Zero-based job indexes partitioned into grants and denials. */
+export interface ScopedAcquireResult {
+  readonly grantedIndexes: readonly number[];
+  readonly blocked: readonly {
+    readonly index: number;
+    readonly retryAfterMs: number;
+  }[];
+  readonly leases?: readonly {
+    readonly index: number;
+    readonly token: string;
+  }[];
 }

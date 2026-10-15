@@ -88,6 +88,28 @@ store is unavailable. Rate bounds do not survive
 [loss of Redis state](https://valvejs.vercel.app/docs/guarantees/#store-state-loss) from a flush, eviction, or
 failover. Read the [full guarantees](https://valvejs.vercel.app/docs/guarantees/).
 
+## Scoped budgets (v0.4.0)
+
+A job can spend shared and per-recipient budgets atomically:
+
+```ts
+const messages = createValve({
+  id: 'business-42',
+  rate: [
+    { name: 'shared', limit: 80, interval: '1s', algorithm: 'fixed-window' },
+    { name: 'spacing', scope: 'recipient', limit: 1, interval: '6s' },
+  ],
+});
+await messages.run(() => sendMessage(), {
+  scopes: { recipient: 'contact-42' },
+});
+```
+
+Blocked recipients let other eligible jobs proceed. Supply opaque application
+IDs, not phone numbers or secrets. Feedback and pauses remain Valve-wide.
+See [Scoped rate limits](https://valvejs.vercel.app/docs/guides/scoped-rate-limits/)
+for wrappers, store requirements, deployment safety, and limits.
+
 ## Documentation and development
 
 ```sh

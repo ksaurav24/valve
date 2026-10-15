@@ -170,7 +170,8 @@ const store = redisStore({ adapter });
 - Keys have the form `PREFIX:{ID}:...`. The hash tag keeps one valve's keys in
   one cluster slot.
 - GCRA keys expire when their stored theoretical arrival time is reached;
-  fixed-window keys expire after twice their interval. Lease keys expire with
+  static fixed-window keys expire after twice their interval, and scoped-path
+  fixed-window keys expire at the end of their window. Lease keys expire with
   their last lease.
 - `PREFIX:{ID}:config` pins a versioned fingerprint of normalized rate and global
   concurrency settings. It has no TTL and is checked in the admission script on
@@ -186,6 +187,13 @@ then runs jobs without shared admission checks.
 Rule order, equivalent duration syntax, local settings, and lease owners do not
 cause mismatches. See [Configuration drift and quota migrations](/docs/guides/share-a-quota/#configuration-drift)
 before changing rules, resetting the config key, or upgrading older workers.
+
+Scoped acquisition uses the same hash tag and configuration key. Unscoped rules
+use `PREFIX:{ID}:r:KEY`; scoped rules use
+`PREFIX:{ID}:s:named:NAME:ENCODED_IDENTITY`. Names and dimensions participate in
+the fingerprint. Each scoped request uses one bounded Lua execution with sparse
+grants. See [Scoped rate limits](/docs/guides/scoped-rate-limits/) for key
+cardinality, identity handling, and Cluster hot-slot tradeoffs.
 
 ## Lifecycle
 

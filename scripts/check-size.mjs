@@ -7,9 +7,10 @@ const require = createRequire(
 const { build } = require('esbuild');
 const base = new URL('../packages/valve/', import.meta.url);
 for (const [entry, budget] of [
-  // Bounded Request replay adds 252 gzip bytes over the 8590-byte baseline.
-  ['index', 8960],
-  ['redis/index', 4096],
+  // Scoped admission adds the delayed heap, validation and a second Lua script.
+  // Measured costs and the prior ceilings are recorded in bench/SCOPED.md.
+  ['index', 12000],
+  ['redis/index', 6200],
   ['headers/index', 2048],
 ]) {
   const result = await build({
