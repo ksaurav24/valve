@@ -8,14 +8,13 @@ worker sharing that budget pauses. A memory store supports single-process use.
 
 ## Quickstart
 
-The package is `@ksaurav24/valve`, version 0.1.0. It is being prepared in this
-private repository and is **not published to npm yet**. Build it locally with
+The package will be published as `valvejs`. It is **not published to npm yet**. Build it locally with
 `pnpm install && pnpm build`, then run a workspace example or install a packed
 tarball in another project.
 
 ```ts
-import { createValve } from '@ksaurav24/valve';
-import { redisStore } from '@ksaurav24/valve/redis';
+import { createValve } from 'valvejs';
+import { redisStore } from 'valvejs/redis';
 
 const api = createValve({
   id: 'partner:credential-42',

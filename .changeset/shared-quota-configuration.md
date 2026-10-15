@@ -1,5 +1,5 @@
 ---
-'@ksaurav24/valve': minor
+'valvejs': minor
 ---
 
 Detect incompatible shared Redis/Valkey quota settings atomically during

@@ -282,8 +282,8 @@ on ports 16379 and 16380, then prepare both bundles before timing:
 
 ```sh
 git worktree add --detach /tmp/valve-drift-baseline 360621096a5b9a05b2886a17748d539cd6436cf5
-pnpm --filter @ksaurav24/valve exec esbuild /tmp/valve-drift-baseline/packages/valve/src/index.ts --bundle --format=esm --platform=node --target=node20 --outfile=/tmp/valve-baseline.mjs
-pnpm --filter @ksaurav24/valve exec esbuild src/index.ts --bundle --format=esm --platform=node --target=node20 --outfile=/tmp/valve-current.mjs
+pnpm --filter valvejs exec esbuild /tmp/valve-drift-baseline/packages/valve/src/index.ts --bundle --format=esm --platform=node --target=node20 --outfile=/tmp/valve-baseline.mjs
+pnpm --filter valvejs exec esbuild src/index.ts --bundle --format=esm --platform=node --target=node20 --outfile=/tmp/valve-current.mjs
 export REDIS_URL=redis://127.0.0.1:16379 VALKEY_URL=redis://127.0.0.1:16380
 for variant in current baseline; do
   VALVE_BENCH_LIBRARY=/tmp/valve-$variant.mjs VALVE_BENCH_REVISION=$variant VALVE_BENCH_OUT=/tmp/comparison-$variant.json pnpm bench:compare

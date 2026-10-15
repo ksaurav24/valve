@@ -7,7 +7,7 @@
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
-    "@ksaurav24/valve": "workspace:*"
+    "valvejs": "workspace:*"
   },
   "devDependencies": {
     "tsx": "4.23.15"

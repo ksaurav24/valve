@@ -21,7 +21,7 @@ and rate rules for every caller. Two local instances can share an explicit
 memory store:
 
 ```ts
-import { createValve, memoryStore } from '@ksaurav24/valve';
+import { createValve, memoryStore } from 'valvejs';
 
 const store = memoryStore();
 const options = {
@@ -52,7 +52,7 @@ If the provider enforces independent quotas, give them different IDs. They
 can still use the same store:
 
 ```ts
-import { createValve, memoryStore } from '@ksaurav24/valve';
+import { createValve, memoryStore } from 'valvejs';
 
 const store = memoryStore();
 const search = createValve({
@@ -89,7 +89,7 @@ then resumes the shared scope explicitly:
 
 ```ts
 import assert from 'node:assert/strict';
-import { createValve, memoryStore } from '@ksaurav24/valve';
+import { createValve, memoryStore } from 'valvejs';
 
 const store = memoryStore();
 const search = createValve({ id: 'partner:search', concurrency: 1, store });

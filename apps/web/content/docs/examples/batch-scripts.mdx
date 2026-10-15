@@ -7,7 +7,7 @@ A one-off script, such as a backfill or a migration, often calls one API
 thousands of times. Run it in a single process with the default memory store.
 
 ```ts title="backfill.ts"
-import { createValve } from '@ksaurav24/valve';
+import { createValve } from 'valvejs';
 
 const github = createValve({
   id: 'github:backfill',

@@ -1,8 +1,8 @@
 // UC3: a rate limit response pauses another worker on the same Redis budget.
 import assert from 'node:assert/strict';
 import { Redis } from 'ioredis';
-import { createValve } from '@ksaurav24/valve';
-import { redisStore } from '@ksaurav24/valve/redis';
+import { createValve } from 'valvejs';
+import { redisStore } from 'valvejs/redis';
 const redis = new Redis(process.env.REDIS_URL ?? 'redis://127.0.0.1:6379');
 const store = redisStore({ client: redis });
 const id = `feedback:example-${Date.now()}`;

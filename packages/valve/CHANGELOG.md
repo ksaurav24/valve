@@ -1,4 +1,4 @@
-# @ksaurav24/valve
+# valvejs
 
 ## 0.2.0
 

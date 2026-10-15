@@ -6,7 +6,7 @@ import { Terminal } from 'lucide-react';
 import { CopyButton } from '@/components/shared/copy-button';
 import { TabsSubtle, TabsSubtleItem } from '@/components/ui/tabs-subtle';
 
-const pkg = '@ksaurav24/valve';
+const pkg = 'valvejs';
 const managers = [
   { label: 'pnpm', command: `pnpm add ${pkg}` },
   { label: 'npm', command: `npm install ${pkg}` },

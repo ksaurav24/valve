@@ -2,11 +2,17 @@
 
 Run `pnpm changeset` for a package change and choose a patch, minor, or major
 release with a summary for its changelog. Commit the generated Markdown file.
-For tooling or documentation changes, use `pnpm changeset --empty`.
+CI, chore, documentation, test, and tooling changes do not need empty changesets.
+Include a changeset when changing published library code, package metadata,
+or library build configuration, even with a `chore:` or `ci:` PR title.
 
-Packages will use the `@ksaurav24` scope. There are no library packages yet.
-The private root workspace is never published.
+The public npm package is `valvejs` in `packages/valve`. The private root
+workspace, website, and examples are never published.
 
 After changesets reach `master`, automation opens or updates a version PR with
-package versions and changelogs. Merging that PR does not publish to npm.
-Publishing will be configured later.
+package versions, changelogs, and the lockfile as needed. It does not refresh
+live website metadata or format unrelated files. Version-only changes do not
+require another changeset. Merging that PR publishes `valvejs` through npm
+trusted publishing and creates the git tag and GitHub Release. The first public
+release is 1.0.0; the npm trusted publisher must target `version.yml` in
+`ksaurav24/valve`.

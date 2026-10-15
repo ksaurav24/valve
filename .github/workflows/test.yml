@@ -8,10 +8,17 @@ on:
 permissions:
   contents: read
 jobs:
+  changes:
+    uses: ./.github/workflows/changes.yml
   unit:
     name: tests
+    needs: changes
+    if: always() && (needs.changes.result != 'success' || needs.changes.outputs.library == 'true' || needs.changes.outputs.package == 'true')
     runs-on: ubuntu-latest
     steps:
+      - name: Require successful change detection
+        if: needs.changes.result != 'success'
+        run: exit 1
       - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803
       - uses: pnpm/action-setup@0977fd99725f1db4007ccb2928dbb4e90d06cc86
       - uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38
@@ -20,13 +27,17 @@ jobs:
           cache: pnpm
       - run: pnpm install --frozen-lockfile
       - run: pnpm test:coverage
+        if: needs.changes.outputs.library == 'true'
       - run: pnpm test:types
-      - run: pnpm --filter @ksaurav24/valve build
+        if: needs.changes.outputs.library == 'true'
+      - run: pnpm --filter valvejs build
       - run: pnpm check:source
       - run: pnpm check:package
       - run: pnpm check:size
   website:
     name: website
+    needs: changes
+    if: needs.changes.outputs.website == 'true'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803
@@ -49,6 +60,8 @@ jobs:
       - run: pnpm --filter @valve/web test:browser
   integration:
     name: integration (${{ matrix.image }})
+    needs: changes
+    if: needs.changes.outputs.library == 'true'
     runs-on: ubuntu-latest
     timeout-minutes: 15
     strategy:
@@ -79,7 +92,7 @@ jobs:
           node-version-file: .node-version
           cache: pnpm
       - run: pnpm install --frozen-lockfile
-      - run: pnpm --filter @ksaurav24/valve build
+      - run: pnpm --filter valvejs build
       - run: pnpm test:integration
         env:
           REDIS_URL: redis://127.0.0.1:6379
@@ -88,6 +101,8 @@ jobs:
           REDIS_URL: redis://127.0.0.1:6379
   cluster-and-recovery:
     name: cluster and recovery
+    needs: changes
+    if: needs.changes.outputs.library == 'true'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803
@@ -99,7 +114,7 @@ jobs:
       - run: pnpm install --frozen-lockfile
       - run: sudo apt-get update && sudo apt-get install -y redis-server
       - run: bash scripts/cluster-test.sh
-      - run: pnpm --filter @ksaurav24/valve build
+      - run: pnpm --filter valvejs build
       - run: pnpm test:integration
         env:
           REDIS_CLUSTER_URL: redis://127.0.0.1:17300

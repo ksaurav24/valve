@@ -4,7 +4,7 @@ description: redisStore options, supported clients, adapters, key layout, and li
 ---
 
 ```ts
-import { redisStore } from '@ksaurav24/valve/redis';
+import { redisStore } from 'valvejs/redis';
 
 const store = redisStore({ client: redis });
 ```
@@ -148,7 +148,7 @@ Implement two methods. Errors whose message contains `NOSCRIPT` must be
 rethrown unchanged, so valve can reload its scripts.
 
 ```ts
-import type { RedisEvalAdapter } from '@ksaurav24/valve/redis';
+import type { RedisEvalAdapter } from 'valvejs/redis';
 
 const adapter: RedisEvalAdapter = {
   evalsha: (sha, keys, args) =>

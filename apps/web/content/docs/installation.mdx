@@ -21,28 +21,28 @@ uses the one you pass in.
 <Tab value="pnpm">
 
 ```sh
-pnpm add @ksaurav24/valve
+pnpm add valvejs
 ```
 
 </Tab>
 <Tab value="npm">
 
 ```sh
-npm install @ksaurav24/valve
+npm install valvejs
 ```
 
 </Tab>
 <Tab value="yarn">
 
 ```sh
-yarn add @ksaurav24/valve
+yarn add valvejs
 ```
 
 </Tab>
 <Tab value="bun">
 
 ```sh
-bun add @ksaurav24/valve
+bun add valvejs
 ```
 
 </Tab>
@@ -53,8 +53,8 @@ bun add @ksaurav24/valve
 <Unpublished>
 
 <Callout type="warn" title="Not on npm yet">
-  `@ksaurav24/valve` has not been published. Until it is, build a tarball from
-  this repository and install that.
+  `valvejs` has not been published. Until it is, build a tarball from this
+  repository and install that.
 </Callout>
 
 <Steps>
@@ -77,7 +77,7 @@ pnpm build
 ### Pack the library
 
 ```sh
-pnpm --filter @ksaurav24/valve pack --out /tmp/valve.tgz
+pnpm --filter valvejs pack --out /tmp/valve.tgz
 ```
 
 </Step>
@@ -116,20 +116,20 @@ yarn add /tmp/valve.tgz
 
 ## Entry points
 
-| Import                     | Contains                                                                                             |
-| -------------------------- | ---------------------------------------------------------------------------------------------------- |
-| `@ksaurav24/valve`         | `createValve`, `memoryStore`, `ValveError`, `isValveError`, `defaultFeedback`, and the public types. |
-| `@ksaurav24/valve/redis`   | `redisStore` and the structural client and adapter types.                                            |
-| `@ksaurav24/valve/headers` | Feedback readers: `retryAfter`, `ietfRateLimit`, `xRateLimit`, `combine`, `defaultFeedback`.         |
+| Import            | Contains                                                                                             |
+| ----------------- | ---------------------------------------------------------------------------------------------------- |
+| `valvejs`         | `createValve`, `memoryStore`, `ValveError`, `isValveError`, `defaultFeedback`, and the public types. |
+| `valvejs/redis`   | `redisStore` and the structural client and adapter types.                                            |
+| `valvejs/headers` | Feedback readers: `retryAfter`, `ietfRateLimit`, `xRateLimit`, `combine`, `defaultFeedback`.         |
 
 Each entry point ships as ESM and CommonJS with TypeScript declarations.
 
 ```ts
 // ESM
-import { createValve } from '@ksaurav24/valve';
+import { createValve } from 'valvejs';
 
 // CommonJS
-const { createValve } = require('@ksaurav24/valve');
+const { createValve } = require('valvejs');
 ```
 
 ## Connect a Redis client
@@ -142,7 +142,7 @@ connect the client yourself. valve never opens or closes it.
 
 ```ts
 import { Redis } from 'ioredis';
-import { redisStore } from '@ksaurav24/valve/redis';
+import { redisStore } from 'valvejs/redis';
 
 const redis = new Redis(process.env.REDIS_URL!);
 const store = redisStore({ client: redis });
@@ -153,7 +153,7 @@ const store = redisStore({ client: redis });
 
 ```ts
 import { createClient } from 'redis';
-import { redisStore } from '@ksaurav24/valve/redis';
+import { redisStore } from 'valvejs/redis';
 
 const redis = await createClient({ url: process.env.REDIS_URL }).connect();
 const store = redisStore({ client: redis });

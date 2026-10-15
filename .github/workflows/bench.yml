@@ -8,8 +8,11 @@ on:
 permissions:
   contents: read
 jobs:
+  changes:
+    uses: ./.github/workflows/changes.yml
   footprint-controls:
-    if: github.event_name == 'pull_request'
+    needs: changes
+    if: github.event_name == 'pull_request' && needs.changes.outputs.benchmarks == 'true'
     runs-on: ubuntu-latest
     services:
       redis:
@@ -38,7 +41,7 @@ jobs:
           node-version-file: .node-version
           cache: pnpm
       - run: pnpm install --frozen-lockfile
-      - run: pnpm --filter @ksaurav24/valve build
+      - run: pnpm --filter valvejs build
       - name: Prepare the PR baseline before timing
         env:
           BASE_SHA: ${{ github.event.pull_request.base.sha }}
@@ -46,7 +49,7 @@ jobs:
           git worktree add --detach /tmp/valve-footprint-baseline "$BASE_SHA"
           cd /tmp/valve-footprint-baseline
           pnpm install --frozen-lockfile
-          pnpm --filter @ksaurav24/valve build
+          pnpm --dir packages/valve build
       - name: Paired bundle, startup, and shared-store controls
         env:
           REDIS_URL: redis://127.0.0.1:6379
@@ -63,6 +66,8 @@ jobs:
           name: footprint-controls
           path: /tmp/valve-footprint-results
   local:
+    needs: changes
+    if: needs.changes.outputs.benchmarks == 'true'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803
@@ -107,10 +112,10 @@ jobs:
           node-version-file: .node-version
           cache: pnpm
       - run: pnpm install --frozen-lockfile
-      - run: pnpm --filter @ksaurav24/valve build
+      - run: pnpm --filter valvejs build
       - run: pnpm test:integration
         env:
           REDIS_URL: redis://127.0.0.1:6379
-      - run: pnpm --filter @ksaurav24/valve exec tsx bench/redis.ts
+      - run: pnpm --filter valvejs exec tsx bench/redis.ts
         env:
           REDIS_URL: redis://127.0.0.1:6379

@@ -10,8 +10,8 @@ budget in Redis or Valkey, so every process that uses the same valve id draws
 from one shared limit. When the provider asks for a pause, every worker pauses.
 
 ```ts
-import { createValve } from '@ksaurav24/valve';
-import { redisStore } from '@ksaurav24/valve/redis';
+import { createValve } from 'valvejs';
+import { redisStore } from 'valvejs/redis';
 
 const hubspot = createValve({
   id: 'hubspot:portal-123',

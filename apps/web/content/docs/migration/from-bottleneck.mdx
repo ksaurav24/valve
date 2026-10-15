@@ -37,8 +37,8 @@ const contact = await limiter.schedule({ priority: 1 }, getContact, '123');
 
 ```ts title="After: valve"
 import { Redis } from 'ioredis';
-import { createValve } from '@ksaurav24/valve';
-import { redisStore } from '@ksaurav24/valve/redis';
+import { createValve } from 'valvejs';
+import { redisStore } from 'valvejs/redis';
 
 const redis = new Redis({ host: '127.0.0.1', port: 6379 });
 

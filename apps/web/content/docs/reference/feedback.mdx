@@ -30,7 +30,7 @@ interface FeedbackSignal {
 
 ## Built-in readers
 
-Import them from `@ksaurav24/valve/headers`.
+Import them from `valvejs/headers`.
 
 | Reader                 | Reads                                                                                      |
 | ---------------------- | ------------------------------------------------------------------------------------------ |
@@ -97,7 +97,7 @@ with the local clock otherwise.
 Read a provider's own headers alongside the defaults:
 
 ```ts
-import { combine, defaultFeedback, xRateLimit } from '@ksaurav24/valve/headers';
+import { combine, defaultFeedback, xRateLimit } from 'valvejs/headers';
 
 const feedback = combine(
   defaultFeedback,
@@ -114,8 +114,8 @@ createValve({ id: 'partner', rate, feedback });
 Write a reader for a non-standard signal:
 
 ```ts
-import type { Feedback } from '@ksaurav24/valve';
-import { combine, defaultFeedback } from '@ksaurav24/valve/headers';
+import type { Feedback } from 'valvejs';
+import { combine, defaultFeedback } from 'valvejs/headers';
 
 // The provider returns 420 with a "Wait-Seconds" header when throttling.
 const waitSeconds: Feedback = (response) => {

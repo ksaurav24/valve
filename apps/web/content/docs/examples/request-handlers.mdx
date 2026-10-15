@@ -12,8 +12,8 @@ error. This example uses Express 5, but the pattern fits any framework:
 
 ```ts title="server.ts"
 import express from 'express';
-import { createValve, isValveError } from '@ksaurav24/valve';
-import { redisStore } from '@ksaurav24/valve/redis';
+import { createValve, isValveError } from 'valvejs';
+import { redisStore } from 'valvejs/redis';
 
 const maps = createValve({
   id: 'maps:key-3',

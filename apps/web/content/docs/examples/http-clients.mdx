@@ -9,8 +9,8 @@ it needs to read rate limit headers.
 All snippets assume a valve like this one:
 
 ```ts
-import { createValve } from '@ksaurav24/valve';
-import { redisStore } from '@ksaurav24/valve/redis';
+import { createValve } from 'valvejs';
+import { redisStore } from 'valvejs/redis';
 
 const partner = createValve({
   id: 'partner:key-1',
@@ -64,7 +64,7 @@ with a small helper. At runtime, axios headers support case-insensitive
 
 ```ts
 import axios, { isAxiosError, type AxiosResponse } from 'axios';
-import type { ResponseLike } from '@ksaurav24/valve';
+import type { ResponseLike } from 'valvejs';
 
 const fromAxios = (res: AxiosResponse): ResponseLike => ({
   status: res.status,

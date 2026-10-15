@@ -1,6 +1,6 @@
 // UC6: feed an axios-shaped response into valve without changing clients.
 import assert from 'node:assert/strict';
-import { createValve } from '@ksaurav24/valve';
+import { createValve } from 'valvejs';
 const api = createValve({ id: 'axios:example', concurrency: 1 });
 const response = await api.run(
   () => ({

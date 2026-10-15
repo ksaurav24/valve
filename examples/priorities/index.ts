@@ -1,6 +1,6 @@
 // UC4: interactive work starts before background sync in a local queue.
 import assert from 'node:assert/strict';
-import { createValve } from '@ksaurav24/valve';
+import { createValve } from 'valvejs';
 const api = createValve({ id: 'priority', concurrency: 1 });
 const starts: string[] = [];
 await Promise.all([

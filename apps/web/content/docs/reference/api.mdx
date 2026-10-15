@@ -219,13 +219,13 @@ The id passed to `createValve`.
 
 ## Other exports
 
-| Export                       | Entry point                | Description                                            |
-| ---------------------------- | -------------------------- | ------------------------------------------------------ |
-| `memoryStore(options?)`      | `@ksaurav24/valve`         | In-process store. Share one instance to share budgets. |
-| `redisStore(options)`        | `@ksaurav24/valve/redis`   | See [Redis store](/docs/reference/redis-store/).       |
-| `ValveError`, `isValveError` | `@ksaurav24/valve`         | See [Errors](/docs/reference/errors/).                 |
-| `defaultFeedback`            | Both                       | The default feedback reader.                           |
-| Feedback readers             | `@ksaurav24/valve/headers` | See [Feedback readers](/docs/reference/feedback/).     |
+| Export                       | Entry point       | Description                                            |
+| ---------------------------- | ----------------- | ------------------------------------------------------ |
+| `memoryStore(options?)`      | `valvejs`         | In-process store. Share one instance to share budgets. |
+| `redisStore(options)`        | `valvejs/redis`   | See [Redis store](/docs/reference/redis-store/).       |
+| `ValveError`, `isValveError` | `valvejs`         | See [Errors](/docs/reference/errors/).                 |
+| `defaultFeedback`            | Both              | The default feedback reader.                           |
+| Feedback readers             | `valvejs/headers` | See [Feedback readers](/docs/reference/feedback/).     |
 
 `memoryStore` accepts `{ clock?: () => number }`, a source of epoch
 milliseconds. It defaults to `Date.now`.
