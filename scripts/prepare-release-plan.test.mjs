@@ -2,51 +2,72 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 import { prepareReleasePlan, releaseTag } from './prepare-release-plan.mjs';
 
-const beta = {
-  name: 'valvejs',
-  version: '0.3.0-beta.0',
-  publishConfig: { tag: 'beta' },
-};
-const pre = { mode: 'pre', tag: 'beta' };
+const pkg = { name: 'valvejs', version: '0.4.0' };
 
-test('first and subsequent betas use the beta tag', () => {
-  assert.equal(releaseTag(beta, pre), 'beta');
-  assert.equal(releaseTag({ ...beta, version: '0.3.0-beta.1' }, pre), 'beta');
+test('plain 0.x and 1.x releases use npm’s default channel', () => {
+  for (const version of ['0.4.0', '0.4.1', '0.5.0', '1.0.0']) {
+    assert.equal(releaseTag({ ...pkg, version }), 'latest');
+    assert.equal(
+      releaseTag({ ...pkg, version, publishConfig: { tag: 'latest' } }),
+      'latest',
+    );
+  }
 });
 
-test('a beta cannot publish with stable or missing prerelease configuration', () => {
-  assert.throws(() => releaseTag(beta));
-  assert.throws(() => releaseTag(beta, { ...pre, mode: 'exit' }));
-  assert.throws(() =>
-    releaseTag({ ...beta, publishConfig: { tag: 'latest' } }, pre),
-  );
-  assert.throws(() => releaseTag({ ...beta, version: '0.3.0' }, pre));
+test('release validation rejects suffixes, malformed versions, and custom channels', () => {
+  for (const version of [
+    '0.4.0-beta.0',
+    '0.4.1-beta',
+    '1.0.0-rc.1',
+    '0.4.0+build.1',
+    'v0.4.0',
+    '0.4',
+    '00.4.0',
+  ]) {
+    assert.throws(() => releaseTag({ ...pkg, version }), /plain x.y.z/);
+  }
+  for (const tag of ['beta', 'next']) {
+    assert.throws(
+      () => releaseTag({ ...pkg, publishConfig: { tag } }),
+      /default npm channel/,
+    );
+  }
+  assert.throws(() => releaseTag({ ...pkg, name: 'another-package' }));
 });
 
-test('stable releases work after exiting beta mode and removing the beta tag', () => {
-  assert.equal(releaseTag({ name: 'valvejs', version: '0.3.0' }), 'latest');
-  assert.throws(() => releaseTag({ ...beta, version: '0.3.0' }));
+test('leftover Changesets prerelease state cannot reach publishing', () => {
+  for (const mode of ['pre', 'exit']) {
+    assert.throws(
+      () => releaseTag(pkg, { mode, tag: 'beta' }),
+      /Finish exiting Changesets prerelease mode/,
+    );
+  }
 });
 
-test('the packed plan corrects a beta marked latest without changing its version or access', () => {
+test('packed plans use latest without changing versions, access, or nonpublish entries', () => {
   const release = {
     kind: 'publish',
-    name: 'valvejs',
-    version: beta.version,
+    name: pkg.name,
+    version: pkg.version,
     access: 'public',
-    tag: 'latest',
+    tag: 'beta',
   };
-  const plan = { version: 1, plan: [[release]] };
-  assert.deepEqual(prepareReleasePlan(plan, beta, pre).plan, [
-    [{ ...release, tag: 'beta' }],
+  const skip = { kind: 'none', name: 'private-workspace' };
+  const plan = { version: 1, plan: [[release, skip]] };
+  assert.deepEqual(prepareReleasePlan(plan, pkg).plan, [
+    [{ ...release, tag: 'latest' }, skip],
   ]);
-  assert.equal(plan.plan[0][0].tag, 'latest');
-  assert.throws(() =>
-    prepareReleasePlan(
-      { version: 1, plan: [[{ ...release, version: '0.2.0' }]] },
-      beta,
-      pre,
-    ),
-  );
-  assert.throws(() => prepareReleasePlan({ version: 2, plan: [] }, beta, pre));
+  assert.equal(plan.plan[0][0].tag, 'beta');
+  for (const unexpected of [{ version: '0.3.0' }, { name: 'other' }]) {
+    assert.throws(
+      () =>
+        prepareReleasePlan(
+          { version: 1, plan: [[{ ...release, ...unexpected }]] },
+          pkg,
+        ),
+      /Unexpected package/,
+    );
+  }
+  assert.throws(() => prepareReleasePlan({ version: 2, plan: [] }, pkg));
+  assert.throws(() => prepareReleasePlan({ version: 1, plan: [{}] }, pkg));
 });

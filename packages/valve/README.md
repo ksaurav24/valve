@@ -1,6 +1,6 @@
 # valvejs
 
-[![npm beta version](https://img.shields.io/npm/v/valvejs/beta.svg?label=npm%20beta)](https://www.npmjs.com/package/valvejs?activeTab=versions)
+[![npm version](https://img.shields.io/npm/v/valvejs.svg)](https://www.npmjs.com/package/valvejs)
 [![npm downloads per month](https://img.shields.io/npm/dm/valvejs.svg)](https://www.npmjs.com/package/valvejs)
 
 **One rate limit for every worker that calls an API.**
@@ -13,14 +13,14 @@ worker sharing that budget pauses. A memory store supports single-process use.
 
 ## Quickstart
 
-Install from the npm `beta` channel. Beta APIs may change before a stable
-release.
+**Beta until 1.0.** APIs may change between releases. Published versions use
+plain version numbers and install through npm’s default channel.
 
 ```sh
-npm install valvejs@beta
+npm install valvejs
 ```
 
-The beta badge above follows the current beta automatically. See the
+The npm badge above follows the current release automatically. See the
 [release history](https://valvejs.vercel.app/releases/) for published versions
 and release notes.
 

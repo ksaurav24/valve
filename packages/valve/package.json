@@ -1,6 +1,6 @@
 {
   "name": "valvejs",
-  "version": "0.4.0-beta.1",
+  "version": "0.4.0",
   "description": "One rate limit for every worker that calls an API.",
   "homepage": "https://valvejs.vercel.app/",
   "bugs": {
@@ -69,8 +69,7 @@
     "NOTICE"
   ],
   "publishConfig": {
-    "access": "public",
-    "tag": "beta"
+    "access": "public"
   },
   "scripts": {
     "build": "node ../../scripts/lua-sha.mjs && tsdown",

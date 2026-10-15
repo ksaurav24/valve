@@ -48,10 +48,10 @@ Nothing in this app hardcodes a version, star count, download count, or contribu
 - `lib/releases.ts` treats a version as released only when npm lists it.
   Other changelog entries are development versions: they appear on
   `/changelog`, never on `/releases`. In MDX, wrap text in `<Unpublished>` or
-  `<Published>` when it depends on that state. Published beta versions display a
-  `beta` badge even if npm's `latest` tag happens to point at a prerelease. Stable
-  `latest` and `beta` metadata remain separate; install commands follow the
-  package's configured npm tag (`valvejs@beta` during the beta series).
+  `<Published>` when it depends on that state. Publication labels (`latest`,
+  `published`, or `dev · unreleased`) come from npm. A separate `beta` label
+  describes API maturity for all 0.x versions, independently of publication.
+  Install commands use the unqualified package name, `valvejs`.
 - The navigation star count refreshes in the browser with SWR against the
   public GitHub API, cached for an hour in `localStorage`, falling back to the
   build value. No token reaches the browser.
@@ -67,9 +67,11 @@ Run both syncs with `pnpm --filter @valve/web sync`. The merge rules live in
 ## Releases and rebuilds
 
 Merging a version PR runs the publish jobs in `.github/workflows/version.yml`:
-npm trusted publishing, then the git tag and GitHub Release. Beta versions use
-`0.3.0-beta.N`, the npm `beta` tag, and GitHub prereleases named
-`valvejs@0.3.0-beta.N`. If the
+npm trusted publishing, then the git tag and GitHub Release. Versions use
+plain `x.y.z` numbers and npm's default `latest` channel. GitHub releases are
+named `valvejs@x.y.z` and are ordinary releases; beta is the project's maturity
+label until 1.0, rather than a prerelease suffix or separate install channel.
+Historical prerelease versions retain their original names and links. If the
 `VERCEL_DEPLOY_HOOK` secret exists, the workflow then triggers a rebuild so
 `/releases` picks up the new npm data. Pushes to `master` rebuild through the
 host's Git integration.

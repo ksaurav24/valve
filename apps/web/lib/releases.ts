@@ -20,11 +20,10 @@ export interface Release extends ChangelogEntry {
   githubUrl: string | null;
 }
 
-export type VersionState = 'latest' | 'published' | 'beta' | 'dev';
+export type VersionState = 'latest' | 'published' | 'dev';
 
 const npm = metadata.npm as {
   latest: string | null;
-  beta?: string | null;
   versions: Record<string, string | null>;
 };
 export const changelogEntries = changelog as ChangelogEntry[];
@@ -48,10 +47,7 @@ export const releases: Release[] = changelogEntries
     githubUrl: githubUrl(entry.version),
   }));
 
-export const latestPublished =
-  npm.latest && !npm.latest.includes('-')
-    ? npm.latest
-    : (npm.beta ?? npm.latest);
+export const latestPublished = npm.latest;
 
 export function versionState(version: string): VersionState {
   return npmVersionState(version, npm);

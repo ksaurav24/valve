@@ -109,12 +109,15 @@ test('home page leads with install, usage, and documentation', async ({
     page.getByRole('tab', { name: published ? 'pnpm' : 'source', exact: true }),
   ).toHaveAttribute('aria-selected', 'true');
   if (published) {
-    const target =
-      release.channel === 'latest' ? 'valvejs' : `valvejs@${release.channel}`;
     await expect(page.getByRole('tabpanel').first()).toContainText(
-      `pnpm add ${target}`,
+      'pnpm add valvejs',
     );
   }
+  await expect(
+    page.getByText('Beta until 1.0. APIs may change between releases.', {
+      exact: true,
+    }),
+  ).toBeVisible();
   await page.getByRole('tab', { name: 'shared.ts' }).click();
   await expect(page.getByRole('tabpanel', { name: 'shared.ts' })).toContainText(
     'redisStore',
@@ -169,6 +172,9 @@ test('releases list only published versions', async ({ page }) => {
       ).toBeVisible();
     }
   }
+  await expect(page.locator('main article h2')).toHaveText(
+    published.map((entry) => `v${entry.version}`),
+  );
 });
 
 test('npm downloads render beside GitHub and accept a zero count', async ({

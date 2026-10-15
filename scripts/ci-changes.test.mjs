@@ -6,20 +6,20 @@ import { join } from 'node:path';
 import test from 'node:test';
 import { classifyChanges, isReleaseOnlyChange } from './ci-changes.mjs';
 
-test('beta channel transitions do not require another version bump', () => {
+test('migrating from beta to plain versions is a release-only change', () => {
   const before = {
     name: 'valvejs',
-    version: '0.2.0',
-    publishConfig: { access: 'public' },
+    version: '0.4.0-beta.0',
+    publishConfig: { access: 'public', tag: 'beta' },
   };
   const after = {
     ...before,
-    version: '0.3.0-beta.0',
-    publishConfig: { access: 'public', tag: 'beta' },
+    version: '0.4.0',
+    publishConfig: { access: 'public' },
   };
   assert.equal(isReleaseOnlyChange(before, after), true);
   assert.equal(
-    isReleaseOnlyChange(after, { ...before, version: '0.3.0' }),
+    isReleaseOnlyChange(after, { ...after, version: '0.4.1' }),
     true,
   );
   assert.equal(
@@ -37,11 +37,8 @@ test('beta channel transitions do not require another version bump', () => {
     }),
     false,
   );
-  assert.equal(
-    isReleaseOnlyChange(before, { ...after, version: '0.3.0' }),
-    false,
-  );
-  assert.equal(before.version, '0.2.0');
+  assert.equal(isReleaseOnlyChange(after, before), false);
+  assert.equal(before.version, '0.4.0-beta.0');
 });
 
 test('CI and chore maintenance does not require release notes or library tests', () => {

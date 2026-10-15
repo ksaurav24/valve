@@ -95,8 +95,7 @@ jobs:
           artifact-ids: ${{ needs.select-mode.outputs.publish-plan-artifact-id }}
           path: ${{ runner.temp }}/valve-publish-plan
           merge-multiple: true
-      # Changesets may select latest for a first prerelease. The packed plan
-      # must explicitly use beta, including when retrying a partially completed release.
+      # Validate plain versions and use npm's default channel, including retries.
       - name: Validate release version and npm channel
         run: node scripts/prepare-release-plan.mjs "$RUNNER_TEMP/valve-publish-plan/publish-plan.json"
       - run: pnpm --filter valvejs build

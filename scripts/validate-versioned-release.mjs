@@ -4,14 +4,13 @@ import { pathToFileURL } from 'node:url';
 import gt from 'semver/functions/gt.js';
 import { releaseTag } from './prepare-release-plan.mjs';
 
-/** A consumed beta changeset requires a strictly newer version and matching release notes. */
+/** A prepared release requires a strictly newer version and matching release notes. */
 export function validateVersionedRelease(pkg, previous, changelog, pre) {
   if (!gt(pkg.version, previous.version))
     throw new Error(
-      'Archived changesets require a new package version greater than the previous version.',
+      'Prepared releases require a new package version greater than the previous version.',
     );
-  if (releaseTag(pkg, pre) !== 'beta')
-    throw new Error('Archived prerelease changesets require the beta channel.');
+  releaseTag(pkg, pre);
   const newest = changelog.match(/^## (\S+)\s*$/m)?.[1];
   if (newest !== pkg.version)
     throw new Error(
@@ -35,7 +34,6 @@ if (
       }),
     ),
     readFileSync('packages/valve/CHANGELOG.md', 'utf8'),
-    json('.changeset/pre.json'),
   );
-  console.log(`Validated prepared beta release: ${pkg.name}@${pkg.version}`);
+  console.log(`Validated prepared release: ${pkg.name}@${pkg.version}`);
 }
