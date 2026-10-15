@@ -1,5 +1,13 @@
 # valvejs
 
+## 0.3.0-beta.2
+
+### Patch Changes
+
+- ddf6c92: Point the npm homepage and README documentation links to valvejs.vercel.app.
+  Add npm beta-version and monthly-download badges, an explicit issue tracker,
+  and package keywords.
+
 ## 0.3.0-beta.1
 
 ### Patch Changes
