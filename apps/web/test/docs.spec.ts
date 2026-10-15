@@ -33,6 +33,7 @@ test('every page and the generated reference resolve', async ({
     '/docs/choosing-an-algorithm/',
     '/docs/guarantees/',
     '/docs/guides/share-a-quota/',
+    '/docs/guides/scoped-rate-limits/',
     '/docs/guides/global-concurrency/',
     '/docs/guides/respect-retry-after/',
     '/docs/guides/priorities-and-shutdown/',
@@ -118,6 +119,13 @@ test('home page leads with install, usage, and documentation', async ({
   await expect(page.getByRole('tabpanel', { name: 'shared.ts' })).toContainText(
     'redisStore',
   );
+  await page.getByRole('tab', { name: 'scoped.ts', exact: true }).click();
+  await expect(page.getByRole('tabpanel', { name: 'scoped.ts' })).toContainText(
+    "scopes: { recipient: 'contact-A' }",
+  );
+  await expect(
+    page.getByRole('link', { name: 'Shared and scoped budgets.' }),
+  ).toHaveAttribute('href', /^\/docs\/guides\/scoped-rate-limits\/?$/);
   expect(
     await page.evaluate(
       () => document.documentElement.scrollWidth > window.innerWidth,

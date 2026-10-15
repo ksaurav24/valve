@@ -49,7 +49,9 @@ interface AcquireResult {
 ```
 
 Each `NormalizedRule` carries `algorithm`, `limit`, `intervalMs`, `burst`, and
-a stable `key` of the form `${algorithm}:${intervalMs}`.
+a stable `key`: `${algorithm}:${intervalMs}` for unnamed rules or
+`named:${name}` for named rules. Named and scoped rules also carry `name` and
+`scope` when configured.
 
 ## Requirements
 
@@ -65,3 +67,38 @@ a stable `key` of the form `${algorithm}:${intervalMs}`.
 The memory store's source, `packages/valve/src/memory-store.ts`, is a compact
 reference implementation. The Redis Lua scripts in `packages/valve/src/redis/`
 show the same logic for a remote backend.
+
+## Scoped admission capability
+
+Existing stores can keep implementing `acquire` for static configurations.
+Scoped rules require the optional `acquireScoped(request)` method; creation
+rejects unsupported stores. Exported `ScopedAcquireRequest` and
+`ScopedAcquireResult` describe this contract:
+
+```ts
+interface ScopedAcquireResult {
+  grantedIndexes: readonly number[];
+  blocked: readonly { index: number; retryAfterMs: number }[];
+  leases?: readonly { index: number; token: string }[];
+}
+```
+
+The request contains `id`, immutable normalized `rules`, ordered `jobs` with
+`cost` and `scopes`, and optional `lease` settings. Indexes are zero-based into
+`jobs`. Every job must appear exactly once in grants or denials. Retry hints
+must be positive safe integers. Global requests need one unique lease token
+per admitted index, released and renewed through the existing methods.
+
+Validate the complete request before mutation. Use one store clock and one
+atomic operation to check the shared pause, every applicable rule, and lease
+capacity. A denial spends nothing; continue evaluating later jobs, including
+lower-cost jobs. Deduplicate keys and update temporary state after each grant
+so repeated identities see earlier admissions in the same batch. Commit only
+final changed states. Pin the complete policy independently of expiring rate
+state and reject incompatible workers.
+
+Requests contain at most 16 rules and 128 jobs. `acquireScopedSync` is an optional
+synchronous optimization with the same semantics. Do not implement scoped
+admission as repeated calls to `acquire`: separate reservations cannot enforce
+all-or-none spending. See [Scoped rate limits](/docs/guides/scoped-rate-limits/)
+for identity requirements and operational limits.

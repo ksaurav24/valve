@@ -23,7 +23,7 @@ try {
       const library =
         variant === 'baseline'
           ? resolve(baselineLibrary)
-          : resolve('packages/valve/src/index.ts');
+          : resolve('packages/valve/dist/index.js');
       console.log(`Pair ${pair + 1}: ${variant}`);
       const result = spawnSync('pnpm', ['bench'], {
         stdio: 'inherit',

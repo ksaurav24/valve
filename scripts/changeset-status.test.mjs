@@ -5,6 +5,7 @@ import {
   mkdtempSync,
   readFileSync,
   rmSync,
+  symlinkSync,
   writeFileSync,
 } from 'node:fs';
 import { tmpdir } from 'node:os';
@@ -144,6 +145,54 @@ test('Changesets validation works in a detached CI checkout without local master
     const invalid = validate(base);
     assert.notEqual(invalid.status, 0);
     assert.match(invalid.stdout + invalid.stderr, /unknown-package/);
+
+    // A feature PR can consume its beta changeset before merging. Exercise the
+    // workflow's archived-note branch and keep it from accepting notes alone.
+    git('reset', '--hard', base);
+    mkdirSync(join(cwd, '.changeset/pre'));
+    mkdirSync(join(cwd, 'scripts'));
+    mkdirSync(join(cwd, 'node_modules'));
+    symlinkSync(
+      fileURLToPath(new URL('../node_modules/semver', import.meta.url)),
+      join(cwd, 'node_modules/semver'),
+      'dir',
+    );
+    for (const name of [
+      'prepare-release-plan.mjs',
+      'validate-versioned-release.mjs',
+    ])
+      write(
+        `scripts/${name}`,
+        readFileSync(new URL(name, import.meta.url), 'utf8'),
+      );
+    write('.changeset/pre.json', JSON.stringify({ mode: 'pre', tag: 'beta' }));
+    write(
+      '.changeset/pre/change.md',
+      "---\n'valvejs': minor\n---\n\nAtomic scoped limits.\n",
+    );
+    write(
+      'packages/valve/CHANGELOG.md',
+      '# valvejs\n\n## 0.4.0-beta.0\n\n- Atomic scoped limits.\n',
+    );
+    commit();
+    const unversioned = validate(base);
+    assert.notEqual(unversioned.status, 0);
+    assert.match(
+      unversioned.stdout + unversioned.stderr,
+      /new package version/,
+    );
+    write(
+      'packages/valve/package.json',
+      JSON.stringify({
+        name: 'valvejs',
+        version: '0.4.0-beta.0',
+        publishConfig: { tag: 'beta' },
+      }),
+    );
+    commit();
+    const archived = validate(base);
+    assert.equal(archived.status, 0, archived.stdout + archived.stderr);
+    assert.match(archived.stdout, /Validated prepared beta release/);
   } finally {
     rmSync(cwd, { recursive: true, force: true });
   }

@@ -10,14 +10,15 @@ in-process and can share limits through Redis. The main differences:
   `minTime` and reservoirs.
 - valve reads **provider rate limit headers** and pauses every worker.
 - valve uses **your** Redis client, and each worker passes its own
-  configuration. There is no settings record stored in Redis.
+  configuration. Redis stores a compatibility fingerprint and rejects workers
+  with different policies; it does not distribute policy updates.
 - Crashed workers' **global concurrency slots** expire automatically through
   leases, without per-job `expiration`.
 - valve has no callback API, no `Group` class, and no runtime
   `updateSettings`.
 
-There is no compatibility layer. Migration is mechanical for most limiters and
-is described below.
+There is no compatibility layer. Translate pacing and quota policies explicitly;
+reservoir reset times and chained reservations can change behavior.
 
 ## Quick comparison
 
@@ -94,29 +95,31 @@ and move event listeners to the [valve events](#events).
 
 ### Roll out and remove Bottleneck
 
-The two libraries keep separate state. While both run, each enforces its own
-limit, so the provider can see up to twice the traffic. Lower both limits for
-the rollout, or switch all workers at once.
+The two libraries keep separate state. Stop producers, drain old workers, and
+wait for the provider quota to recover before admitting work through Valve.
+Running both against the same credential gives each an independent budget.
+An uninterrupted transition requires external coordination of that budget;
+simply starting Valve with a fresh ID does not transfer Bottleneck reservations.
 
 </Step>
 </Steps>
 
 ## Limiter options
 
-| Bottleneck                                                                                         | valve                                                          |
-| -------------------------------------------------------------------------------------------------- | -------------------------------------------------------------- |
-| `id`                                                                                               | `id` (required, no `{` or `}`)                                 |
-| `maxConcurrent` (local)                                                                            | `concurrency: n`                                               |
-| `maxConcurrent` (clustered)                                                                        | `concurrency: { limit: n, scope: 'global' }`                   |
-| `minTime: ms`                                                                                      | `rate: { limit: 1, interval: ms }`                             |
-| `reservoir` + `reservoirRefreshAmount` + `reservoirRefreshInterval`                                | `rate: { limit: amount, interval, algorithm: 'fixed-window' }` |
-| `reservoir` + `reservoirIncreaseAmount` + `reservoirIncreaseInterval` + `reservoirIncreaseMaximum` | `rate: { limit: amount, interval, burst: maximum }`            |
-| `highWater` with `strategy: OVERFLOW`                                                              | `maxQueue`                                                     |
-| `highWater` with `LEAK`, `OVERFLOW_PRIORITY`, or `BLOCK`                                           | No equivalent. `maxQueue` rejects the **new** job.             |
-| `datastore`, `clientOptions`, `clusterNodes`                                                       | `store: redisStore({ client })` with a client you create       |
-| `clearDatastore`                                                                                   | No equivalent. Use a new `prefix` or id to start fresh.        |
-| `timeout` (Redis key TTL)                                                                          | Not needed. Keys expire on their own.                          |
-| `Promise`                                                                                          | Not supported. valve uses native promises.                     |
+| Bottleneck                                                                                         | valve                                                                   |
+| -------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------- |
+| `id`                                                                                               | `id` (required, no `{` or `}`)                                          |
+| `maxConcurrent` (local)                                                                            | `concurrency: n`                                                        |
+| `maxConcurrent` (clustered)                                                                        | `concurrency: { limit: n, scope: 'global' }`                            |
+| `minTime: ms`                                                                                      | `rate: { limit: 1, interval: ms }`                                      |
+| `reservoir` + `reservoirRefreshAmount` + `reservoirRefreshInterval`                                | `rate: { limit: amount, interval, algorithm: 'fixed-window' }`          |
+| `reservoir` + `reservoirIncreaseAmount` + `reservoirIncreaseInterval` + `reservoirIncreaseMaximum` | `rate: { limit: amount, interval, burst: maximum }`                     |
+| `highWater` with `strategy: OVERFLOW`                                                              | `maxQueue`                                                              |
+| `highWater` with `LEAK`, `OVERFLOW_PRIORITY`, or `BLOCK`                                           | No equivalent. `maxQueue` rejects the **new** job.                      |
+| `datastore`, `clientOptions`, `clusterNodes`                                                       | `store: redisStore({ client })` with a client you create                |
+| `clearDatastore`                                                                                   | No direct equivalent. Follow the coordinated quota migration procedure. |
+| `timeout` (Redis key TTL)                                                                          | Not needed. Keys expire on their own.                                   |
+| `Promise`                                                                                          | Not supported. valve uses native promises.                              |
 
 ### minTime
 
@@ -176,15 +179,96 @@ rate: { limit: 2, interval: '1s', burst: 40 }
 | `counts()`, `queued()`, `running()`      | `stats()`                                                          |
 | `empty()`                                | `stats().queued === 0`                                             |
 | `on('idle')` or awaiting idle            | `idle()`, or `on('idle')`                                          |
-| `updateSettings(options)`                | No equivalent. Create a new valve and close the old one.           |
+| `updateSettings(options)`                | No runtime policy mutation. Coordinate a quota migration.          |
 | `incrementReservoir`, `currentReservoir` | No equivalent.                                                     |
-| `chain(limiter)`                         | Call through two valves: `a.run(() => b.run(fn))`.                 |
+| `chain(limiter)`                         | Use one atomic policy with scoped rules; see below.                |
 | `jobStatus(id)`, `jobs(status)`          | No equivalent.                                                     |
 
 <Callout type="warn" title="run passes a context, not your arguments">
   `run(fn)` calls `fn({ signal })`. Do not pass a function that expects its own
   arguments directly. Write `run(() => fn(a, b))`, not `run(fn)`.
 </Callout>
+
+## Chaining vs Atomic Rules
+
+Use scoped rules when one job must spend several budgets together. Bottleneck's
+`chain()` forwards work admitted by one limiter into another limiter's queue.
+Valve evaluates all configured budgets in one store operation, using the job's
+identities to select scoped counters.
+
+These examples express the same intended pacing policy: one business admission
+per 100 ms and one admission per recipient per six seconds. They use local
+stores to keep the comparison focused; the reservation guarantees differ.
+
+```ts title="Bottleneck: independent chained reservations"
+import Bottleneck from 'bottleneck';
+
+const business = new Bottleneck({ minTime: 100 });
+const recipients = new Bottleneck.Group({ minTime: 6000 });
+recipients.on('created', (limiter) => limiter.chain(business));
+
+const recipientId = 'contact-42';
+await recipients.key(recipientId).schedule(() =>
+  fetch('https://example.com/messages', {
+    method: 'POST',
+    body: JSON.stringify({ recipientId, text: 'Hello' }),
+  }),
+);
+```
+
+```ts title="Valve: one atomic admission"
+import { createValve } from 'valvejs';
+
+const messages = createValve({
+  id: 'business-42',
+  rate: [
+    { name: 'business', limit: 1, interval: '100ms' },
+    { name: 'recipient', scope: 'recipient', limit: 1, interval: '6s' },
+  ],
+});
+
+const recipientId = 'contact-42';
+await messages.run(
+  () =>
+    fetch('https://example.com/messages', {
+      method: 'POST',
+      body: JSON.stringify({ recipientId, text: 'Hello' }),
+    }),
+  { scopes: { recipient: recipientId } },
+);
+await messages.close();
+```
+
+Chaining is useful when independently managed limiters and queues are the
+composition you need. `Group` creates keyed instances, and each limiter can
+have its own settings and lifecycle. But an earlier stage can reserve capacity
+while a later stage waits. Reversing the chain changes which budget is reserved
+first; it cannot make both reservations atomic. An outer concurrency slot may
+also remain occupied while downstream work waits.
+
+Valve grants a job only when every applicable budget allows it, so a denied
+recipient spends no business quota. A1 can start, A2 can wait for recipient A,
+and eligible B1 can proceed. The caller manages one Valve and supplies opaque
+identities rather than managing a limiter graph. Priorities and cancellation
+belong to one local queue. Nesting `a.run(() => b.run(fn))` still creates
+independent reservations and does **not** provide this guarantee.
+
+The tradeoffs are explicit:
+
+- Every job must supply every configured identity. Rules are static; scoped
+  identities cannot select dynamically different limits or omit rules.
+- All keys in an atomic Redis operation must share a Cluster slot. A hot
+  business cannot spread its atomic budget over several shards.
+- Scope dimensions select rate counters, not independent concurrency limits
+  or feedback channels. Global leases and 429/`Retry-After` pauses apply to
+  the whole Valve ID.
+- Queues remain local and non-durable. There is no cross-worker scheduling
+  fairness. Atomic admission does not guarantee provider delivery, exact
+  arrival spacing, or exactly-once side effects.
+
+See [Scoped rate limits](/docs/guides/scoped-rate-limits/) for mixed algorithms
+and multiple dimensions, and [Changing a shared quota](/docs/guides/share-a-quota/#changing-a-shared-quota)
+for adding, renaming, or removing rules safely.
 
 ## Job options
 
@@ -264,8 +348,10 @@ const apiFetch = api.wrapFetch(fetch, { retries: 2 });
 
 ## Groups
 
-`Bottleneck.Group` creates one limiter per key. In valve, keep a `Map` of
-valves that share one store. See [Per-tenant budgets](/docs/examples/per-tenant-budgets/).
+`Bottleneck.Group` creates one limiter per key. For per-key rate budgets under
+one shared policy, prefer scoped rules as shown above; inactive Redis counters
+expire automatically. For independent per-key concurrency limits or feedback
+pauses, keep a `Map` of valves that share one store. See [Per-tenant budgets](/docs/examples/per-tenant-budgets/).
 
 ```ts
 // Bottleneck

@@ -1,0 +1,21 @@
+{
+  "node": "v26.8.1",
+  "cpu": "12th Gen Intel(R) Core(TM) i5-12450H",
+  "entries": [
+    {
+      "entry": "index",
+      "baseline": 8928,
+      "current": 11796
+    },
+    {
+      "entry": "redis/index",
+      "baseline": 3494,
+      "current": 6043
+    },
+    {
+      "entry": "headers/index",
+      "baseline": 1184,
+      "current": 1184
+    }
+  ]
+}

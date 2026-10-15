@@ -14,8 +14,15 @@ const features = [
     description:
       'GCRA spaces starts; fixed windows cap aligned intervals. Several rules are checked atomically.',
     snippet:
-      "rate: [{ limit: 10, interval: '1s' }, { limit: 5000, interval: '1h' }]",
+      "rate: [{ limit: 10, interval: '1s' }, { limit: 5000, interval: '1h', algorithm: 'fixed-window' }]",
     href: '/docs/choosing-an-algorithm',
+  },
+  {
+    title: 'Shared and scoped budgets.',
+    description:
+      'Spend business and per-recipient or per-tenant budgets atomically. Eligible identities proceed while others wait.',
+    snippet: "api.run(send, { scopes: { recipient: 'contact-42' } })",
+    href: '/docs/guides/scoped-rate-limits',
   },
   {
     title: 'One budget, many workers.',

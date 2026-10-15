@@ -136,8 +136,9 @@ running requests. See [Respect provider feedback](/docs/guides/respect-retry-aft
   applies every rule to every job in that valve; it does not select rules by
   endpoint or model. See [Layered quotas](/docs/examples/layered-quotas/).
 
-If a request consumes both an account-wide quota and an independent model
-quota, separate IDs alone do not enforce both. Coordinate admission through
-the relevant valves in your application and send feedback to the scope it
-describes. Admissions across different IDs are not atomic. Valve does not
-automatically route responses to multiple scopes.
+If a request consumes both an account-wide quota and an independent model or
+recipient quota, use [scoped rate limits](/docs/guides/scoped-rate-limits/) under
+one Valve ID. Supply identities on each job to spend all applicable budgets
+atomically. Chaining separate valves reserves their budgets independently and
+can leave one reservation waiting on another. Feedback still applies to the
+whole Valve ID; Valve does not automatically identify a response's quota scope.

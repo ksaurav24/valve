@@ -3,6 +3,11 @@ import { duration, integer } from './duration.js';
 import { failure, invalid } from './errors.js';
 import type { NormalizedRule } from './store.js';
 import type { ValveOptions } from './types.js';
+/**
+ * Validate options before creating a queue and resolve defaults, durations and rule keys.
+ * Scoped policies also require bounded batches and a store with scoped admission support.
+ * @throws {ValveError} INVALID_OPTIONS when the policy cannot be enforced as configured.
+ */
 export function normalize(options: ValveOptions) {
   const id = options?.id;
   if (
@@ -96,6 +101,7 @@ export function normalize(options: ValveOptions) {
       'Provide a rate rule',
     );
   const seen = new Set<string>();
+  const names = new Set<string>();
   const rules: NormalizedRule[] = raw.map((rule, i) => {
     if (!rule || typeof rule !== 'object')
       invalid(
@@ -128,7 +134,31 @@ export function normalize(options: ValveOptions) {
         'Use gcra or fixed-window',
       );
     const burst = integer(rule.burst ?? 1, id, `rate[${i}].burst`);
-    const key = `${algorithm}:${intervalMs}`;
+    for (const field of ['name', 'scope'] as const) {
+      if (
+        rule[field] !== undefined &&
+        (typeof rule[field] !== 'string' ||
+          !/^[A-Za-z][A-Za-z0-9_-]{0,63}$/.test(rule[field]))
+      )
+        throw failure(
+          id,
+          'INVALID_OPTIONS',
+          `rate[${i}].${field} must be a 1-64 character identifier beginning with a letter.`,
+        );
+    }
+    if (rule.scope !== undefined && rule.name === undefined)
+      throw failure(
+        id,
+        'INVALID_OPTIONS',
+        'Scoped rules require a unique name.',
+      );
+    if (rule.name !== undefined && names.has(rule.name))
+      throw failure(id, 'INVALID_OPTIONS', `Duplicate rule name ${rule.name}.`);
+    if (rule.name !== undefined) names.add(rule.name);
+    const key =
+      rule.name === undefined
+        ? `${algorithm}:${intervalMs}`
+        : `named:${rule.name}`;
     if (seen.has(key))
       throw failure(
         id,
@@ -142,8 +172,46 @@ export function normalize(options: ValveOptions) {
       intervalMs,
       burst: algorithm === 'gcra' ? burst : 1,
       key,
+      ...(rule.name === undefined ? {} : { name: rule.name }),
+      ...(rule.scope === undefined ? {} : { scope: rule.scope }),
     };
   });
+  const scopes = [
+    ...new Set(
+      rules.flatMap((rule) => (rule.scope === undefined ? [] : [rule.scope])),
+    ),
+  ];
+  const scoped = scopes.length > 0;
+  if (scoped && (rules.length > 16 || (options.batch ?? 32) > 128))
+    throw failure(
+      id,
+      'INVALID_OPTIONS',
+      'Scoped admission supports at most 16 rules and batch 128.',
+    );
+  if (
+    scoped &&
+    rules.some(
+      (rule) =>
+        rule.intervalMs > Number.MAX_SAFE_INTEGER / 4 ||
+        (rule.intervalMs / rule.limit) * rule.burst >
+          Number.MAX_SAFE_INTEGER / 4,
+    )
+  )
+    throw failure(
+      id,
+      'INVALID_OPTIONS',
+      'Scoped rate durations exceed the safe numeric range.',
+    );
+  if (
+    scoped &&
+    options.store &&
+    typeof options.store.acquireScoped !== 'function'
+  )
+    throw failure(
+      id,
+      'INVALID_OPTIONS',
+      'Scoped rules require a store with acquireScoped.',
+    );
   const maxWait =
     options.maxWait === undefined
       ? Infinity
@@ -193,7 +261,11 @@ export function normalize(options: ValveOptions) {
     );
   return {
     id,
-    rules,
+    rules: scoped
+      ? Object.freeze(rules.map((rule) => Object.freeze(rule)))
+      : rules,
+    scopes,
+    scoped,
     concurrency,
     global: scope === 'global',
     leaseTtl,

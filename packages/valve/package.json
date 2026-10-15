@@ -1,6 +1,6 @@
 {
   "name": "valvejs",
-  "version": "0.3.0-beta.1",
+  "version": "0.4.0-beta.0",
   "description": "One rate limit for every worker that calls an API.",
   "homepage": "https://valvejs.vercel.app/",
   "bugs": {
@@ -77,7 +77,7 @@
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
     "test:coverage": "vitest run --coverage",
-    "test:integration": "vitest run --config vitest.integration.config.ts",
+    "test:integration": "pnpm build && vitest run --config vitest.integration.config.ts",
     "test:types": "vitest run --typecheck.only",
     "check:package": "publint && node ../../scripts/check-package.mjs",
     "check:size": "node ../../scripts/check-size.mjs",

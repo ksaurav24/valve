@@ -16,7 +16,7 @@ import { changelogEntries, current, versionState } from '@/lib/releases';
 export const metadata: Metadata = {
   title: { absolute: 'valve: Shared rate limits for outbound API calls' },
   description:
-    'A TypeScript library for outbound API rate limits, shared budgets, and provider backoff. Memory, Redis, and Valkey stores with zero runtime dependencies.',
+    'A TypeScript library for outbound API rate limits, atomic shared and scoped budgets, and provider backoff. Memory, Redis, and Valkey stores with zero runtime dependencies.',
 };
 
 const samples = [
@@ -48,6 +48,24 @@ const api = createValve({
 
 const limitedFetch = api.wrapFetch();
 await limitedFetch('https://api.example.com/contacts');`,
+  },
+  {
+    file: 'scoped.ts',
+    code: `import { createValve } from 'valvejs';
+
+const messages = createValve({
+  id: 'business-42',
+  rate: [
+    { name: 'shared', limit: 80, interval: '1s', burst: 8 },
+    { name: 'spacing', scope: 'recipient', limit: 1, interval: '6s' },
+  ],
+});
+
+// Spend both budgets, or neither. Other recipients can proceed while A waits.
+await messages.run(() => sendMessage(), {
+  scopes: { recipient: 'contact-A' },
+});
+await messages.close();`,
   },
   {
     file: 'queue.ts',

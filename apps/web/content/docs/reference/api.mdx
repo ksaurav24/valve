@@ -35,12 +35,19 @@ is invalid. At least one of `rate` or a finite `concurrency` is required.
 
 | Field       | Type                       | Default  | Description                                                     |
 | ----------- | -------------------------- | -------- | --------------------------------------------------------------- |
+| `name`      | `string`                   | None     | Stable rule identity; required for scoped rules.                |
+| `scope`     | `string`                   | None     | Job identity dimension; absent means Valve-wide.                |
 | `limit`     | `number`                   | Required | Cost units allowed per `interval`. Positive integer.            |
 | `interval`  | `Duration`                 | Required | Window length. At least 1ms.                                    |
 | `burst`     | `number`                   | `1`      | Units that may start back to back. GCRA only. Positive integer. |
 | `algorithm` | `'gcra' \| 'fixed-window'` | `'gcra'` | See [Choose an algorithm](/docs/choosing-an-algorithm/).        |
 
-Two rules in one valve cannot share the same `algorithm` and `interval`.
+Unnamed rules cannot share the same `algorithm` and `interval`. Set a unique
+`name` to distinguish rules with matching algorithms and intervals. Scoped rules
+require names and select a job identity through `scope`. Both fields accept
+1-64 ASCII letters, digits, underscores or hyphens, beginning with a letter.
+See [Scoped rate limits](/docs/guides/scoped-rate-limits/). Scoped configurations
+support at most 16 rules and batch 128 (default 32).
 
 ### ConcurrencyOptions
 
@@ -83,13 +90,14 @@ synchronously.
 
 #### RunOptions
 
-| Option     | Type                                    | Default         | Description                                                |
-| ---------- | --------------------------------------- | --------------- | ---------------------------------------------------------- |
-| `cost`     | `number`                                | `1`             | Units spent from every rule.                               |
-| `priority` | `number`                                | `0`             | Higher starts first. Integer.                              |
-| `maxWait`  | `Duration`                              | Valve `maxWait` | Queue deadline for this job.                               |
-| `signal`   | `AbortSignal`                           | None            | Cancels the job while queued. Passed to `fn` once running. |
-| `observe`  | `(result) => ResponseLike \| undefined` | None            | Maps a resolved result to a response for feedback.         |
+| Option     | Type                                    | Default         | Description                                                     |
+| ---------- | --------------------------------------- | --------------- | --------------------------------------------------------------- |
+| `scopes`   | `Readonly<Record<string, string>>`      | None            | Required identities for scoped rules; copied before enqueueing. |
+| `cost`     | `number`                                | `1`             | Units spent from every rule.                                    |
+| `priority` | `number`                                | `0`             | Higher starts first. Integer.                                   |
+| `maxWait`  | `Duration`                              | Valve `maxWait` | Queue deadline for this job.                                    |
+| `signal`   | `AbortSignal`                           | None            | Cancels the job while queued. Passed to `fn` once running.      |
+| `observe`  | `(result) => ResponseLike \| undefined` | None            | Maps a resolved result to a response for feedback.              |
 
 ### wrap
 
@@ -113,14 +121,15 @@ by default. See [Respect provider feedback](/docs/guides/respect-retry-after/#wi
 
 #### WrapFetchOptions
 
-| Option               | Type                            | Default         | Description                                                                             |
-| -------------------- | ------------------------------- | --------------- | --------------------------------------------------------------------------------------- |
-| `retries`            | `number`                        | `2`             | Retries after a 429, or a 503 with a valid `Retry-After`. `0` disables.                 |
-| `retryUnsafeMethods` | `boolean`                       | `false`         | Opt in to retries for other methods after verifying provider-specific idempotency.      |
-| `maxReplayBodySize`  | `number`                        | `65536`         | Finite integer byte limit for inherited Request replay. `0` sends once without probing. |
-| `cost`               | `number \| (...args) => number` | `1`             | Cost per request, or a function of the fetch arguments.                                 |
-| `priority`           | `number \| (...args) => number` | `0`             | Priority per request, or a function of the fetch arguments.                             |
-| `maxWait`            | `Duration`                      | Valve `maxWait` | Queue deadline for each attempt.                                                        |
+| Option               | Type                                                                                | Default         | Description                                                                             |
+| -------------------- | ----------------------------------------------------------------------------------- | --------------- | --------------------------------------------------------------------------------------- |
+| `scopes`             | `Readonly<Record<string, string>> \| (...args) => Readonly<Record<string, string>>` | None            | Fixed identities or a synchronous resolver, snapshotted once across retries.            |
+| `retries`            | `number`                                                                            | `2`             | Retries after a 429, or a 503 with a valid `Retry-After`. `0` disables.                 |
+| `retryUnsafeMethods` | `boolean`                                                                           | `false`         | Opt in to retries for other methods after verifying provider-specific idempotency.      |
+| `maxReplayBodySize`  | `number`                                                                            | `65536`         | Finite integer byte limit for inherited Request replay. `0` sends once without probing. |
+| `cost`               | `number \| (...args) => number`                                                     | `1`             | Cost per request, or a function of the fetch arguments.                                 |
+| `priority`           | `number \| (...args) => number`                                                     | `0`             | Priority per request, or a function of the fetch arguments.                             |
+| `maxWait`            | `Duration`                                                                          | Valve `maxWait` | Queue deadline for each attempt.                                                        |
 
 The request's abort signal, from `init.signal` or the `Request`, cancels queued
 attempts and is passed to `fetchImpl` for running ones.

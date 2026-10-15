@@ -1,0 +1,58 @@
+{
+  "node": "v26.8.1",
+  "protocol": "Three alternating cold-run pairs; no samples discarded; original 15% gate unchanged.",
+  "jobs": 100000,
+  "accuracyJobs": 300,
+  "results": {
+    "accumulatedDelayMs": 66.55594800000017,
+    "p-limit": 112.66900799999999,
+    "p-queue": 119.64174400000002,
+    "p99DelayMs": 0.4760199999999486,
+    "p99IdealDelayMs": 66.05999800000018,
+    "valve": 106.20498400000001
+  },
+  "samples": [
+    {
+      "pair": 0,
+      "library": "/home/xlr8/code/valve/packages/valve/src/index.ts",
+      "jobs": 100000,
+      "accuracyJobs": 300,
+      "results": {
+        "valve": 101.162555,
+        "p-limit": 111.29526900000002,
+        "p-queue": 119.64174400000002,
+        "p99DelayMs": 0.45223799999985204,
+        "p99IdealDelayMs": 66.05999800000018,
+        "accumulatedDelayMs": 66.55594800000017
+      }
+    },
+    {
+      "pair": 1,
+      "library": "/home/xlr8/code/valve/packages/valve/src/index.ts",
+      "jobs": 100000,
+      "accuracyJobs": 300,
+      "results": {
+        "valve": 109.06300399999999,
+        "p-limit": 112.66900799999999,
+        "p-queue": 126.70977000000005,
+        "p99DelayMs": 0.4760199999999486,
+        "p99IdealDelayMs": 65.49594399999978,
+        "accumulatedDelayMs": 65.74561799999992
+      }
+    },
+    {
+      "pair": 2,
+      "library": "/home/xlr8/code/valve/packages/valve/src/index.ts",
+      "jobs": 100000,
+      "accuracyJobs": 300,
+      "results": {
+        "valve": 106.20498400000001,
+        "p-limit": 115.515038,
+        "p-queue": 116.53990900000002,
+        "p99DelayMs": 1.5186809999997877,
+        "p99IdealDelayMs": 125.21221000000014,
+        "accumulatedDelayMs": 125.5722209999999
+      }
+    }
+  ]
+}

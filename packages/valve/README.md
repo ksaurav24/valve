@@ -13,15 +13,17 @@ worker sharing that budget pauses. A memory store supports single-process use.
 
 ## Quickstart
 
-The `valvejs` v0.3.0 beta series starts at `0.3.0-beta.0` and uses the npm
-`beta` tag. Install the beta with:
+The next release is `0.4.0-beta.0`, the first beta with atomic scoped rate
+limits. Beta APIs may change before a stable release. Once published, install
+it from the npm `beta` channel:
 
 ```sh
 npm install valvejs@beta
 ```
 
-To pin the first beta, use `npm install valvejs@0.3.0-beta.0`. Beta APIs may
-change before a stable release.
+To pin this release after publication, use `npm install valvejs@0.4.0-beta.0`.
+Until then, `valvejs@beta` selects the previous published beta. Build this
+branch from source to try scoped limits before publication.
 
 ```ts
 import { createValve } from 'valvejs';
@@ -56,7 +58,9 @@ shared cooldowns; `retries: 0` disables automatic retries.
   and abort signals.
 - Reads `Retry-After`, IETF `RateLimit`, and common `x-ratelimit-*` headers.
 - Retries fetch rate limit responses after a shared pause.
-- Supports GCRA, fixed windows, and several rules checked together.
+- Supports GCRA pacing, explicit fixed windows, and several rules checked together.
+- Spends shared and per-recipient or per-tenant budgets atomically; eligible
+  identities proceed while others wait.
 - Provides ESM and CommonJS entry points with TypeScript declarations.
 
 ## Choose the right tool
@@ -87,6 +91,29 @@ failure, and `onStoreError: 'open'` gives up shared rate guarantees while the
 store is unavailable. Rate bounds do not survive
 [loss of Redis state](https://valvejs.vercel.app/docs/guarantees/#store-state-loss) from a flush, eviction, or
 failover. Read the [full guarantees](https://valvejs.vercel.app/docs/guarantees/).
+
+## Scoped budgets (0.4.0 beta)
+
+A job can spend shared and per-recipient budgets atomically:
+
+```ts
+const messages = createValve({
+  id: 'business-42',
+  rate: [
+    { name: 'shared', limit: 80, interval: '1s', burst: 8 },
+    { name: 'spacing', scope: 'recipient', limit: 1, interval: '6s' },
+  ],
+});
+await messages.run(() => sendMessage(), {
+  scopes: { recipient: 'contact-42' },
+});
+await messages.close();
+```
+
+Blocked recipients let other eligible jobs proceed. Supply opaque application
+IDs, not phone numbers or secrets. Feedback and pauses remain Valve-wide.
+See [Scoped rate limits](https://valvejs.vercel.app/docs/guides/scoped-rate-limits/)
+for wrappers, store requirements, deployment safety, and limits.
 
 ## Documentation and development
 

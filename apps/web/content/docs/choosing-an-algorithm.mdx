@@ -4,8 +4,10 @@ description: Match a GCRA or fixed-window rule to the quota your provider docume
 ---
 
 Read your provider's rate limit documentation first, then pick the rule that
-describes it. When in doubt, use the default GCRA rule with `burst: 1`. It
-never exceeds `limit` per interval, in any window.
+describes it. Keep the default GCRA rule with `burst: 1` for pacing. Choose
+fixed-window explicitly when the provider counts matching calendar windows.
+**Exact rolling-window quotas are unsupported.** GCRA spaces admissions; it
+does not keep an exact history of requests in a moving time window.
 
 | Provider says                                   | Rule                                                           |
 | ----------------------------------------------- | -------------------------------------------------------------- |
@@ -53,14 +55,46 @@ A fixed-window rule allows `limit` units in each aligned window
 rate: { limit: 100, interval: '1m', algorithm: 'fixed-window' }
 ```
 
-Windows are aligned to the epoch, not to when your process started. A 24-hour
-window resets at midnight UTC.
+Valve computes the window index as `Math.floor(storeTimeMs / intervalMs)`.
+The epoch is 1970-01-01 00:00:00 UTC, so a `24h` interval ends at UTC midnight
+and a `1m` interval ends at a UTC minute boundary. This deterministic alignment
+lets every worker agree on a reset using the store clock, regardless of process
+startup time or the worker's timezone. It does not use the host's local midnight.
+
+Arbitrary intervals are epoch-aligned, not necessarily calendar-aligned: `7h`
+is a sequence of seven-hour blocks from the epoch. Local-time calendar resets,
+custom reset offsets, months, and daylight-saving adjustments are unsupported.
+
+For a daily limit of 100, 100 admissions at 23:59:59.999 UTC and another 100 at
+00:00:00.000 UTC are permitted. A request at the boundary belongs to the new
+window. Setting `burst` does not change fixed-window behavior; it is a GCRA
+option.
 
 <Callout type="warn">
   Near a boundary, the end of one window and the start of the next can admit up
   to `2 × limit` units close together. Use fixed windows only when the provider
   counts the same way.
 </Callout>
+
+## Exact rolling windows are unsupported
+
+An exact rolling limit of 100 requests per 24 hours counts admissions in the
+preceding 24 hours at each decision. An admission stops counting exactly
+24 hours later; there is no shared midnight reset. This needs timestamp history
+or an equivalent exact representation that Valve does not implement.
+
+Fixed-window resets an entire counter at each aligned boundary. GCRA maintains
+a theoretical arrival time, drains accumulated pacing debt continuously, and
+allows an explicit burst. Neither implements an exact rolling-window counter.
+For example, a GCRA rule with `limit: 100`, `interval: '24h'`, `burst: 1` spaces
+unit-cost admissions 14.4 minutes apart. An exact rolling counter could instead
+allow all 100 immediately when empty, then block further admissions until old
+ones leave the window. Raising GCRA's burst changes its bound; it does not turn
+it into that rolling counter.
+
+Use GCRA to pace work, fixed-window for a provider's matching calendar quota,
+and a different limiter if exact rolling-window semantics are required. These
+are admission guarantees, not measurements of provider arrival times.
 
 ## Combine rules
 
@@ -77,12 +111,25 @@ rate: [
 The store checks all rules in one atomic step. If any rule rejects a job,
 none of its cost is spent.
 
-Two rules in one valve cannot share the same algorithm and interval.
+Unnamed rules cannot share the same algorithm and interval. Give each rule a
+unique `name` to distinguish otherwise matching rules.
+[Scoped rules](/docs/guides/scoped-rate-limits/) require names.
 
 ## Changing rules
 
-Rule state is keyed by algorithm and interval. Changing a `limit` keeps the
-existing state, so you can raise or lower it with a rolling deploy. During the
-rollout, workers with different limits enforce different bounds on the same
-state. Keep the configuration identical across workers once the deploy
-finishes.
+Unnamed rule state is keyed by algorithm and interval; named rules use their
+names, and scoped rules also include the job identity. State keys alone do not
+make a policy change compatible: Redis checks a persistent fingerprint of the
+complete policy before every admission.
+
+Changing a name, scope dimension, algorithm, interval, limit, burst, or global
+lease setting rejects incompatible workers with `INVALID_OPTIONS`. Adding or
+removing a rule also changes the fingerprint. Reordering identical rules or
+using equivalent duration syntax is safe during a rolling deployment.
+
+For policy changes, stop and drain old workers, allow existing budgets and the
+provider quota to recover, then reset only the fingerprint and deploy one
+consistent policy. Follow the practical
+[quota migration procedure](/docs/guides/share-a-quota/#changing-a-shared-quota).
+Do not delete active rate keys or introduce a fresh namespace to bypass spent
+quota.
