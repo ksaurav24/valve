@@ -83,13 +83,17 @@ Concurrency counts jobs, not cost.
 
 Leases renew every `leaseTtl / 3` while a job runs and release when it
 settles. A crashed worker's leases expire after the TTL. If renewal fails or a
-lease expires, the job's signal aborts and its promise rejects with
-`LEASE_LOST`.
+lease expires, the job's signal aborts when the event loop can process the
+loss. Its promise rejects with `LEASE_LOST` when the callback settles. Once
+lease loss is detected, a late renewal response does not restore the job's
+ownership, even if Redis applied the renewal.
 
 Leases bound ownership, not external side effects. A process paused for longer
-than its TTL can resume after its slot was reassigned. Jobs must honor the
-abort signal. If you need a strict bound during process stalls or network
-partitions, use fencing tokens in the external system.
+than its TTL can resume after its slot was reassigned and perform synchronous
+effects before abort handling runs. Jobs must honor the abort signal, but a
+rejection cannot undo an effect. If you need a strict bound during process
+stalls or network partitions, validate fencing tokens in the external system.
+Valve does not guarantee exactly-once side effects.
 
 Without a subscriber, global-slot waiters poll at most every 50ms plus jitter.
 

@@ -98,6 +98,24 @@ process.on('SIGTERM', async () => {
 `close` never closes a store client you supplied. Close your clients after the
 valves.
 
+### Drain during a store outage
+
+With `onStoreError: 'wait'`, draining keeps retrying queued jobs while Redis is
+offline. The default `maxWait` is infinite, so `close({ drain: true })` can
+remain pending indefinitely. Set a finite `maxWait` on the valve or each job
+to reject queued work with `MAX_WAIT_EXCEEDED`, or abort queued jobs with a
+caller-owned signal when your shutdown deadline arrives.
+
+Choose `close()` if queued work should be rejected immediately on shutdown.
+The first `close` call fixes the policy; calling `close()` after starting a
+drain returns the same promise and does not cancel the queue.
+
+Every close policy still waits for running callbacks to settle. A queue wait
+deadline does not limit running work, and lease loss only signals cancellation.
+Pass the job's signal to operations that support it and give running work its
+own timeout. Keep the process supervisor's termination deadline as a final
+bound for callbacks that never settle.
+
 ### Wait without closing
 
 `idle()` resolves when nothing is queued or running in this process. Use it to
