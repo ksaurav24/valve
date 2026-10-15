@@ -100,6 +100,9 @@ test('home page leads with install, usage, and documentation', async ({
   await expect(
     page.getByRole('link', { name: /^v\d+\.\d+\.\d+/ }).first(),
   ).toContainText(release.version);
+  await expect(
+    page.locator('#changelog > ol > li > div > span:first-child'),
+  ).toHaveText(changelog.slice(0, 3).map((entry) => `v${entry.version}`));
   const published = Object.hasOwn(metadata.npm.versions, release.version);
   await expect(
     page.getByRole('tab', { name: published ? 'pnpm' : 'source', exact: true }),

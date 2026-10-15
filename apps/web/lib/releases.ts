@@ -27,7 +27,7 @@ const npm = metadata.npm as {
   beta?: string | null;
   versions: Record<string, string | null>;
 };
-const entries = changelog as ChangelogEntry[];
+export const changelogEntries = changelog as ChangelogEntry[];
 
 function isPublished(version: string) {
   return Object.hasOwn(npm.versions, version);
@@ -39,7 +39,7 @@ function githubUrl(version: string) {
 }
 
 /** Only versions npm lists are releases; everything else is development. */
-export const releases: Release[] = entries
+export const releases: Release[] = changelogEntries
   .filter((entry) => isPublished(entry.version))
   .map((entry) => ({
     ...entry,
@@ -47,10 +47,6 @@ export const releases: Release[] = entries
     npmUrl: `${site.npm}/v/${entry.version}`,
     githubUrl: githubUrl(entry.version),
   }));
-
-export const unreleased: ChangelogEntry[] = entries.filter(
-  (entry) => !isPublished(entry.version),
-);
 
 export const latestPublished =
   npm.latest && !npm.latest.includes('-')
