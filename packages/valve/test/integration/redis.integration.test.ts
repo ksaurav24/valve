@@ -185,7 +185,14 @@ suite('real Redis/Valkey', () => {
       (await store.acquire({ id, rules, costs: [1], lease })).granted,
     ).toBe(0);
     const keys = await io.keys(`${prefix}:{${id}}:*`);
-    expect(keys).toHaveLength(4);
+    expect(keys.sort()).toEqual(
+      [
+        `${prefix}:{${id}}:pause`,
+        ...rules.map((rule) => `${prefix}:{${id}}:r:${rule.key}`),
+        `${prefix}:{${id}}:leases`,
+        `${prefix}:{${id}}:config`,
+      ].sort(),
+    );
     await io.del(...keys);
     const other = { ...lease, owner: 'state-loss-other' };
     expect(
