@@ -56,6 +56,14 @@ export function redisStore(options: RedisStoreOptions): Store {
     AcquireRequest['rules'],
     { args: string[]; fingerprint: string }
   >();
+  /** Execute a Redis script with NOSCRIPT recovery and the configured timeout.
+   * A timeout rejects the caller without cancelling an already-issued command.
+   * @param script Lua source used when the server has not cached sha.
+   * @param sha Script digest for the initial EVALSHA attempt.
+   * @param keys Redis keys passed to the script.
+   * @param args Serialized script arguments.
+   * @returns The unvalidated Redis reply.
+   */
   async function execute(
     script: string,
     sha: string,
@@ -87,6 +95,11 @@ export function redisStore(options: RedisStoreOptions): Store {
   }
   return {
     kind: 'redis',
+    /** Check shared configuration and acquire rate budget and leases atomically.
+     * @param request Normalized quota rules, job costs, and optional lease settings.
+     * @returns Granted job count, retry timing, and any acquired lease tokens.
+     * @throws {ValveError} INVALID_OPTIONS when Redis reports a configuration mismatch.
+     */
     acquire: async (request) => {
       let rules = prepared.get(request.rules);
       if (!rules) {
@@ -186,6 +199,10 @@ export function redisStore(options: RedisStoreOptions): Store {
   };
 }
 
+/** Serialize normalized rules for Lua and a fingerprint that ignores rule order.
+ * @param rules Normalized rules in admission script order.
+ * @returns Lua arguments in request order and a canonical versioned fingerprint.
+ */
 function prepareRules(rules: AcquireRequest['rules']) {
   return {
     args: rules.flatMap((rule) => [
@@ -194,7 +211,6 @@ function prepareRules(rules: AcquireRequest['rules']) {
       String(rule.limit),
       String(rule.burst),
     ]),
-    // Canonical, collision-free encoding; rule order does not affect admission.
     fingerprint: `v1:[${rules
       .map((rule) =>
         JSON.stringify([
