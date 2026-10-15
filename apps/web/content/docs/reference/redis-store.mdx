@@ -109,6 +109,39 @@ original connection before reapplying the desired pause or resume through a
 healthy connection. Otherwise an older queued command can overwrite that
 correction later. The error alone does not establish which state Redis holds. See [Guarantees](/docs/guarantees/).
 
+## Durability
+
+Rate history, shared pauses, and global leases live in Redis. If those keys
+disappear, the next acquire sees a fresh budget and returns no error. Processes
+that have not already seen a pause stop honoring it. Jobs holding lost leases
+reject with `LEASE_LOST` at their next renewal, and new jobs can take those
+slots before then. Keys can disappear after:
+
+- `FLUSHDB` or `FLUSHALL`.
+- A restart with persistence disabled, or a crash inside the persistence loss
+  window.
+- Eviction under memory pressure. Every valve key has a TTL, so `volatile-*`
+  policies can evict it as well as `allkeys-*` policies.
+- Failover. Replication is asynchronous, so a promoted replica can miss
+  admissions the old primary acknowledged.
+
+To reduce exposure:
+
+- Set `maxmemory-policy noeviction` on the instance holding valve's keys. When
+  memory runs out, writes then fail with `OOM`, and valve treats the failure
+  as a store error handled by [`onStoreError`](/docs/guarantees/#store-failures).
+- Keep memory headroom, and alert on `used_memory`, `evicted_keys`, and OOM
+  errors.
+- Enable [persistence](https://redis.io/docs/latest/operate/oss_and_stack/management/persistence/)
+  (AOF with `appendfsync everysec` loses at most about one second of writes).
+- Monitor failovers and [replication](https://redis.io/docs/latest/operate/oss_and_stack/management/replication/)
+  lag. `WAIT` does not make failover lossless.
+
+These measures make loss less likely. They cannot restore lost history. If
+exceeding an external quota is costly, treat the provider's own enforcement as
+the hard limit. See [Store state loss](/docs/guarantees/#store-state-loss) and
+[Redis eviction](https://redis.io/docs/latest/develop/reference/eviction/).
+
 ## Bring your own client
 
 Implement two methods. Errors whose message contains `NOSCRIPT` must be

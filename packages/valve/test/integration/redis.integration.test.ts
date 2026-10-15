@@ -165,6 +165,43 @@ suite('real Redis/Valkey', () => {
     }
     await store.close();
   });
+  it('starts a fresh budget when Redis loses valve keys', async () => {
+    // Documented limit: a flush, eviction, or stale failover erases admission
+    // history, and Redis answers normally afterwards.
+    const store = redisStore({ client: io, prefix });
+    const id = `state-loss-${crypto.randomUUID()}`;
+    const rules = normalize({
+      id,
+      rate: [
+        { limit: 1, interval: 60000, burst: 1 },
+        { limit: 1, interval: 60000, algorithm: 'fixed-window' },
+      ],
+    }).rules;
+    const lease = { limit: 1, ttlMs: 60000, owner: 'state-loss' };
+    const first = await store.acquire({ id, rules, costs: [1], lease });
+    expect(first.granted).toBe(1);
+    await store.pause(id, 60000);
+    expect(
+      (await store.acquire({ id, rules, costs: [1], lease })).granted,
+    ).toBe(0);
+    const keys = await io.keys(`${prefix}:{${id}}:*`);
+    expect(keys.sort()).toEqual(
+      [
+        `${prefix}:{${id}}:pause`,
+        ...rules.map((rule) => `${prefix}:{${id}}:r:${rule.key}`),
+        `${prefix}:{${id}}:leases`,
+        `${prefix}:{${id}}:config`,
+      ].sort(),
+    );
+    await io.del(...keys);
+    const other = { ...lease, owner: 'state-loss-other' };
+    expect(
+      (await store.acquire({ id, rules, costs: [1], lease: other })).granted,
+    ).toBe(1);
+    expect(await store.renew!(id, first.leases!, 60000)).toBe(false);
+    await io.del(...(await io.keys(`${prefix}:{${id}}:*`)));
+    await store.close();
+  });
   it('keeps 5000 atomic admissions across eight child processes inside the global rolling bound', async () => {
     const id = `multiprocess-${process.pid}`;
     const script = fileURLToPath(new URL('./worker.mjs', import.meta.url));

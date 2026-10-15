@@ -79,7 +79,9 @@ Concurrency and queue order are local to a valve instance. A pause blocks
 subsequent grants; already-issued grants can still start. A cancelled job or
 timed-out store call can waste its grant. Queued work does not survive process
 failure, and `onStoreError: 'open'` gives up shared rate guarantees while the
-store is unavailable. Read the [full guarantees](apps/web/content/docs/guarantees.mdx).
+store is unavailable. Rate bounds do not survive
+[loss of Redis state](apps/web/content/docs/guarantees.mdx#store-state-loss) from a flush, eviction, or
+failover. Read the [full guarantees](apps/web/content/docs/guarantees.mdx).
 
 ## Documentation and development
 
