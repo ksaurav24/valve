@@ -1,6 +1,6 @@
 // Shared Redis and Valkey budgets with script-cache recovery and timeouts.
 import { duration } from '../duration.js';
-import { invalid } from '../errors.js';
+import { failure, invalid } from '../errors.js';
 import type { AcquireRequest, Store } from '../store.js';
 import { subscriptions } from './subscriptions.js';
 import { adapterFor } from './clients.js';
@@ -52,7 +52,18 @@ export function redisStore(options: RedisStoreOptions): Store {
     ? subscriptions(options.subscriber, prefix)
     : undefined;
   const timeout = duration(options.timeout ?? '2s', undefined, 'redis timeout');
-  const prepared = new WeakMap<AcquireRequest['rules'], string[]>();
+  const prepared = new WeakMap<
+    AcquireRequest['rules'],
+    { args: string[]; fingerprint: string }
+  >();
+  /** Execute a Redis script with NOSCRIPT recovery and the configured timeout.
+   * A timeout rejects the caller without cancelling an already-issued command.
+   * @param script Lua source used when the server has not cached sha.
+   * @param sha Script digest for the initial EVALSHA attempt.
+   * @param keys Redis keys passed to the script.
+   * @param args Serialized script arguments.
+   * @returns The unvalidated Redis reply.
+   */
   async function execute(
     script: string,
     sha: string,
@@ -84,24 +95,26 @@ export function redisStore(options: RedisStoreOptions): Store {
   }
   return {
     kind: 'redis',
+    /** Check shared configuration and acquire rate budget and leases atomically.
+     * @param request Normalized quota rules, job costs, and optional lease settings.
+     * @returns Granted job count, retry timing, and any acquired lease tokens.
+     * @throws {ValveError} INVALID_OPTIONS when Redis reports a configuration mismatch.
+     */
     acquire: async (request) => {
-      let ruleArgs = prepared.get(request.rules);
-      if (!ruleArgs) {
-        ruleArgs = request.rules.flatMap((rule) => [
-          rule.algorithm === 'gcra' ? '0' : '1',
-          String(rule.intervalMs),
-          String(rule.limit),
-          String(rule.burst),
-        ]);
-        prepared.set(request.rules, ruleArgs);
+      let rules = prepared.get(request.rules);
+      if (!rules) {
+        rules = prepareRules(request.rules);
+        prepared.set(request.rules, rules);
       }
       const base = `${prefix}:{${request.id}}`;
       const keys = [
         `${base}:pause`,
         ...request.rules.map((rule) => `${base}:r:${rule.key}`),
         ...(request.lease ? [`${base}:leases`] : []),
+        `${base}:config`,
       ];
       const args = [
+        `${rules.fingerprint}:${request.lease ? `${request.lease.limit}:${request.lease.ttlMs}` : 'local'}`,
         ...(request.lease
           ? [
               'leases',
@@ -110,11 +123,17 @@ export function redisStore(options: RedisStoreOptions): Store {
               request.lease.owner,
             ]
           : []),
-        ...ruleArgs,
+        ...rules.args,
         String(request.costs.length),
         ...request.costs.map(String),
       ];
       const raw = await execute(ACQUIRE, ACQUIRE_SHA, keys, args);
+      if (raw === 'CONFIG_MISMATCH')
+        throw failure(
+          request.id,
+          'INVALID_OPTIONS',
+          'shared quota configuration does not match Redis. Use identical rate and global concurrency settings on every worker; drain all workers and follow the shared quota migration procedure before resetting the config key.',
+        );
       if (
         !Array.isArray(raw) ||
         (raw.length !== 3 && raw.length !== 4) ||
@@ -177,5 +196,31 @@ export function redisStore(options: RedisStoreOptions): Store {
       ) === 1,
     ...(notices ? { subscribe: notices.subscribe } : {}),
     close: () => notices?.close() ?? Promise.resolve(),
+  };
+}
+
+/** Serialize normalized rules for Lua and a fingerprint that ignores rule order.
+ * @param rules Normalized rules in admission script order.
+ * @returns Lua arguments in request order and a canonical versioned fingerprint.
+ */
+function prepareRules(rules: AcquireRequest['rules']) {
+  return {
+    args: rules.flatMap((rule) => [
+      rule.algorithm === 'gcra' ? '0' : '1',
+      String(rule.intervalMs),
+      String(rule.limit),
+      String(rule.burst),
+    ]),
+    fingerprint: `v1:[${rules
+      .map((rule) =>
+        JSON.stringify([
+          rule.algorithm,
+          rule.intervalMs,
+          rule.limit,
+          rule.burst,
+        ]),
+      )
+      .sort()
+      .join(',')}]`,
   };
 }

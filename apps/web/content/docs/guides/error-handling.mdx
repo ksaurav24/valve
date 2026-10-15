@@ -63,6 +63,13 @@ createValve({ id: 'crm', rate, store, onStoreError: 'wait' });
 
 Every store failure emits a `store-error` event, whatever the policy.
 
+A reported shared Redis configuration mismatch rejects affected jobs with
+`INVALID_OPTIONS` under every policy. It cannot fail open or retry indefinitely
+as an outage. Restore matching settings or follow
+[Changing a shared quota](/docs/guides/share-a-quota/#changing-a-shared-quota).
+An outage or timeout can hide the mismatch response. With `'open'`, those jobs
+run without shared admission checks, as they do during any other store outage.
+
 ## Errors in callbacks
 
 valve catches errors thrown by event listeners, feedback readers, and

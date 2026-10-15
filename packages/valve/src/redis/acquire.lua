@@ -1,23 +1,29 @@
 -- Atomically grant a prefix across all rate rules using the Redis clock.
 redis.replicate_commands()
+-- Pin configuration independently of expiring budget state. Check on every
+-- admission, before any budget mutation, including while the quota is paused.
+local configKey = KEYS[#KEYS]
+local config = redis.call('GET', configKey)
+if config and config ~= ARGV[1] then return 'CONFIG_MISMATCH' end
+if not config then redis.call('SET', configKey, ARGV[1]) end
 local t = redis.call('TIME')
 local now = tonumber(t[1]) * 1000 + tonumber(t[2]) / 1000
 local pttl = redis.call('PTTL', KEYS[1])
 if pttl > 0 then return {0, pttl, pttl} end
-local nr = #KEYS - 1
-local idx = 1
+local nr = #KEYS - 2
+local idx = 2
 local leaseLimit = nil
 local leaseTtl = nil
 local owner = nil
 local slotKey = nil
 local slots = 0
-if ARGV[1] == 'leases' then
-  leaseLimit = tonumber(ARGV[2])
-  leaseTtl = tonumber(ARGV[3])
-  owner = ARGV[4]
-  slotKey = KEYS[#KEYS]
+if ARGV[2] == 'leases' then
+  leaseLimit = tonumber(ARGV[3])
+  leaseTtl = tonumber(ARGV[4])
+  owner = ARGV[5]
+  slotKey = KEYS[#KEYS-1]
   nr = nr - 1
-  idx = 5
+  idx = 6
   redis.call('ZREMRANGEBYSCORE', slotKey, '-inf', now)
   slots = redis.call('ZCARD', slotKey)
 end

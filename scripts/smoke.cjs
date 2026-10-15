@@ -10,6 +10,38 @@ const { createValve } = require('../packages/valve/dist/index.cjs');
   const redis = require('../packages/valve/dist/redis/index.cjs');
   assert.equal(typeof esm.createValve, 'function');
   assert.equal(typeof redis.redisStore, 'function');
+  const esmRedis = await import('../packages/valve/dist/redis/index.js');
+  for (const [create, makeStore] of [
+    [esm.createValve, redis.redisStore],
+    [createValve, esmRedis.redisStore],
+  ]) {
+    for (const onStoreError of ['wait', 'throw', 'open']) {
+      const store = makeStore({
+        adapter: {
+          evalsha: async () => 'CONFIG_MISMATCH',
+          eval: async () => 'CONFIG_MISMATCH',
+        },
+      });
+      const mixed = create({
+        id: 'mixed-format',
+        concurrency: 1,
+        store,
+        onStoreError,
+        maxWait: 1000,
+      });
+      let calls = 0;
+      try {
+        await assert.rejects(
+          mixed.run(() => ++calls),
+          (error) => error.code === 'INVALID_OPTIONS',
+        );
+        assert.equal(calls, 0);
+      } finally {
+        await mixed.close();
+        await store.close();
+      }
+    }
+  }
   assert.deepEqual(
     headers.retryAfter()({ status: 429, headers: { 'retry-after': '1' } }),
     { pauseMs: 1000 },

@@ -304,6 +304,7 @@ suite('global lease resilience', () => {
     'loses ownership after a %s renewal response without touching a later token',
     async (fault) => {
       const f = await fixture();
+      const leaseTtl = 900;
       let attempted = false;
       const delivered = deferred<boolean>();
       const finish = deferred<number>();
@@ -331,7 +332,7 @@ suite('global lease resilience', () => {
       const api = createValve({
         id: f.id,
         store: wrapped,
-        concurrency: { limit: 1, scope: 'global', leaseTtl: 900 },
+        concurrency: { limit: 1, scope: 'global', leaseTtl },
       });
       api.on('store-error', ({ error }) => errors.push(error));
       const task = api.run((context) => {
@@ -365,7 +366,7 @@ suite('global lease resilience', () => {
           id: f.id,
           rules: [],
           costs: [1],
-          lease: { limit: 1, ttlMs: 10000, owner: 'replacement' },
+          lease: { limit: 1, ttlMs: leaseTtl, owner: 'replacement' },
         });
         expect(replacement.granted).toBe(1);
         const replacementTokens = replacement.leases!;
