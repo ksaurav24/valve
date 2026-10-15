@@ -2,7 +2,7 @@
 'valvejs': minor
 ---
 
-Add atomic scoped rate limits for requests that spend shared and per-identity budgets together. Named rules select recipient, tenant, or resource counters through per-job `scopes`; memory and Redis/Valkey stores spend every applicable budget or none. Blocked identities wait while other eligible jobs proceed, with priority, weighted costs, cancellation, deadlines, and global concurrency leases.
+Introduce atomic scoped rate limits, the headline feature of the 0.4.0 beta series. Requests spend shared and per-identity budgets together. Named rules select recipient, tenant, or resource counters through per-job `scopes`; memory and Redis/Valkey stores spend every applicable budget or none. Blocked identities wait while other eligible jobs proceed, with priority, weighted costs, cancellation, deadlines, and global concurrency leases.
 
 Fetch wrappers accept fixed identities or a synchronous resolver. Identities are copied once per logical request and reused across retries; every attempt reacquires all budgets. Missing required identities name the missing dimension and reject before queueing. Inactive Redis scope keys expire automatically.
 
