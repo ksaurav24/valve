@@ -12,7 +12,7 @@ function pick(fresh, cached, isEmpty) {
 }
 
 export const emptyMetadata = {
-  npm: { latest: null, versions: {} },
+  npm: { latest: null, beta: null, versions: {} },
   repo: { stars: 0, forks: 0 },
   contributors: [],
   releases: [],
@@ -47,15 +47,20 @@ export function mergeMetadata(snapshot, fresh) {
   return { data, status };
 }
 
-/** Packument to `{ latest, versions: { [version]: isoDate } }`. A 404 is `null`. */
+/** Preserve stable and beta tags separately; a 404 or tombstone has no releases. */
 export function parsePackument(json) {
-  if (json === null) return { latest: null, versions: {} };
+  if (json === null || json?.time?.unpublished)
+    return { latest: null, beta: null, versions: {} };
   if (typeof json !== 'object' || typeof json.versions !== 'object')
     throw new Error('malformed packument');
   const versions = {};
   for (const version of Object.keys(json.versions))
     versions[version] = json.time?.[version] ?? null;
-  return { latest: json['dist-tags']?.latest ?? null, versions };
+  return {
+    latest: json['dist-tags']?.latest ?? null,
+    beta: json['dist-tags']?.beta ?? null,
+    versions,
+  };
 }
 
 export function parseRepo(json) {

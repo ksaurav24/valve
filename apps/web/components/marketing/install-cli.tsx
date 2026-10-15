@@ -5,8 +5,9 @@ import Link from 'next/link';
 import { Terminal } from 'lucide-react';
 import { CopyButton } from '@/components/shared/copy-button';
 import { TabsSubtle, TabsSubtleItem } from '@/components/ui/tabs-subtle';
+import { site } from '@/lib/site';
 
-const pkg = 'valvejs';
+const pkg = site.installPackage;
 const managers = [
   { label: 'pnpm', command: `pnpm add ${pkg}` },
   { label: 'npm', command: `npm install ${pkg}` },
@@ -16,7 +17,7 @@ const managers = [
 const fromSource = [
   'git clone https://github.com/ksaurav24/valve.git && cd valve',
   'pnpm install && pnpm build',
-  `pnpm --filter ${pkg} pack --out /tmp/valve.tgz`,
+  `pnpm --filter ${site.packageName} pack --out /tmp/valve.tgz`,
 ].join('\n');
 
 /** Registry commands only claim to work once npm lists the package. */

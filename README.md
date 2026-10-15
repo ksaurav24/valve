@@ -13,10 +13,15 @@ worker sharing that budget pauses. A memory store supports single-process use.
 
 ## Quickstart
 
-The package is `valvejs`. The source repository is
-public, but the package is **not published to npm yet**. Build it locally with
-`pnpm install && pnpm build`, then run a workspace example or install a packed
-tarball in another project.
+The `valvejs` v0.3.0 beta series starts at `0.3.0-beta.0` and uses the npm
+`beta` tag. Install the beta with:
+
+```sh
+npm install valvejs@beta
+```
+
+To pin the first beta, use `npm install valvejs@0.3.0-beta.0`. Beta APIs may
+change before a stable release.
 
 ```ts
 import { createValve } from 'valvejs';
@@ -110,8 +115,8 @@ Run `pnpm test` for unit and property tests, `pnpm test:coverage` for coverage,
 and `pnpm test:types` for inference checks. With Redis running, use
 `REDIS_URL=redis://127.0.0.1:6379 pnpm test:integration` for real-store tests.
 
-Postgres, global concurrency, provider presets, and Bottleneck compatibility
-are planned for later versions. Publishing remains to be configured.
+Postgres stores, provider presets, and Bottleneck compatibility are planned for
+later versions. Shared global concurrency is supported by Redis and Valkey.
 
 ## Contributing and security
 

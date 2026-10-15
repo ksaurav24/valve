@@ -72,8 +72,24 @@ It explicitly dispatches CI for bot-created PRs so required checks can run.
 Version PRs update package versions, changelogs, and the lockfile as needed.
 They do not refresh live website metadata or format unrelated files.
 Merging a version PR publishes to npm through trusted publishing, then creates
-the git tag and GitHub Release. CI and package-name maintenance does not request
-a separate version bump; it ships with the planned v0.3.0 release.
+the git tag and GitHub Release. The first public beta is
+`0.3.0-beta.0`, installed with `npm install valvejs@beta`.
+
+CI and package-name maintenance uses an empty changeset and does not add a
+separate version bump. It ships alongside the existing v0.3.0 feature changes.
+
+The repository is in Changesets prerelease mode (`.changeset/pre.json`, tag
+`beta`). Run `pnpm version-packages` to bump versions and generate the changelog;
+the first beta is `0.3.0-beta.0`. Keep the `-beta.N` suffix in
+`package.json`; beta is a prerelease version as well as an npm tag. Later beta
+releases increment the suffix. The workflow validates and sets the packed npm
+publish plan to `beta`, including retries, and creates the
+`valvejs@0.3.0-beta.0` Git tag and GitHub release marked **Pre-release**.
+
+For a stable release, run `pnpm changeset pre exit`, remove `publishConfig.tag`
+(or set it to `latest`), update beta installation instructions, and then run
+`pnpm version-packages`. Review and merge the stable version PR before publishing.
+The release guard rejects a stable version while beta mode is still active.
 
 The npm trusted publisher must be configured for `valvejs`, the GitHub repository
 `ksaurav24/valve`, and the workflow filename `version.yml`.

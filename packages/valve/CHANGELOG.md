@@ -1,5 +1,31 @@
 # valvejs
 
+## 0.3.0-beta.0
+
+### Minor Changes
+
+- d859290: Keep admitting jobs through a healthy store while optional notification subscription startup is pending. Shared rate limits and pauses remain enforced by the store, and subscription failures still emit store errors.
+- 3f7dff2: Detect incompatible shared Redis/Valkey quota settings atomically during
+  admission. A versioned fingerprint without a TTL covers normalized rate rules and
+  global concurrency settings. Reported mismatches reject with `INVALID_OPTIONS`
+  under every store-error policy, including `open`. Store outages and timeouts
+  retain their existing policy behavior. Equivalent rule order and durations
+  continue to share a budget. Document coordinated quota changes and the limits of
+  rolling upgrades from versions without the guard. Reliable shared quotas and
+  mismatch detection require a non-evicting Redis deployment; eviction can remove
+  the fingerprint or active budget state.
+
+### Patch Changes
+
+- a4a60a1: Release cancelled queue entries during backpressure so repeated aborts and wait expirations cannot grow queue storage without bound.
+- 55016dd: Bound automatic replay of inherited Request bodies to 64 KiB by default.
+  Larger bodies are sent once, avoiding whole-upload buffering during retries.
+  Use a finite `maxReplayBodySize` to adjust the byte limit, or `0` to send
+  Request bodies once without probing. Small string and byte bodies still
+  retry under the existing method policy. Explicit `init.body` overrides no
+  longer clone the unused Request body; direct init streams remain single-use.
+- 2950d2a: Honor the longest exhausted quota window when combining provider feedback readers, including conflicting IETF and x-ratelimit headers. Keep remaining/reset values paired within one reader and preserve explicit Retry-After precedence. Previously combine() selected the first remaining and reset independently; missing fields are now kept missing rather than borrowed from another quota. Standalone readers retain their parsing behavior.
+
 ## 0.2.0
 
 ### Minor Changes

@@ -7,7 +7,11 @@ import {
 } from './merge-metadata.mjs';
 
 const snapshot = {
-  npm: { latest: '1.0.0', versions: { '1.0.0': '2026-01-01T00:00:00Z' } },
+  npm: {
+    latest: '1.0.0',
+    beta: null,
+    versions: { '1.0.0': '2026-01-01T00:00:00Z' },
+  },
   repo: { stars: 42, forks: 3 },
   contributors: [{ login: 'a', avatar: '', url: '', contributions: 5 }],
   releases: [{ tag: 'v1.0.0', name: 'v1.0.0', url: '', publishedAt: null }],
@@ -56,7 +60,7 @@ test('an npm 404 with no snapshot means nothing is published', () => {
       releases: failed,
     },
   );
-  assert.deepEqual(data.npm, { latest: null, versions: {} });
+  assert.deepEqual(data.npm, { latest: null, beta: null, versions: {} });
   assert.equal(data.repo.stars, 0);
 });
 
@@ -67,7 +71,11 @@ test('packuments map versions to publish times', () => {
       versions: { '1.0.0': {} },
       time: { '1.0.0': '2026-01-01T00:00:00Z', created: 'x' },
     }),
-    { latest: '1.0.0', versions: { '1.0.0': '2026-01-01T00:00:00Z' } },
+    {
+      latest: '1.0.0',
+      beta: null,
+      versions: { '1.0.0': '2026-01-01T00:00:00Z' },
+    },
   );
   assert.throws(() => parsePackument({ error: 'x' }));
 });
@@ -85,5 +93,35 @@ test('bots are not listed as contributors', () => {
       },
     ]).map((c) => c.login),
     ['me'],
+  );
+});
+
+test('beta tags and stable latest tags stay distinct', () => {
+  const parsed = parsePackument({
+    'dist-tags': { latest: '0.2.0', beta: '0.3.0-beta.0' },
+    versions: { '0.2.0': {}, '0.3.0-beta.0': {} },
+  });
+  assert.equal(parsed.latest, '0.2.0');
+  assert.equal(parsed.beta, '0.3.0-beta.0');
+  assert.ok(Object.hasOwn(parsed.versions, '0.3.0-beta.0'));
+  assert.equal(
+    parsePackument({
+      'dist-tags': { beta: '0.3.0-beta.0' },
+      versions: { '0.3.0-beta.0': {} },
+    }).latest,
+    null,
+  );
+});
+
+test('an npm tombstone is treated as unpublished', () => {
+  assert.deepEqual(
+    parsePackument({
+      time: { unpublished: { time: '2025-02-22T16:04:28.026Z' } },
+    }),
+    {
+      latest: null,
+      beta: null,
+      versions: {},
+    },
   );
 });

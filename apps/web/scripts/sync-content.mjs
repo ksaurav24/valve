@@ -10,7 +10,7 @@ const contributing = new URL(
   import.meta.url,
 );
 
-const { version } = JSON.parse(
+const { version, publishConfig } = JSON.parse(
   await readFile(new URL('package.json', packageDir), 'utf8'),
 );
 if (!version) throw new Error('packages/valve/package.json has no version.');
@@ -82,5 +82,5 @@ await writeFile(
 );
 await writeFile(
   new URL('release.json', generated),
-  JSON.stringify({ version }) + '\n',
+  JSON.stringify({ version, channel: publishConfig?.tag ?? 'latest' }) + '\n',
 );

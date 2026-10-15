@@ -5,6 +5,7 @@ import { cn } from '@/lib/utils';
 const labels: Record<VersionState, string> = {
   latest: 'latest',
   published: 'published',
+  beta: 'beta',
   dev: 'dev · unreleased',
 };
 
@@ -27,7 +28,9 @@ export function VersionBadge({
       title={
         state === 'dev'
           ? 'Development version: not published to npm yet'
-          : `Published on npm`
+          : state === 'beta'
+            ? 'Beta prerelease published on npm'
+            : 'Published on npm'
       }
     >
       <span
