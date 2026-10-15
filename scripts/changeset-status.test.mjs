@@ -5,6 +5,7 @@ import {
   mkdtempSync,
   readFileSync,
   rmSync,
+  symlinkSync,
   writeFileSync,
 } from 'node:fs';
 import { tmpdir } from 'node:os';
@@ -150,6 +151,12 @@ test('Changesets validation works in a detached CI checkout without local master
     git('reset', '--hard', base);
     mkdirSync(join(cwd, '.changeset/pre'));
     mkdirSync(join(cwd, 'scripts'));
+    mkdirSync(join(cwd, 'node_modules'));
+    symlinkSync(
+      fileURLToPath(new URL('../node_modules/semver', import.meta.url)),
+      join(cwd, 'node_modules/semver'),
+      'dir',
+    );
     for (const name of [
       'prepare-release-plan.mjs',
       'validate-versioned-release.mjs',

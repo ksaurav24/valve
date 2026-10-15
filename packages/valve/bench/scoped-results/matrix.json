@@ -10,9 +10,9 @@
       "evaluated": 100,
       "granted": 100,
       "keysPerCall": 2,
-      "evaluationsPerSecond": 52171.671929917014,
-      "medianMs": 0.015430000000009159,
-      "p99Ms": 0.3007790000000057
+      "evaluationsPerSecond": 51288.12695247404,
+      "medianMs": 0.015689999999978,
+      "p99Ms": 0.3034110000000112
     },
     {
       "store": "memory",
@@ -23,9 +23,9 @@
       "evaluated": 100,
       "granted": 1,
       "keysPerCall": 2,
-      "evaluationsPerSecond": 73538.2796160805,
-      "medianMs": 0.013363999999995713,
-      "p99Ms": 0.0565029999999922
+      "evaluationsPerSecond": 75042.96209580921,
+      "medianMs": 0.013188000000013744,
+      "p99Ms": 0.06224399999999264
     },
     {
       "store": "memory",
@@ -34,11 +34,11 @@
       "workload": "mixed",
       "iterations": 100,
       "evaluated": 100,
-      "granted": 1,
+      "granted": 51,
       "keysPerCall": 2,
-      "evaluationsPerSecond": 60868.16260320711,
-      "medianMs": 0.009942000000023654,
-      "p99Ms": 0.6860609999999951
+      "evaluationsPerSecond": 55431.26633836674,
+      "medianMs": 0.009802000000007638,
+      "p99Ms": 0.7301030000000139
     },
     {
       "store": "memory",
@@ -49,9 +49,9 @@
       "evaluated": 100,
       "granted": 100,
       "keysPerCall": 8,
-      "evaluationsPerSecond": 85217.78256513407,
-      "medianMs": 0.010952000000003181,
-      "p99Ms": 0.03080499999998665
+      "evaluationsPerSecond": 42827.19441190955,
+      "medianMs": 0.017287000000010266,
+      "p99Ms": 0.2605429999999842
     },
     {
       "store": "memory",
@@ -62,9 +62,9 @@
       "evaluated": 100,
       "granted": 1,
       "keysPerCall": 8,
-      "evaluationsPerSecond": 87185.17433545274,
-      "medianMs": 0.00989500000000021,
-      "p99Ms": 0.05430300000000443
+      "evaluationsPerSecond": 170431.20799940798,
+      "medianMs": 0.005629999999996471,
+      "p99Ms": 0.010915000000011332
     },
     {
       "store": "memory",
@@ -73,11 +73,11 @@
       "workload": "mixed",
       "iterations": 100,
       "evaluated": 100,
-      "granted": 1,
+      "granted": 51,
       "keysPerCall": 8,
-      "evaluationsPerSecond": 48669.781857173984,
-      "medianMs": 0.011922999999995909,
-      "p99Ms": 0.6962690000000009
+      "evaluationsPerSecond": 163506.3612149556,
+      "medianMs": 0.0060100000000034015,
+      "p99Ms": 0.015379999999993288
     },
     {
       "store": "memory",
@@ -88,9 +88,9 @@
       "evaluated": 100,
       "granted": 100,
       "keysPerCall": 16,
-      "evaluationsPerSecond": 47965.01240135701,
-      "medianMs": 0.009160000000008495,
-      "p99Ms": 1.0342899999999986
+      "evaluationsPerSecond": 121826.12488152002,
+      "medianMs": 0.007926999999995132,
+      "p99Ms": 0.017874000000006163
     },
     {
       "store": "memory",
@@ -101,9 +101,9 @@
       "evaluated": 100,
       "granted": 1,
       "keysPerCall": 16,
-      "evaluationsPerSecond": 129899.31504091788,
-      "medianMs": 0.0075230000000203745,
-      "p99Ms": 0.016901999999987538
+      "evaluationsPerSecond": 115340.51981662888,
+      "medianMs": 0.0069700000000239015,
+      "p99Ms": 0.1664959999999951
     },
     {
       "store": "memory",
@@ -112,11 +112,11 @@
       "workload": "mixed",
       "iterations": 100,
       "evaluated": 100,
-      "granted": 1,
+      "granted": 51,
       "keysPerCall": 16,
-      "evaluationsPerSecond": 127710.65873156954,
-      "medianMs": 0.007488000000023476,
-      "p99Ms": 0.03619199999999978
+      "evaluationsPerSecond": 126904.8416735191,
+      "medianMs": 0.007684999999980846,
+      "p99Ms": 0.013433000000020456
     },
     {
       "store": "memory",
@@ -127,9 +127,9 @@
       "evaluated": 3200,
       "granted": 3200,
       "keysPerCall": 33,
-      "evaluationsPerSecond": 700504.9984315097,
-      "medianMs": 0.038981000000006816,
-      "p99Ms": 0.31533999999999196
+      "evaluationsPerSecond": 698700.1774916995,
+      "medianMs": 0.03794700000000262,
+      "p99Ms": 0.15888900000001627
     },
     {
       "store": "memory",
@@ -140,9 +140,9 @@
       "evaluated": 3200,
       "granted": 1,
       "keysPerCall": 2,
-      "evaluationsPerSecond": 858810.7135563161,
-      "medianMs": 0.03153199999999856,
-      "p99Ms": 0.2788400000000024
+      "evaluationsPerSecond": 954655.9315607182,
+      "medianMs": 0.030307999999990898,
+      "p99Ms": 0.2378789999999924
     },
     {
       "store": "memory",
@@ -153,9 +153,9 @@
       "evaluated": 3200,
       "granted": 1601,
       "keysPerCall": 18,
-      "evaluationsPerSecond": 896930.1165308292,
-      "medianMs": 0.034077999999993835,
-      "p99Ms": 0.06678800000000251
+      "evaluationsPerSecond": 827618.2414302037,
+      "medianMs": 0.03533500000000345,
+      "p99Ms": 0.200398999999976
     },
     {
       "store": "memory",
@@ -166,9 +166,9 @@
       "evaluated": 3200,
       "granted": 3200,
       "keysPerCall": 225,
-      "evaluationsPerSecond": 171940.53049886503,
-      "medianMs": 0.13729800000001546,
-      "p99Ms": 0.607245000000006
+      "evaluationsPerSecond": 188867.17703299664,
+      "medianMs": 0.1322900000000118,
+      "p99Ms": 0.5960699999999974
     },
     {
       "store": "memory",
@@ -179,9 +179,9 @@
       "evaluated": 3200,
       "granted": 1,
       "keysPerCall": 8,
-      "evaluationsPerSecond": 415270.0507628663,
-      "medianMs": 0.07899899999998183,
-      "p99Ms": 0.25124099999999316
+      "evaluationsPerSecond": 462406.96408008266,
+      "medianMs": 0.0655089999999916,
+      "p99Ms": 0.245317
     },
     {
       "store": "memory",
@@ -192,9 +192,9 @@
       "evaluated": 3200,
       "granted": 1601,
       "keysPerCall": 120,
-      "evaluationsPerSecond": 297617.8020088261,
-      "medianMs": 0.10001400000001581,
-      "p99Ms": 0.3367539999999849
+      "evaluationsPerSecond": 275068.21261878667,
+      "medianMs": 0.10295000000002119,
+      "p99Ms": 0.4301770000000147
     },
     {
       "store": "memory",
@@ -205,9 +205,9 @@
       "evaluated": 3200,
       "granted": 3200,
       "keysPerCall": 481,
-      "evaluationsPerSecond": 127934.37478311114,
-      "medianMs": 0.22844599999999105,
-      "p99Ms": 0.8473380000000361
+      "evaluationsPerSecond": 104999.63299347112,
+      "medianMs": 0.2663639999999532,
+      "p99Ms": 1.2673010000000318
     },
     {
       "store": "memory",
@@ -218,9 +218,9 @@
       "evaluated": 3200,
       "granted": 1,
       "keysPerCall": 16,
-      "evaluationsPerSecond": 341579.9267140545,
-      "medianMs": 0.09347800000000461,
-      "p99Ms": 0.10089099999999007
+      "evaluationsPerSecond": 298505.15149929374,
+      "medianMs": 0.10119199999996908,
+      "p99Ms": 0.3102119999999786
     },
     {
       "store": "memory",
@@ -231,9 +231,9 @@
       "evaluated": 3200,
       "granted": 1601,
       "keysPerCall": 256,
-      "evaluationsPerSecond": 184723.59001060968,
-      "medianMs": 0.15564799999998513,
-      "p99Ms": 0.5274289999999837
+      "evaluationsPerSecond": 156520.60945994867,
+      "medianMs": 0.18196700000004284,
+      "p99Ms": 0.5938049999999748
     },
     {
       "store": "memory",
@@ -244,9 +244,9 @@
       "evaluated": 12800,
       "granted": 12800,
       "keysPerCall": 129,
-      "evaluationsPerSecond": 885147.970808655,
-      "medianMs": 0.1364019999999755,
-      "p99Ms": 0.3856359999999768
+      "evaluationsPerSecond": 820436.7197478508,
+      "medianMs": 0.14687799999995832,
+      "p99Ms": 0.3627010000000155
     },
     {
       "store": "memory",
@@ -257,9 +257,9 @@
       "evaluated": 12800,
       "granted": 1,
       "keysPerCall": 2,
-      "evaluationsPerSecond": 1216896.4937314368,
-      "medianMs": 0.0993970000000104,
-      "p99Ms": 0.28270700000001625
+      "evaluationsPerSecond": 1143353.685028945,
+      "medianMs": 0.10543799999999237,
+      "p99Ms": 0.2502309999999852
     },
     {
       "store": "memory",
@@ -270,9 +270,9 @@
       "evaluated": 12800,
       "granted": 6401,
       "keysPerCall": 66,
-      "evaluationsPerSecond": 941059.0457940967,
-      "medianMs": 0.13065599999998767,
-      "p99Ms": 0.34232500000001664
+      "evaluationsPerSecond": 898022.4633303339,
+      "medianMs": 0.1350039999999808,
+      "p99Ms": 0.2910400000000095
     },
     {
       "store": "memory",
@@ -283,9 +283,9 @@
       "evaluated": 12800,
       "granted": 12800,
       "keysPerCall": 897,
-      "evaluationsPerSecond": 220326.93246299564,
-      "medianMs": 0.4974409999999807,
-      "p99Ms": 4.883102000000008
+      "evaluationsPerSecond": 181853.33065724763,
+      "medianMs": 0.5933619999999564,
+      "p99Ms": 3.861614999999972
     },
     {
       "store": "memory",
@@ -296,9 +296,9 @@
       "evaluated": 12800,
       "granted": 1,
       "keysPerCall": 8,
-      "evaluationsPerSecond": 589749.644364836,
-      "medianMs": 0.21399100000002136,
-      "p99Ms": 0.33438999999998487
+      "evaluationsPerSecond": 521462.7551745353,
+      "medianMs": 0.23779400000000805,
+      "p99Ms": 0.37782500000002983
     },
     {
       "store": "memory",
@@ -309,9 +309,9 @@
       "evaluated": 12800,
       "granted": 6401,
       "keysPerCall": 456,
-      "evaluationsPerSecond": 336855.490836608,
-      "medianMs": 0.3528239999999414,
-      "p99Ms": 1.2045830000000706
+      "evaluationsPerSecond": 284150.5002236456,
+      "medianMs": 0.41420799999991686,
+      "p99Ms": 1.3477399999999307
     },
     {
       "store": "memory",
@@ -322,9 +322,9 @@
       "evaluated": 12800,
       "granted": 12800,
       "keysPerCall": 1921,
-      "evaluationsPerSecond": 109460.13679028112,
-      "medianMs": 1.1129989999999452,
-      "p99Ms": 3.1544489999999996
+      "evaluationsPerSecond": 105132.65938753897,
+      "medianMs": 1.1395400000000109,
+      "p99Ms": 3.5515570000000025
     },
     {
       "store": "memory",
@@ -335,9 +335,9 @@
       "evaluated": 12800,
       "granted": 1,
       "keysPerCall": 16,
-      "evaluationsPerSecond": 351227.0721436911,
-      "medianMs": 0.3576140000000123,
-      "p99Ms": 0.5291760000000068
+      "evaluationsPerSecond": 327571.1855691858,
+      "medianMs": 0.3837099999999509,
+      "p99Ms": 0.6244299999999612
     },
     {
       "store": "memory",
@@ -348,9 +348,9 @@
       "evaluated": 12800,
       "granted": 6401,
       "keysPerCall": 976,
-      "evaluationsPerSecond": 163496.0545272635,
-      "medianMs": 0.7265499999999747,
-      "p99Ms": 2.2133139999999685
+      "evaluationsPerSecond": 141999.8520317174,
+      "medianMs": 0.8601320000000214,
+      "p99Ms": 2.469149000000016
     },
     {
       "store": "redis",
@@ -361,9 +361,9 @@
       "evaluated": 100,
       "granted": 100,
       "keysPerCall": 2,
-      "evaluationsPerSecond": 3525.360420510628,
-      "medianMs": 0.19502800000009302,
-      "p99Ms": 6.64937000000009
+      "evaluationsPerSecond": 4774.328473989891,
+      "medianMs": 0.12956499999995685,
+      "p99Ms": 7.4364660000001095
     },
     {
       "store": "redis",
@@ -374,9 +374,9 @@
       "evaluated": 100,
       "granted": 1,
       "keysPerCall": 2,
-      "evaluationsPerSecond": 8739.472649733074,
-      "medianMs": 0.11293399999999565,
-      "p99Ms": 0.3434740000000147
+      "evaluationsPerSecond": 10474.15998546131,
+      "medianMs": 0.0668839999998454,
+      "p99Ms": 0.38073499999995875
     },
     {
       "store": "redis",
@@ -385,11 +385,11 @@
       "workload": "mixed",
       "iterations": 100,
       "evaluated": 100,
-      "granted": 1,
+      "granted": 51,
       "keysPerCall": 2,
-      "evaluationsPerSecond": 11672.776587025743,
-      "medianMs": 0.07542899999998554,
-      "p99Ms": 0.22948199999996177
+      "evaluationsPerSecond": 6701.289549250907,
+      "medianMs": 0.15046399999982896,
+      "p99Ms": 0.2907590000002074
     },
     {
       "store": "redis",
@@ -400,9 +400,9 @@
       "evaluated": 100,
       "granted": 100,
       "keysPerCall": 8,
-      "evaluationsPerSecond": 5440.14943437692,
-      "medianMs": 0.16987199999994118,
-      "p99Ms": 0.3106289999998353
+      "evaluationsPerSecond": 5325.936672482019,
+      "medianMs": 0.2070929999999862,
+      "p99Ms": 0.49993400000016663
     },
     {
       "store": "redis",
@@ -413,9 +413,9 @@
       "evaluated": 100,
       "granted": 1,
       "keysPerCall": 8,
-      "evaluationsPerSecond": 6357.379719487941,
-      "medianMs": 0.14302700000007462,
-      "p99Ms": 0.4239540000000943
+      "evaluationsPerSecond": 10615.068939566256,
+      "medianMs": 0.08347500000013497,
+      "p99Ms": 0.262222999999949
     },
     {
       "store": "redis",
@@ -424,11 +424,11 @@
       "workload": "mixed",
       "iterations": 100,
       "evaluated": 100,
-      "granted": 1,
+      "granted": 51,
       "keysPerCall": 8,
-      "evaluationsPerSecond": 8384.988355347683,
-      "medianMs": 0.10882500000002437,
-      "p99Ms": 0.25829399999997804
+      "evaluationsPerSecond": 10338.691394610012,
+      "medianMs": 0.08767599999987397,
+      "p99Ms": 0.2356800000000021
     },
     {
       "store": "redis",
@@ -439,9 +439,9 @@
       "evaluated": 100,
       "granted": 100,
       "keysPerCall": 16,
-      "evaluationsPerSecond": 6527.85402673938,
-      "medianMs": 0.14022700000009536,
-      "p99Ms": 0.7383099999999558
+      "evaluationsPerSecond": 6005.505727540608,
+      "medianMs": 0.14175900000009278,
+      "p99Ms": 1.127512999999908
     },
     {
       "store": "redis",
@@ -452,9 +452,9 @@
       "evaluated": 100,
       "granted": 1,
       "keysPerCall": 16,
-      "evaluationsPerSecond": 7648.2326922785805,
-      "medianMs": 0.1188520000000608,
-      "p99Ms": 0.25548699999990276
+      "evaluationsPerSecond": 6524.6421706811825,
+      "medianMs": 0.12772900000004483,
+      "p99Ms": 0.29295200000001387
     },
     {
       "store": "redis",
@@ -463,11 +463,11 @@
       "workload": "mixed",
       "iterations": 100,
       "evaluated": 100,
-      "granted": 1,
+      "granted": 51,
       "keysPerCall": 16,
-      "evaluationsPerSecond": 7430.888464519082,
-      "medianMs": 0.12992400000007365,
-      "p99Ms": 0.21909600000003593
+      "evaluationsPerSecond": 5957.7131056107355,
+      "medianMs": 0.14149600000018836,
+      "p99Ms": 0.4014110000000528
     },
     {
       "store": "redis",
@@ -478,9 +478,9 @@
       "evaluated": 3200,
       "granted": 3200,
       "keysPerCall": 33,
-      "evaluationsPerSecond": 92390.20831249101,
-      "medianMs": 0.3218019999999342,
-      "p99Ms": 0.9066359999999349
+      "evaluationsPerSecond": 103910.34096230323,
+      "medianMs": 0.29771899999991547,
+      "p99Ms": 0.8374940000001061
     },
     {
       "store": "redis",
@@ -491,9 +491,9 @@
       "evaluated": 3200,
       "granted": 1,
       "keysPerCall": 2,
-      "evaluationsPerSecond": 175833.43123226412,
-      "medianMs": 0.163763999999901,
-      "p99Ms": 0.7678949999999531
+      "evaluationsPerSecond": 118893.80019361923,
+      "medianMs": 0.23561199999994642,
+      "p99Ms": 0.7593400000000656
     },
     {
       "store": "redis",
@@ -504,9 +504,9 @@
       "evaluated": 3200,
       "granted": 1601,
       "keysPerCall": 18,
-      "evaluationsPerSecond": 117479.05944942504,
-      "medianMs": 0.2671550000000025,
-      "p99Ms": 0.43192199999998593
+      "evaluationsPerSecond": 95366.77794579144,
+      "medianMs": 0.2890059999999721,
+      "p99Ms": 0.7496229999999287
     },
     {
       "store": "redis",
@@ -517,9 +517,9 @@
       "evaluated": 3200,
       "granted": 3200,
       "keysPerCall": 225,
-      "evaluationsPerSecond": 19488.015841613276,
-      "medianMs": 1.5910499999999956,
-      "p99Ms": 3.1884679999998298
+      "evaluationsPerSecond": 19122.532022114294,
+      "medianMs": 1.6103479999999308,
+      "p99Ms": 3.683269999999993
     },
     {
       "store": "redis",
@@ -530,9 +530,9 @@
       "evaluated": 3200,
       "granted": 1,
       "keysPerCall": 8,
-      "evaluationsPerSecond": 97856.53217121917,
-      "medianMs": 0.3137060000001384,
-      "p99Ms": 0.5763409999999567
+      "evaluationsPerSecond": 55141.140210218655,
+      "medianMs": 0.5565769999998338,
+      "p99Ms": 1.6773420000001806
     },
     {
       "store": "redis",
@@ -543,9 +543,9 @@
       "evaluated": 3200,
       "granted": 1601,
       "keysPerCall": 120,
-      "evaluationsPerSecond": 28497.668209467705,
-      "medianMs": 1.113256999999976,
-      "p99Ms": 2.22253099999989
+      "evaluationsPerSecond": 22970.76940879248,
+      "medianMs": 1.3784209999998893,
+      "p99Ms": 2.918184999999994
     },
     {
       "store": "redis",
@@ -556,9 +556,9 @@
       "evaluated": 3200,
       "granted": 3200,
       "keysPerCall": 481,
-      "evaluationsPerSecond": 9597.76124540747,
-      "medianMs": 3.2415739999999005,
-      "p99Ms": 5.182735000000093
+      "evaluationsPerSecond": 9230.135218106194,
+      "medianMs": 3.315205999999762,
+      "p99Ms": 5.282095000000027
     },
     {
       "store": "redis",
@@ -569,9 +569,9 @@
       "evaluated": 3200,
       "granted": 1,
       "keysPerCall": 16,
-      "evaluationsPerSecond": 41688.28920979664,
-      "medianMs": 0.753842000000077,
-      "p99Ms": 2.20220600000016
+      "evaluationsPerSecond": 35830.439922669895,
+      "medianMs": 0.8208900000004178,
+      "p99Ms": 7.006797000000006
     },
     {
       "store": "redis",
@@ -582,9 +582,9 @@
       "evaluated": 3200,
       "granted": 1601,
       "keysPerCall": 256,
-      "evaluationsPerSecond": 15944.91375114619,
-      "medianMs": 1.9772850000003928,
-      "p99Ms": 3.348846999999978
+      "evaluationsPerSecond": 15827.9317054028,
+      "medianMs": 1.9845719999998437,
+      "p99Ms": 2.6637259999997696
     },
     {
       "store": "redis",
@@ -595,9 +595,9 @@
       "evaluated": 12800,
       "granted": 12800,
       "keysPerCall": 129,
-      "evaluationsPerSecond": 91731.3195098097,
-      "medianMs": 1.3148059999998623,
-      "p99Ms": 5.6268410000002405
+      "evaluationsPerSecond": 84716.67444747259,
+      "medianMs": 1.50707199999988,
+      "p99Ms": 2.251158000000032
     },
     {
       "store": "redis",
@@ -608,9 +608,9 @@
       "evaluated": 12800,
       "granted": 1,
       "keysPerCall": 2,
-      "evaluationsPerSecond": 205720.65093164105,
-      "medianMs": 0.5738949999999932,
-      "p99Ms": 1.157893999999942
+      "evaluationsPerSecond": 164497.73194253564,
+      "medianMs": 0.7762190000003102,
+      "p99Ms": 1.2608749999999418
     },
     {
       "store": "redis",
@@ -621,9 +621,9 @@
       "evaluated": 12800,
       "granted": 6401,
       "keysPerCall": 66,
-      "evaluationsPerSecond": 115992.29546550466,
-      "medianMs": 1.0526559999998426,
-      "p99Ms": 1.6721670000001723
+      "evaluationsPerSecond": 99200.17841152097,
+      "medianMs": 1.2230380000000878,
+      "p99Ms": 2.2622019999998884
     },
     {
       "store": "redis",
@@ -634,9 +634,9 @@
       "evaluated": 12800,
       "granted": 12800,
       "keysPerCall": 897,
-      "evaluationsPerSecond": 20108.75411202428,
-      "medianMs": 6.152313999999933,
-      "p99Ms": 8.044961999999941
+      "evaluationsPerSecond": 19839.511003668642,
+      "medianMs": 6.178903999999875,
+      "p99Ms": 10.403751999999713
     },
     {
       "store": "redis",
@@ -647,9 +647,9 @@
       "evaluated": 12800,
       "granted": 1,
       "keysPerCall": 8,
-      "evaluationsPerSecond": 86879.5288881518,
-      "medianMs": 1.4723229999999603,
-      "p99Ms": 1.8508750000000873
+      "evaluationsPerSecond": 95925.24329957909,
+      "medianMs": 1.3136959999997089,
+      "p99Ms": 2.521425000000363
     },
     {
       "store": "redis",
@@ -660,9 +660,9 @@
       "evaluated": 12800,
       "granted": 6401,
       "keysPerCall": 456,
-      "evaluationsPerSecond": 35620.340941150884,
-      "medianMs": 3.4596669999996266,
-      "p99Ms": 5.3774710000002415
+      "evaluationsPerSecond": 34780.13316296767,
+      "medianMs": 3.5074939999999515,
+      "p99Ms": 5.88743999999997
     },
     {
       "store": "redis",
@@ -673,9 +673,9 @@
       "evaluated": 12800,
       "granted": 12800,
       "keysPerCall": 1921,
-      "evaluationsPerSecond": 9996.953084902156,
-      "medianMs": 12.37513300000046,
-      "p99Ms": 16.96679200000017
+      "evaluationsPerSecond": 9609.915727270489,
+      "medianMs": 12.45861799999966,
+      "p99Ms": 20.826105000000098
     },
     {
       "store": "redis",
@@ -686,9 +686,9 @@
       "evaluated": 12800,
       "granted": 1,
       "keysPerCall": 16,
-      "evaluationsPerSecond": 68255.72281709466,
-      "medianMs": 1.8635700000004363,
-      "p99Ms": 2.2505139999993844
+      "evaluationsPerSecond": 63068.37540181142,
+      "medianMs": 2.027441000000181,
+      "p99Ms": 2.533365000000231
     },
     {
       "store": "redis",
@@ -699,9 +699,9 @@
       "evaluated": 12800,
       "granted": 6401,
       "keysPerCall": 976,
-      "evaluationsPerSecond": 17018.771419012966,
-      "medianMs": 6.833990000000085,
-      "p99Ms": 12.785973000000013
+      "evaluationsPerSecond": 16151.004095432781,
+      "medianMs": 7.354741000000104,
+      "p99Ms": 11.284206999999697
     }
   ],
   "contention": [
@@ -710,27 +710,27 @@
       "batch": 32,
       "iterations": 100,
       "granted": 1601,
-      "evaluationsPerSecond": 93516.81800610195,
-      "medianMs": 0.2952999999997701,
-      "p99Ms": 2.1060379999998986
+      "evaluationsPerSecond": 50041.05947118809,
+      "medianMs": 0.6490270000003875,
+      "p99Ms": 2.692818999999872
     },
     {
       "workers": 4,
       "batch": 32,
       "iterations": 100,
       "granted": 6401,
-      "evaluationsPerSecond": 139198.34390510392,
-      "medianMs": 0.854668999999376,
-      "p99Ms": 5.215885999999955
+      "evaluationsPerSecond": 136931.57709884905,
+      "medianMs": 0.8791800000008152,
+      "p99Ms": 3.5270330000003014
     },
     {
       "workers": 8,
       "batch": 32,
       "iterations": 100,
       "granted": 12801,
-      "evaluationsPerSecond": 142100.42557911787,
-      "medianMs": 1.7334280000004583,
-      "p99Ms": 3.80891100000008
+      "evaluationsPerSecond": 141884.02352253118,
+      "medianMs": 1.7669319999995423,
+      "p99Ms": 3.075644999999895
     }
   ]
 }

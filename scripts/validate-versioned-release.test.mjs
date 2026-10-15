@@ -57,3 +57,46 @@ test('prepared beta releases retain the prerelease publishing guard', () => {
     /Beta releases require/,
   );
 });
+
+test('prepared releases reject equal versions and every form of downgrade', () => {
+  for (const [version, oldVersion] of [
+    ['0.4.0-beta.0', '0.4.0-beta.0'],
+    ['0.4.0-beta.0', '0.4.0-beta.1'],
+    ['0.4.0-beta.2', '0.4.0-beta.10'],
+    ['0.4.0-beta.0', '0.4.0'],
+    ['0.4.0-beta.0', '0.5.0-beta.0'],
+    ['0.4.0-beta.0', '1.0.0'],
+  ]) {
+    assert.throws(
+      () =>
+        validateVersionedRelease(
+          { ...pkg, version },
+          { version: oldVersion },
+          `# valvejs\n\n## ${version}\n`,
+          pre,
+        ),
+      /greater than the previous version/,
+      `${oldVersion} -> ${version}`,
+    );
+  }
+});
+
+test('prepared releases compare beta identifiers and version components numerically', () => {
+  for (const [version, oldVersion] of [
+    ['0.4.0-beta.10', '0.4.0-beta.2'],
+    ['0.4.0-beta.0', '0.3.0'],
+    ['0.10.0-beta.0', '0.9.0-beta.20'],
+    ['1.0.0-beta.0', '0.99.0'],
+  ]) {
+    assert.doesNotThrow(
+      () =>
+        validateVersionedRelease(
+          { ...pkg, version },
+          { version: oldVersion },
+          `# valvejs\n\n## ${version}\n`,
+          pre,
+        ),
+      `${oldVersion} -> ${version}`,
+    );
+  }
+});

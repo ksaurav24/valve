@@ -156,7 +156,9 @@ against `document.baseURI` by passing it as the second argument to `new URL`:
 const limitedFetch = messages.wrapFetch(fetch, {
   scopes: (input) => {
     const url = new URL(input instanceof Request ? input.url : String(input));
-    return { recipient: url.searchParams.get('contactId') ?? '' };
+    const recipient = url.searchParams.get('contactId');
+    if (!recipient) throw new Error('contactId is required');
+    return { recipient };
   },
 });
 ```
@@ -197,9 +199,9 @@ and block other clients on that shard; it is a safety bound, not a recommended
 batch size.
 
 Start with 32. In the checked-in [scoped benchmark report](https://github.com/ksaurav24/valve/blob/master/packages/valve/bench/SCOPED.md),
-32 jobs with two rules and cold identities took 0.322 ms median / 0.907 ms p99 per
+32 jobs with two rules and cold identities took 0.298 ms median / 0.837 ms p99 per
 Redis admission. At 128 jobs and 16 rules (1,921 unique keys), this grew to
-12.38 ms / 16.97 ms. These are local measurements, not production latency
+12.46 ms / 20.83 ms. These are local measurements, not production latency
 promises. Benchmark your rule count, identity distribution, payload costs, and
 worker contention. Try batches of 8 or 16 when shard latency matters; increase
 only when measured round-trip savings justify longer script execution.

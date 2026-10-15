@@ -43,11 +43,13 @@ try {
           let uniqueKeys = 0;
           const samples: number[] = [];
           for (let i = 0; i < iterations; i++) {
+            // Mixed identities alternate across the full stream, including one-job batches.
             const jobs = Array.from({ length: batch }, (_, j) => ({
               cost: 1,
               scopes: {
                 recipient:
-                  workload === 'hot' || (workload === 'mixed' && j % 2 === 0)
+                  workload === 'hot' ||
+                  (workload === 'mixed' && (i * batch + j) % 2 === 0)
                     ? 'hot'
                     : `cold-${i}-${j}`,
               },
@@ -59,6 +61,17 @@ try {
             samples.push(performance.now() - start);
             granted += result.grantedIndexes.length;
           }
+          const evaluated = batch * iterations;
+          const expected =
+            workload === 'cold'
+              ? evaluated
+              : workload === 'hot'
+                ? 1
+                : Math.floor(evaluated / 2) + 1;
+          if (granted !== expected)
+            throw new Error(
+              `${id}: expected ${expected} grants, received ${granted}`,
+            );
           const elapsed = samples.reduce((a, b) => a + b, 0);
           samples.sort((a, b) => a - b);
           const result = {

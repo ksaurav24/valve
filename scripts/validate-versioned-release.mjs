@@ -1,12 +1,15 @@
 import { execFileSync } from 'node:child_process';
 import { readFileSync } from 'node:fs';
 import { pathToFileURL } from 'node:url';
+import gt from 'semver/functions/gt.js';
 import { releaseTag } from './prepare-release-plan.mjs';
 
-/** A consumed beta changeset must accompany a new manifest version and matching release notes. */
+/** A consumed beta changeset requires a strictly newer version and matching release notes. */
 export function validateVersionedRelease(pkg, previous, changelog, pre) {
-  if (pkg.version === previous.version)
-    throw new Error('Archived changesets require a new package version.');
+  if (!gt(pkg.version, previous.version))
+    throw new Error(
+      'Archived changesets require a new package version greater than the previous version.',
+    );
   if (releaseTag(pkg, pre) !== 'beta')
     throw new Error('Archived prerelease changesets require the beta channel.');
   const newest = changelog.match(/^## (\S+)\s*$/m)?.[1];

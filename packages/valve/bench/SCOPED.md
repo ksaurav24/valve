@@ -29,6 +29,8 @@ execution and request construction. It covers:
 - Memory and Redis 7.4.11 on loopback.
 - Batch sizes 1, 32 and 128; 2, 8 and 16 rules; 100 calls per scenario.
 - Cold identities, one repeated hot identity, and alternating hot/cold jobs.
+  Mixed calls alternate over the full job stream, so batch-one workloads also
+  exercise both identities. Every scenario checks its expected grant count.
 - Up to 12,800 cold identities per scenario, with expiring counters retained
   during measurement to exercise cardinality.
 - One, four and eight concurrent Redis clients sharing one Valve ID and slot.
@@ -41,6 +43,14 @@ not model a remote network or a production Redis Cluster's other workloads.
 
 ## Results
 
+The matrix was regenerated after correcting the batch-one mixed workload. All
+six batch-one mixed cases (two stores x three rule counts) now admit **51 of
+100** jobs: one hot identity and 50 distinct cold identities. The earlier
+batch-one rows measured only hot jobs and are superseded. The full run includes
+54 matrix cases and three contention cases, with every scenario recorded. Matrix
+latencies are observations from this run, not a paired comparison between code
+revisions. No builds or tests ran alongside it.
+
 The final static medians were **114.27 ms before and 106.22 ms after** for
 100,000 jobs. Median p99 per-start delay was **1.382 ms before and 1.312 ms
 after**. Both pass the unchanged 15% regression gate. This run found no static
@@ -51,23 +61,23 @@ p99 ideal-sequence delay was 506.32 ms before and 491.78 ms after, so the origin
 
 At the default batch of 32 with two rules:
 
-- Cold recipients: memory median **0.039 ms**, Redis median **0.322 ms**;
-  Redis p99 **0.907 ms**, with all 3,200 jobs admitted.
-- Mixed recipients: memory median **0.034 ms**, Redis median **0.267 ms**;
-  1,601 of 3,200 jobs admitted. Redis evaluated about **117,479 jobs/s**.
-- One hot recipient: Redis median **0.164 ms** with only one admission across
+- Cold recipients: memory median **0.038 ms**, Redis median **0.298 ms**;
+  Redis p99 **0.837 ms**, with all 3,200 jobs admitted.
+- Mixed recipients: memory median **0.035 ms**, Redis median **0.289 ms**;
+  1,601 of 3,200 jobs admitted. Redis evaluated about **95,367 jobs/s**.
+- One hot recipient: Redis median **0.236 ms** with only one admission across
   3,200 evaluations. This illustrates why denial speed must not be presented
   as useful throughput.
 
 The largest cold scenario, batch 128 with 16 rules, touched 1,921 unique rate
-keys per call. Redis median was **12.38 ms**, p99 **16.97 ms**. Its mixed case
-used 976 keys and had a **6.83 ms** median. Large batches with many independent
+keys per call. Redis median was **12.46 ms**, p99 **20.83 ms**. Its mixed case
+used 976 keys and had a **7.35 ms** median. Large batches with many independent
 keys can monopolize a Redis shard for materially longer than the default
 workload; the 128-job cap is a maximum, not a recommended default.
 
 For one, four and eight concurrent clients sharing one quota domain, mixed
-32-job batches evaluated about **93,517**, **139,198**, and **142,100 jobs/s**.
-Median call latency grew from **0.295 ms** to **0.855 ms** to **1.733 ms**.
+32-job batches evaluated about **50,041**, **136,932**, and **141,884 jobs/s**.
+Median call latency grew from **0.649 ms** to **0.879 ms** to **1.767 ms**.
 The extra clients do not remove the hot-slot constraint. These are loopback
 client-observed durations, including JavaScript and network overhead, not
 isolated Lua CPU timings or Cluster capacity claims.
@@ -94,8 +104,9 @@ The current built-artifact timing run includes the scoped priority fix and
 persistent static-policy ownership guard. Current core/Redis sizes are
 **11,843 / 6,088 bytes**, still within the existing ceilings. The retained
 `size.json` describes the original measurement; these follow-up sizes come
-from `pnpm check:size`. The scoped store matrix is unchanged and was not rerun;
-its workloads do not exercise static ownership or changed test helpers.
+from `pnpm check:size`. The regenerated scoped matrix above does not change
+the retained static comparison; no library runtime code changed in the benchmark
+correction.
 
 ## Correctness checks
 
