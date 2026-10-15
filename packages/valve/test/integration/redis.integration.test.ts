@@ -167,7 +167,7 @@ suite('real Redis/Valkey', () => {
     // Documented limit: a flush, eviction, or stale failover erases admission
     // history, and Redis answers normally afterwards.
     const store = redisStore({ client: io, prefix });
-    const id = 'state-loss';
+    const id = `state-loss-${crypto.randomUUID()}`;
     const rules = normalize({
       id,
       rate: [
