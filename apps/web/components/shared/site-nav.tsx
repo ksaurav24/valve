@@ -8,6 +8,7 @@ import { SearchTrigger } from 'fumadocs-ui/layouts/shared/slots/search-trigger';
 import { AnimatedThemeToggler } from '@/components/magicui/animated-theme-toggler';
 import { FluidHoverHighlight } from '@/components/fluid-hover-highlight';
 import { GitHubStars } from '@/components/shared/github-stars';
+import { NpmDownloads } from '@/components/shared/npm-downloads';
 import {
   DropdownContent,
   DropdownMenu,
@@ -22,7 +23,13 @@ function isActive(pathname: string, href: string) {
   return href === '/' ? pathname === '/' : pathname.startsWith(href);
 }
 
-export function SiteNav({ stars }: { stars: number }) {
+export function SiteNav({
+  stars,
+  downloads,
+}: {
+  stars: number;
+  downloads: number | null;
+}) {
   const pathname = usePathname();
   const router = useRouter();
   const listRef = useRef<HTMLDivElement>(null);
@@ -33,16 +40,16 @@ export function SiteNav({ stars }: { stars: number }) {
 
   return (
     <header className="sticky top-0 z-40 border-b border-border bg-background/80 backdrop-blur-md supports-[backdrop-filter]:bg-background/65">
-      <div className="mx-auto flex h-14 max-w-[90rem] items-center gap-4 px-4 sm:px-6">
+      <div className="mx-auto flex h-14 max-w-[90rem] items-center gap-2 px-4 sm:gap-4 sm:px-6">
         <Link
           href="/"
-          className="font-mono text-[15px] font-semibold tracking-tight text-foreground"
+          className="shrink-0 font-mono text-[15px] font-semibold tracking-tight text-foreground"
           aria-label="valve home"
         >
           valve<span className="text-muted-foreground">_</span>
         </Link>
 
-        <nav aria-label="Main navigation" className="hidden md:block">
+        <nav aria-label="Main navigation" className="hidden lg:block">
           <div
             ref={listRef}
             className="relative flex items-center"
@@ -72,15 +79,16 @@ export function SiteNav({ stars }: { stars: number }) {
           </div>
         </nav>
 
-        <div className="ml-auto flex items-center gap-1.5">
+        <div className="ml-auto flex items-center gap-1 sm:gap-1.5">
           <SearchTrigger
             hideIfDisabled
             className="text-muted-foreground"
             aria-label="Search documentation"
           />
           <GitHubStars initial={stars} />
+          <NpmDownloads initial={downloads} />
           <AnimatedThemeToggler />
-          <div className="md:hidden">
+          <div className="lg:hidden">
             <DropdownMenu>
               <DropdownTrigger
                 aria-label="Open navigation"

@@ -1,5 +1,19 @@
 import type { SVGProps } from 'react';
 
+/** npm wordmark from npm/logos, using the surrounding text color. */
+export function NpmIcon(props: SVGProps<SVGSVGElement>) {
+  return (
+    <svg
+      viewBox="0 0 780 250"
+      fill="currentColor"
+      aria-hidden="true"
+      {...props}
+    >
+      <path d="M240 250h100v-50h100V0H240v250zm100-200h50v100h-50V50zM480 0v200h100V50h50v150h50V50h50v150h50V0H480zM0 200h100V50h50v150h50V0H0v200z" />
+    </svg>
+  );
+}
+
 /** GitHub mark. lucide-react no longer ships brand icons. */
 export function GitHubIcon(props: SVGProps<SVGSVGElement>) {
   return (

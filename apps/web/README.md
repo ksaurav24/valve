@@ -31,14 +31,14 @@ writes deployable files to `apps/web/out`. Hosting needs no Node.js server.
 
 ## Data and sources of truth
 
-Nothing in this app hardcodes a version, star count, or contributor list.
+Nothing in this app hardcodes a version, star count, download count, or contributor list.
 
 - `scripts/sync-content.mjs` copies the version from
   `packages/valve/package.json` into `.generated/release.json`, the package
   changelog into `content/changelog/` (and parsed entries into
   `.generated/changelog.json`), and the root `CONTRIBUTING.md` into
   `content/contributing/`. All outputs are gitignored. Edit the sources.
-- `scripts/sync-metadata.mjs` fetches the npm packument, stars, contributors,
+- `scripts/sync-metadata.mjs` fetches the npm packument, download count, stars, contributors,
   and GitHub Releases into `.generated/metadata.json`. Set `GITHUB_TOKEN` to
   raise the API limit. Failed or suspicious answers (errors, rate limits, a
   zero or empty answer when the snapshot has data) keep the committed
@@ -55,6 +55,11 @@ Nothing in this app hardcodes a version, star count, or contributor list.
 - The navigation star count refreshes in the browser with SWR against the
   public GitHub API, cached for an hour in `localStorage`, falling back to the
   build value. No token reaches the browser.
+- The npm counter links to the package and counts downloads in the last 30
+  available days. It refreshes with SWR against npm's public downloads API,
+  with requests deduplicated for an hour. Failed requests keep the build value;
+  a valid zero replaces an older count. npm updates statistics daily, so a new
+  package may show `—` until data is available. No count is invented for a 404.
 
 Run both syncs with `pnpm --filter @valve/web sync`. The merge rules live in
 `scripts/merge-metadata.mjs` and are covered by `pnpm --filter @valve/web test`.

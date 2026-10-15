@@ -1,5 +1,7 @@
-# valve
+# valvejs
 
+[![npm beta version](https://img.shields.io/npm/v/valvejs/beta.svg?label=npm%20beta)](https://www.npmjs.com/package/valvejs?activeTab=versions)
+[![npm downloads per month](https://img.shields.io/npm/dm/valvejs.svg)](https://www.npmjs.com/package/valvejs)
 [![CI](https://github.com/ksaurav24/valve/actions/workflows/ci.yml/badge.svg?branch=master)](https://github.com/ksaurav24/valve/actions/workflows/ci.yml)
 [![License: Apache-2.0](https://img.shields.io/badge/license-Apache--2.0-blue.svg)](LICENSE)
 [![GitHub stars](https://img.shields.io/github/stars/ksaurav24/valve)](https://github.com/ksaurav24/valve/stargazers)
@@ -10,6 +12,8 @@
 valve queues outbound API calls under one budget shared by your workers,
 stored in Redis or Valkey. When the provider asks you to slow down, every
 worker sharing that budget pauses. A memory store supports single-process use.
+
+[Documentation](https://valvejs.vercel.app/docs/) · [npm package](https://www.npmjs.com/package/valvejs) · [Releases](https://valvejs.vercel.app/releases/)
 
 ## Quickstart
 

@@ -1,5 +1,6 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
+import { parseDownloads } from '../lib/npm-downloads.mjs';
 import {
   mergeMetadata,
   parseContributors,
@@ -12,15 +13,55 @@ const snapshot = {
     beta: null,
     versions: { '1.0.0': '2026-01-01T00:00:00Z' },
   },
+  downloads: 42,
   repo: { stars: 42, forks: 3 },
   contributors: [{ login: 'a', avatar: '', url: '', contributions: 5 }],
   releases: [{ tag: 'v1.0.0', name: 'v1.0.0', url: '', publishedAt: null }],
 };
 const failed = { ok: false, reason: 'HTTP 403' };
 
+test('download counts accept zero and reject malformed or unrelated data', () => {
+  assert.equal(parseDownloads({ package: 'valvejs', downloads: 0 }), 0);
+  assert.equal(parseDownloads({ package: 'valvejs', downloads: 1234 }), 1234);
+  for (const json of [
+    null,
+    {},
+    { error: 'not found' },
+    { package: 'another-package', downloads: 10 },
+    { package: 'valvejs', downloads: -1 },
+    { package: 'valvejs', downloads: 1.5 },
+    { package: 'valvejs', downloads: '10' },
+  ])
+    assert.throws(() => parseDownloads(json));
+});
+
+test('a rolling download count can decrease to zero; outages keep the snapshot', () => {
+  const fresh = {
+    npm: failed,
+    repo: failed,
+    contributors: failed,
+    releases: failed,
+  };
+  const { data, status } = mergeMetadata(snapshot, {
+    ...fresh,
+    downloads: { ok: true, value: 0 },
+  });
+  assert.equal(data.downloads, 0);
+  assert.equal(status.downloads, 'fresh');
+  assert.equal(
+    mergeMetadata(snapshot, { ...fresh, downloads: failed }).data.downloads,
+    42,
+  );
+  assert.equal(
+    mergeMetadata({}, { ...fresh, downloads: failed }).data.downloads,
+    null,
+  );
+});
+
 test('failed fetches keep every snapshot field', () => {
   const { data, status } = mergeMetadata(snapshot, {
     npm: failed,
+    downloads: failed,
     repo: failed,
     contributors: failed,
     releases: failed,
@@ -32,6 +73,7 @@ test('failed fetches keep every snapshot field', () => {
 test('zero stars or empty lists never replace cached data', () => {
   const { data } = mergeMetadata(snapshot, {
     npm: { ok: true, value: parsePackument(null) },
+    downloads: failed,
     repo: { ok: true, value: { stars: 0, forks: 0 } },
     contributors: { ok: true, value: [] },
     releases: { ok: true, value: [] },
@@ -42,6 +84,7 @@ test('zero stars or empty lists never replace cached data', () => {
 test('fresh answers replace the snapshot', () => {
   const { data, status } = mergeMetadata(snapshot, {
     npm: failed,
+    downloads: failed,
     repo: { ok: true, value: { stars: 43, forks: 3 } },
     contributors: failed,
     releases: failed,
@@ -55,6 +98,7 @@ test('an npm 404 with no snapshot means nothing is published', () => {
     {},
     {
       npm: { ok: true, value: parsePackument(null) },
+      downloads: failed,
       repo: failed,
       contributors: failed,
       releases: failed,

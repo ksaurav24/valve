@@ -58,17 +58,17 @@ export function GitHubStars({
     <a
       href={site.repository}
       className={cn(
-        'group inline-flex h-8 items-center overflow-hidden rounded-md border border-border text-xs font-medium text-muted-foreground hover:border-ring hover:text-foreground',
+        'group inline-flex h-8 shrink-0 items-center overflow-hidden rounded-md border border-border text-xs font-medium text-muted-foreground hover:border-ring hover:text-foreground',
         className,
       )}
       aria-label={`valve on GitHub, ${stars} stars`}
     >
-      <span className="flex h-full items-center gap-1.5 px-2.5">
+      <span className="flex h-full items-center gap-1.5 px-2 sm:px-2.5">
         <GitHubIcon className="size-3.5" />
         <span className="hidden sm:inline">GitHub</span>
       </span>
-      <span className="flex h-full items-center gap-1 border-l border-border bg-muted/60 px-2.5 tabular-nums group-hover:bg-accent">
-        <Star className="size-3 transition-transform duration-150 group-hover:scale-110 group-hover:fill-current" />
+      <span className="hidden h-full items-center gap-1 border-l border-border bg-muted/60 px-2 tabular-nums group-hover:bg-accent min-[480px]:flex sm:px-2.5">
+        <Star className="hidden size-3 transition-transform duration-150 group-hover:scale-110 group-hover:fill-current sm:block" />
         {compact.format(stars)}
       </span>
     </a>

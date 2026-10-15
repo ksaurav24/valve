@@ -1,4 +1,5 @@
 import { mkdir, readFile, writeFile } from 'node:fs/promises';
+import { downloadsEndpoint, parseDownloads } from '../lib/npm-downloads.mjs';
 import {
   mergeMetadata,
   parseContributors,
@@ -49,22 +50,25 @@ async function readSnapshot() {
 }
 
 const api = `https://api.github.com/repos/${repo}`;
-const [snapshot, npm, repository, contributors, releases] = await Promise.all([
-  readSnapshot(),
-  load(
-    `https://registry.npmjs.org/${pkg.replace('/', '%2f')}`,
-    { accept: 'application/json' },
-    parsePackument,
-    // npm answers 404 until the first publish: a valid "nothing published".
-    { notFound: null },
-  ),
-  load(api, github, parseRepo),
-  load(`${api}/contributors?per_page=100`, github, parseContributors),
-  load(`${api}/releases?per_page=100`, github, parseReleases),
-]);
+const [snapshot, npm, downloads, repository, contributors, releases] =
+  await Promise.all([
+    readSnapshot(),
+    load(
+      `https://registry.npmjs.org/${pkg.replace('/', '%2f')}`,
+      { accept: 'application/json' },
+      parsePackument,
+      // npm answers 404 until the first publish: a valid "nothing published".
+      { notFound: null },
+    ),
+    load(downloadsEndpoint, { accept: 'application/json' }, parseDownloads),
+    load(api, github, parseRepo),
+    load(`${api}/contributors?per_page=100`, github, parseContributors),
+    load(`${api}/releases?per_page=100`, github, parseReleases),
+  ]);
 
 const { data, status } = mergeMetadata(snapshot, {
   npm,
+  downloads,
   repo: repository,
   contributors,
   releases,

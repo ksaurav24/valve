@@ -2,6 +2,9 @@ import type { ReactNode } from 'react';
 import { DocsLayout } from 'fumadocs-ui/layouts/docs';
 import { source } from '@/lib/source';
 import { AnimatedThemeToggler } from '@/components/magicui/animated-theme-toggler';
+import { NpmDownloads } from '@/components/shared/npm-downloads';
+import { monthlyDownloads } from '@/lib/npm';
+import { site } from '@/lib/site';
 
 export default function Layout({ children }: { children: ReactNode }) {
   return (
@@ -15,7 +18,7 @@ export default function Layout({ children }: { children: ReactNode }) {
         ),
         url: '/',
       }}
-      githubUrl="https://github.com/ksaurav24/valve"
+      githubUrl={site.repository}
       sidebar={{ defaultOpenLevel: 1 }}
       slots={{ themeSwitch: AnimatedThemeToggler }}
       links={[
@@ -23,6 +26,11 @@ export default function Layout({ children }: { children: ReactNode }) {
         { text: 'Releases', url: '/releases' },
         { text: 'Contributors', url: '/contributors' },
         { text: 'TypeDoc', url: '/api/index.html', external: true },
+        {
+          type: 'custom',
+          secondary: true,
+          children: <NpmDownloads initial={monthlyDownloads} />,
+        },
       ]}
     >
       {children}

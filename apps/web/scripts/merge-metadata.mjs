@@ -13,6 +13,7 @@ function pick(fresh, cached, isEmpty) {
 
 export const emptyMetadata = {
   npm: { latest: null, beta: null, versions: {} },
+  downloads: null,
   repo: { stars: 0, forks: 0 },
   contributors: [],
   releases: [],
@@ -30,6 +31,8 @@ export function mergeMetadata(snapshot, fresh) {
       base.npm,
       (npm) => Object.keys(npm.versions).length === 0,
     ),
+    // A rolling 30-day count may legitimately fall, including all the way to zero.
+    downloads: pick(fresh.downloads, base.downloads, (count) => count === null),
     repo: pick(fresh.repo, base.repo, (repo) => repo.stars === 0),
     contributors: pick(
       fresh.contributors,
