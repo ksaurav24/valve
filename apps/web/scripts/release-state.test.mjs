@@ -36,3 +36,13 @@ test('the maturity label ends at 1.0, independently of latest', () => {
   assert.equal(npmVersionState('1.0.0', npm), 'latest');
   assert.equal(npmVersionState('1.1.0', npm), 'published');
 });
+
+test('grouped preview notes never masquerade as a plain npm release or new development', () => {
+  const npm = {
+    latest: '0.4.0',
+    versions: { '0.4.0': null, '0.3.0-beta.0': null },
+  };
+  assert.equal(npmVersionState('0.3.0', npm, ['0.3.0-beta.0']), 'historical');
+  assert.equal(npmVersionState('0.4.1', npm), 'dev');
+  assert.equal(npmVersionState('0.4.0', npm), 'latest');
+});

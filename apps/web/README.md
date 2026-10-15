@@ -49,7 +49,7 @@ Nothing in this app hardcodes a version, star count, download count, or contribu
   Other changelog entries are development versions: they appear on
   `/changelog`, never on `/releases`. In MDX, wrap text in `<Unpublished>` or
   `<Published>` when it depends on that state. Publication labels (`latest`,
-  `published`, or `dev · unreleased`) come from npm. A separate `beta` label
+  `published`, `historical notes`, or `dev · unreleased`) come from npm. A separate `beta` label
   describes API maturity for all 0.x versions, independently of publication.
   Install commands use the unqualified package name, `valvejs`.
 - The navigation star count refreshes in the browser with SWR against the
@@ -71,9 +71,11 @@ npm trusted publishing, then the git tag and GitHub Release. Versions use
 plain `x.y.z` numbers and npm's default `latest` channel. GitHub releases are
 named `valvejs@x.y.z` and are ordinary releases; beta is the project's maturity
 label until 1.0, rather than a prerelease suffix or separate install channel.
-The website omits historical prerelease entries from `/changelog`, `/releases`,
-and the homepage changelog. Their original notes remain in the full package
-changelog, and their published versions and GitHub releases remain available. If the
+The website groups preview-only series under plain version headings on
+`/changelog` and the homepage, marked as historical notes. Once a plain release
+has its own changelog entry, that entry replaces the preview series in these
+lists. `/releases` includes only versions actually published to npm. Original
+build names and notes remain in the full package changelog and on GitHub. If the
 `VERCEL_DEPLOY_HOOK` secret exists, the workflow then triggers a rebuild so
 `/releases` picks up the new npm data. Pushes to `master` rebuild through the
 host's Git integration.

@@ -30,8 +30,10 @@ export default function ChangelogPage() {
           >
             packages/valve/CHANGELOG.md
           </a>
-          . Versions npm does not list are development versions. Historical
-          prerelease notes remain in the full package changelog linked above.
+          . Preview-only history is grouped under plain headings and marked as
+          historical notes. Other versions npm does not list are development
+          versions. Original build versions remain in the full package
+          changelog.
         </p>
       </PageHeader>
       <div className="mx-auto max-w-5xl px-4 py-12 sm:px-6">

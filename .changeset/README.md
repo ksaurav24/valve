@@ -36,5 +36,6 @@ version before removing the obsolete npm channel with
 `npm dist-tag rm valvejs beta` from an authenticated maintainer session.
 Verify `latest` points to the new version first. Existing prerelease versions,
 Git tags, GitHub releases, and full package changelog entries remain available.
-The website omits historical prereleases from its version lists; users who
+The website groups preview-only history under plain headings without claiming
+a plain npm release was published. Users who
 installed with `@beta` should switch to `npm install valvejs`.

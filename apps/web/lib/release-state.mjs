@@ -1,10 +1,12 @@
 /**
  * @param {string} version
  * @param {{ latest: string | null, versions: Record<string, string | null> }} npm
- * @returns {'dev' | 'latest' | 'published'}
+ * @param {string[] | undefined} sourceVersions
+ * @returns {'dev' | 'latest' | 'published' | 'historical'}
  */
-export function npmVersionState(version, npm) {
-  if (!Object.hasOwn(npm.versions, version)) return 'dev';
+export function npmVersionState(version, npm, sourceVersions) {
+  if (!Object.hasOwn(npm.versions, version))
+    return sourceVersions?.length ? 'historical' : 'dev';
   return version === npm.latest ? 'latest' : 'published';
 }
 
