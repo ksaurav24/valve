@@ -1,3 +1,4 @@
+import { scopedCases } from '../scoped-cases.js';
 import { randomUUID } from 'node:crypto';
 import { fork } from 'node:child_process';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
@@ -40,6 +41,67 @@ suite('scoped Redis/Valkey admission', () => {
     await other.close();
     await io.quit();
     await node.quit();
+  });
+  it.each(scopedCases)('$name', async ({ rate, steps }) => {
+    const id = randomUUID();
+    const rules = normalize({ id, rate }).rules;
+    for (const step of steps) {
+      const plan = prepareScoped({ id, rules, jobs: step.jobs });
+      const keys = ['config', 'pause', 'leases', ...plan.keys].map(
+        (key) => `${prefix}:{${id}}:${key}`,
+      );
+      expect(
+        await io.eval(
+          withLuaClock(SCOPED),
+          keys.length,
+          ...keys,
+          JSON.stringify(plan),
+          step.now,
+        ),
+      ).toEqual([
+        step.expected.grantedIndexes,
+        step.expected.blocked.map((b) => [b.index, b.retryAfterMs]),
+        [],
+      ]);
+    }
+  });
+  it('expires inactive scoped keys automatically and restores their budgets', async () => {
+    const id = 'expiry';
+    const rules = normalize({
+      id,
+      rate: [
+        {
+          name: 'pacing',
+          scope: 'recipient',
+          limit: 1,
+          interval: 500,
+          burst: 2,
+        },
+        {
+          name: 'window',
+          scope: 'recipient',
+          limit: 2,
+          interval: 500,
+          algorithm: 'fixed-window',
+        },
+      ],
+    }).rules;
+    const req = { id, rules, jobs: [{ cost: 2, scopes: { recipient: 'A' } }] };
+    expect((await store.acquireScoped!(req)).grantedIndexes).toEqual([0]);
+    const pacing = `${prefix}:{${id}}:s:named:pacing:A`;
+    const window = `${prefix}:{${id}}:s:named:window:A`;
+    expect(Number(await io.call('PEXPIRETIME', pacing))).toBe(
+      Math.ceil(Number(await io.get(pacing))),
+    );
+    const windowIndex = Number(await io.hget(window, 'w'));
+    expect(Number(await io.call('PEXPIRETIME', window))).toBe(
+      (windowIndex + 1) * 500,
+    );
+    await expect
+      .poll(() => io.exists(pacing, window), { timeout: 3000 })
+      .toBe(0);
+    expect(await io.pttl(`${prefix}:{${id}}:config`)).toBe(-1);
+    expect((await other.acquireScoped!(req)).grantedIndexes).toEqual([0]);
   });
   it('grants sparsely, shares state across clients and recovers NOSCRIPT', async () => {
     const req = make('sparse');
@@ -284,8 +346,10 @@ suite('scoped Redis/Valkey admission', () => {
   });
   it('bounds combined admissions across independent processes', async () => {
     const id = `process-${randomUUID()}`;
+    const children: ReturnType<typeof fork>[] = [];
+    let ready = 0;
     const run = () =>
-      new Promise<number>((resolve, reject) => {
+      new Promise<string[]>((resolve, reject) => {
         const child = fork(
           new URL('./scoped-worker.mjs', import.meta.url),
           [],
@@ -299,13 +363,16 @@ suite('scoped Redis/Valkey admission', () => {
             stdio: ['ignore', 'pipe', 'pipe', 'ipc'],
           },
         );
-        let result: number | undefined;
+        children.push(child);
+        let result: string[] | undefined;
         let stderr = '';
         child.stderr!.on('data', (data) => {
           stderr += String(data);
         });
         child.on('message', (value) => {
-          result = Number(value);
+          if (value === 'ready') {
+            if (++ready === 4) for (const worker of children) worker.send('go');
+          } else if (Array.isArray(value)) result = value;
         });
         child.on('error', reject);
         child.on('exit', (code) =>
@@ -314,11 +381,12 @@ suite('scoped Redis/Valkey admission', () => {
             : reject(new Error(stderr || `worker exit ${code}`)),
         );
       });
-    expect(
-      (await Promise.all([run(), run(), run(), run()])).reduce(
-        (a, b) => a + b,
-        0,
-      ),
-    ).toBe(10);
+    try {
+      const admitted = (await Promise.all([run(), run(), run(), run()])).flat();
+      expect(admitted).toHaveLength(10);
+      expect(new Set(admitted).size).toBe(10);
+    } finally {
+      for (const child of children) child.kill();
+    }
   });
 });

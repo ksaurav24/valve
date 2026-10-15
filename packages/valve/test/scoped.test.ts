@@ -1,3 +1,4 @@
+import { scopedCases } from './scoped-cases.js';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { createValve, memoryStore } from '../src/index.js';
 import { normalize } from '../src/rules.js';
@@ -31,6 +32,46 @@ const request = (
 afterEach(() => vi.useRealTimers());
 
 describe('scoped atomic memory admission', () => {
+  it.each(scopedCases)('$name', async ({ rate, steps }) => {
+    let now = 0;
+    const store = memoryStore({ clock: () => now });
+    const id = 'boundaries';
+    const rules = normalize({ id, rate }).rules;
+    for (const step of steps) {
+      now = step.now;
+      expect(
+        await store.acquireScoped!({ id, rules, jobs: step.jobs }),
+      ).toEqual(step.expected);
+    }
+    await store.close();
+  });
+  it('names missing dimensions before queueing or accessing the store', async () => {
+    const store = memoryStore();
+    const acquire = vi.spyOn(store, 'acquireScopedSync');
+    const api = createValve({
+      id: 'missing',
+      store,
+      rate: [
+        { name: 'tenant', scope: 'tenant', limit: 1, interval: '1s' },
+        { name: 'recipient', scope: 'recipient', limit: 1, interval: '1s' },
+      ],
+    });
+    for (const scopes of [undefined, {}, { tenant: 'T' }]) {
+      await expect(
+        api.run(() => 0, scopes ? { scopes } : {}),
+      ).rejects.toMatchObject({
+        code: 'INVALID_OPTIONS',
+        message: expect.stringContaining(
+          `Missing required scope identity "${scopes?.tenant ? 'recipient' : 'tenant'}"`,
+        ),
+      });
+    }
+    expect(acquire).not.toHaveBeenCalled();
+    await expect(
+      api.run(() => 42, { scopes: { tenant: 'T', recipient: 'A' } }),
+    ).resolves.toBe(42);
+    await api.close();
+  });
   it('spends all budgets or none and uses intermediate state within a batch', async () => {
     let now = 1000;
     const store = memoryStore({ clock: () => now });
@@ -591,4 +632,37 @@ it('prioritizes all eligible delayed jobs across batch boundaries', async () => 
   await Promise.all(jobs);
   expect(started).toEqual([99, 0, 1, 2, 3, 4, 5]);
   await api.close();
+});
+
+it('skips high-priority delayed identities across batches and cancels all their timers', async () => {
+  vi.useFakeTimers();
+  const api = createValve({
+    id: 'cancel-batches',
+    rate: rate.slice(1),
+    batch: 2,
+  });
+  const seed = api.run(() => 0, { scopes: { recipient: 'A' } });
+  await vi.advanceTimersByTimeAsync(0);
+  await seed;
+  const controller = new AbortController();
+  const blocked = vi.fn();
+  const jobs = Array.from({ length: 6 }, () =>
+    api
+      .run(blocked, {
+        scopes: { recipient: 'A' },
+        priority: 10,
+        signal: controller.signal,
+      })
+      .catch((error) => error.code),
+  );
+  const ready = api.run(() => 'B', { scopes: { recipient: 'B' } });
+  await vi.advanceTimersByTimeAsync(0);
+  expect(await ready).toBe('B');
+  expect(blocked).not.toHaveBeenCalled();
+  controller.abort();
+  expect(await Promise.all(jobs)).toEqual(Array(6).fill('ABORTED'));
+  await vi.advanceTimersByTimeAsync(100);
+  expect(blocked).not.toHaveBeenCalled();
+  await api.close();
+  expect(vi.getTimerCount()).toBe(0);
 });

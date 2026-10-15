@@ -90,21 +90,28 @@ the existing factory and store entry points.
 The timing run preceded a final scoped-only priority fix that promotes overdue
 delayed jobs in bounded batches before selection. That fix does not change the
 static admission branch or the store-only matrix workloads. Bundle measurements
-include the fix.
+include the fix. A subsequent missing-identity diagnostic change brings current
+core/Redis sizes to **11,834 / 6,088 bytes**, still within those ceilings. The
+retained size JSON describes the original measurement; these follow-up sizes
+come from `pnpm check:size`. The diagnostic revision does not change algorithms,
+Lua, or the static admission path; the timings above were not remeasured for it.
 
 ## Correctness checks
 
-The unit suite passes 326 tests with 98.32% line coverage and the existing
+The unit suite passes 330 tests with 98.32% line coverage and the existing
 coverage thresholds. Integration checks
 run against Redis 7, Valkey 8, and a three-master Redis Cluster. Tests cover:
 
+- Exact UTC boundary checks and mixed GCRA bursts/fixed windows use explicit
+  expected timelines against both memory and Lua. Real-store expiry checks
+  verify expiry timestamps, automatic cleanup, and full recovered capacity.
 - All-or-none spending, sparse grants, weighted costs, repeated identities,
   multiple scope dimensions, priority, cancellation, deadlines and shutdown.
 - A deterministic memory/Lua comparison over 100 generated workloads, with
   several batches per workload and varying clock advances.
 - Shared policy compatibility, collision-free keys, wrong Redis types and
   malformed state rejected before configuration, quota or lease mutation.
-- Indexed leases, renewal/release/expiry, four independent worker processes,
+- Indexed leases, renewal/release/expiry, four synchronized independent worker processes with unique-identity assertions,
   Cluster slot compatibility, and script-cache recovery.
 - Restart/outage policies, reconnect, state loss, and a committed command whose
   result arrives after the client timeout. The timed-out attempt does not run

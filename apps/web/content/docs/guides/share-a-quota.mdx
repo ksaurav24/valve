@@ -146,7 +146,8 @@ migration. Before resetting the fingerprint:
 2. Let outstanding Redis commands settle and close the old clients. Account for
    timed-out commands and offline queues as described in
    [Timeouts and reconnection](/docs/reference/redis-store/#timeouts-and-reconnection).
-3. Wait until all old `PREFIX:{ID}:r:*` keys have expired and the provider's quota
+3. Wait until all old shared `PREFIX:{ID}:r:*` and scoped `PREFIX:{ID}:s:*`
+   rate keys have expired and the provider's quota
    has fully recovered. GCRA debt can exceed one interval when `burst > limit`.
    Confirm that `PREFIX:{ID}:leases` is empty or expired and that no old jobs can
    start or continue. Leave any provider cooldown in place.
@@ -164,6 +165,34 @@ Do not delete the config key while workers are active. Changing the prefix or id
 creates an independent budget: old and new workers can exceed a provider quota
 when they overlap. A namespace change requires the same drain and recovery
 steps, or an external mechanism that enforces a common budget during migration.
+
+### Adding, renaming, or removing rules
+
+Prepare the complete new policy before the coordinated migration above:
+
+- **Add a scoped rule:** update every producer to supply its required identity at
+  the cutover. For example, adding `{ name: 'recipientPacing', scope: 'recipient',
+limit: 1, interval: '6s' }` requires `scopes: { recipient: stableId }` on every
+  job. Stage the code behind a deployment gate, then switch policy and callers
+  together after draining. Old policies reject extra dimensions; new policies
+  reject missing ones.
+- **Rename a rule or dimension:** change all worker configurations and, for a
+  dimension rename, every caller's `scopes` property. A name selects state keys;
+  a rename is not a cosmetic edit and does not transfer the old counter.
+- **Remove a rule:** remove its identity from callers only if no remaining rule
+  uses that dimension. Wait for the old quota to recover before starting the
+  reduced policy; removing a rule does not cancel provider restrictions.
+- **Change an algorithm, interval, limit, or burst:** use the same migration,
+  even for a limit increase. Valve cannot infer whether the provider permits
+  reinterpreting existing debt or counts under the new settings.
+
+Routine rolling deployments with an unchanged normalized policy retain their
+budgets. Mixed-policy rolling deployments are unsupported: new workers receive
+fingerprint conflicts until the coordinated cutover. If uninterrupted processing
+is required during a policy change, use external coordination that enforces the
+common provider budget. Do not delete the fingerprint or switch IDs while old
+workers are still admitting jobs. Normal inactive-scope expiry needs no migration
+or administrative deletion.
 
 ### Upgrading older Valve workers
 

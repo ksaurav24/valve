@@ -13,12 +13,17 @@ export function scopeSnapshot(
       'INVALID_OPTIONS',
       'scopes must contain exactly the configured dimensions with opaque nonempty string values of at most 256 characters.',
     );
+  if (input === undefined) input = {};
   if (!input || typeof input !== 'object' || Array.isArray(input)) throw bad();
   const values = input as Record<string, unknown>;
-  if (Object.keys(values).length !== dimensions.length) throw bad();
   const copy: Record<string, string> = Object.create(null);
   for (const dimension of dimensions) {
-    if (!Object.hasOwn(values, dimension)) throw bad();
+    if (!Object.hasOwn(values, dimension))
+      throw failure(
+        id,
+        'INVALID_OPTIONS',
+        `Missing required scope identity "${dimension}" in options.scopes.`,
+      );
     const value = values[dimension];
     if (typeof value !== 'string' || !value.length || value.length > 256)
       throw bad();
@@ -29,6 +34,7 @@ export function scopeSnapshot(
     }
     copy[dimension] = value;
   }
+  if (Object.keys(values).length !== dimensions.length) throw bad();
   return Object.freeze(copy);
 }
 
