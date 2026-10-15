@@ -2,6 +2,21 @@
   "name": "valvejs",
   "version": "0.3.0-beta.0",
   "description": "One rate limit for every worker that calls an API.",
+  "homepage": "https://valvejs.vercel.app/",
+  "bugs": {
+    "url": "https://github.com/ksaurav24/valve/issues"
+  },
+  "keywords": [
+    "rate-limit",
+    "rate-limiter",
+    "distributed",
+    "redis",
+    "valkey",
+    "queue",
+    "throttling",
+    "fetch",
+    "typescript"
+  ],
   "type": "module",
   "sideEffects": false,
   "license": "Apache-2.0",

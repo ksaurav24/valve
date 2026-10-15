@@ -3,6 +3,10 @@
   "private": true,
   "version": "0.0.0",
   "description": "Workspace tooling for valve",
+  "homepage": "https://valvejs.vercel.app/",
+  "bugs": {
+    "url": "https://github.com/ksaurav24/valve/issues"
+  },
   "license": "Apache-2.0",
   "author": "Saurav K. <ksaurav4093@gmail.com>",
   "repository": {

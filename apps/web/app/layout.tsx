@@ -8,6 +8,8 @@ import '@fontsource-variable/geist-mono';
 import './globals.css';
 
 export const metadata: Metadata = {
+  metadataBase: new URL(site.url),
+  applicationName: site.packageName,
   title: { default: 'valve', template: '%s | valve' },
   description: site.description,
 };

@@ -1,10 +1,15 @@
-# valve
+# valvejs
 
-One rate limit for every worker that calls an API.
+[![npm beta version](https://img.shields.io/npm/v/valvejs/beta.svg?label=npm%20beta)](https://www.npmjs.com/package/valvejs?activeTab=versions)
+[![npm downloads per month](https://img.shields.io/npm/dm/valvejs.svg)](https://www.npmjs.com/package/valvejs)
+
+**One rate limit for every worker that calls an API.**
 
 valve queues outbound API calls under one budget shared by your workers,
 stored in Redis or Valkey. When the provider asks you to slow down, every
 worker sharing that budget pauses. A memory store supports single-process use.
+
+[Documentation](https://valvejs.vercel.app/docs/) · [npm package](https://www.npmjs.com/package/valvejs) · [Releases](https://valvejs.vercel.app/releases/)
 
 ## Quickstart
 
@@ -35,7 +40,7 @@ Pass a connected `ioredis` or `node-redis` client. valve uses its structural
 interface and never owns its connection. Disable command-client offline queues
 (`enableOfflineQueue: false` for ioredis, `disableOfflineQueue: true` for
 node-redis) to reject commands issued while disconnected. Store timeouts do not
-cancel commands already sent; see [timeouts and reconnection](https://github.com/ksaurav24/valve/blob/master/apps/web/content/docs/reference/redis-store.mdx#timeouts-and-reconnection).
+cancel commands already sent; see [timeouts and reconnection](https://valvejs.vercel.app/docs/reference/redis-store/#timeouts-and-reconnection).
 Each worker uses the same server,
 prefix, id, and rules. The library has zero runtime and peer dependencies.
 
@@ -80,8 +85,8 @@ subsequent grants; already-issued grants can still start. A cancelled job or
 timed-out store call can waste its grant. Queued work does not survive process
 failure, and `onStoreError: 'open'` gives up shared rate guarantees while the
 store is unavailable. Rate bounds do not survive
-[loss of Redis state](https://github.com/ksaurav24/valve/blob/master/apps/web/content/docs/guarantees.mdx#store-state-loss) from a flush, eviction, or
-failover. Read the [full guarantees](https://github.com/ksaurav24/valve/blob/master/apps/web/content/docs/guarantees.mdx).
+[loss of Redis state](https://valvejs.vercel.app/docs/guarantees/#store-state-loss) from a flush, eviction, or
+failover. Read the [full guarantees](https://valvejs.vercel.app/docs/guarantees/).
 
 ## Documentation and development
 
@@ -93,14 +98,14 @@ pnpm docs:dev
 
 The Next.js and Fumadocs MDX documentation site lives in `apps/web/`. Build it with `pnpm docs:build`.
 
-- [Quickstart](https://github.com/ksaurav24/valve/blob/master/apps/web/content/docs/quickstart.mdx)
-- [Share a quota](https://github.com/ksaurav24/valve/blob/master/apps/web/content/docs/guides/share-a-quota.mdx)
-- [Choose provider quota scopes](https://github.com/ksaurav24/valve/blob/master/apps/web/content/docs/guides/provider-quota-scopes.mdx)
-- [Respect Retry-After](https://github.com/ksaurav24/valve/blob/master/apps/web/content/docs/guides/respect-retry-after.mdx)
-- [Priorities and shutdown](https://github.com/ksaurav24/valve/blob/master/apps/web/content/docs/guides/priorities-and-shutdown.mdx)
-- [Migrate from Bottleneck](https://github.com/ksaurav24/valve/blob/master/apps/web/content/docs/migration/from-bottleneck.mdx)
-- [API reference](https://github.com/ksaurav24/valve/blob/master/apps/web/content/docs/reference/api.mdx)
-- [Tests and benchmarks](https://github.com/ksaurav24/valve/blob/master/apps/web/content/docs/reference/testing.mdx)
+- [Quickstart](https://valvejs.vercel.app/docs/quickstart/)
+- [Share a quota](https://valvejs.vercel.app/docs/guides/share-a-quota/)
+- [Choose provider quota scopes](https://valvejs.vercel.app/docs/guides/provider-quota-scopes/)
+- [Respect Retry-After](https://valvejs.vercel.app/docs/guides/respect-retry-after/)
+- [Priorities and shutdown](https://valvejs.vercel.app/docs/guides/priorities-and-shutdown/)
+- [Migrate from Bottleneck](https://valvejs.vercel.app/docs/migration/from-bottleneck/)
+- [API reference](https://valvejs.vercel.app/docs/reference/api/)
+- [Tests and benchmarks](https://valvejs.vercel.app/docs/reference/testing/)
 - [Contributing](https://github.com/ksaurav24/valve/blob/master/CONTRIBUTING.md)
 
 Run `pnpm test` for unit and property tests, `pnpm test:coverage` for coverage,

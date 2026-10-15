@@ -160,6 +160,95 @@ test('releases list only published versions', async ({ page }) => {
   }
 });
 
+test('npm downloads render beside GitHub and accept a zero count', async ({
+  page,
+}) => {
+  await page.route(
+    'https://api.npmjs.org/downloads/point/last-month/valvejs',
+    (route) => route.fulfill({ json: { package: 'valvejs', downloads: 0 } }),
+  );
+  await page.goto('/');
+  const npm = page.getByRole('banner').getByRole('link', {
+    name: 'valvejs on npm, 0 downloads in the last 30 days',
+  });
+  await expect(npm).toBeVisible();
+  await expect(npm).toHaveAttribute(
+    'href',
+    'https://www.npmjs.com/package/valvejs',
+  );
+  await expect(npm.locator('svg').first()).toBeVisible();
+  await expect(
+    page.getByRole('banner').getByRole('link', { name: /on GitHub/ }),
+  ).toBeVisible();
+  expect(
+    await page.evaluate(
+      () => document.documentElement.scrollWidth > innerWidth,
+    ),
+  ).toBe(false);
+  await page.goto('/docs/');
+  const docsNpm = page.getByRole('link', { name: /valvejs on npm/ });
+  // Fumadocs places secondary links in the sidebar on mobile.
+  if (!(await docsNpm.first().isVisible())) {
+    await page
+      .getByRole('button', { name: 'Open Sidebar', exact: true })
+      .click();
+  }
+  await expect(
+    page
+      .getByRole('link', {
+        name: 'valvejs on npm, 0 downloads in the last 30 days',
+      })
+      .first(),
+  ).toBeVisible();
+});
+
+test('download API failures preserve the build-time count', async ({
+  page,
+}) => {
+  await page.route(
+    'https://api.npmjs.org/downloads/point/last-month/valvejs',
+    (route) =>
+      route.fulfill({ status: 404, json: { error: 'package not found' } }),
+  );
+  await page.goto('/');
+  const initialDownloads = metadata.downloads as number | null;
+  const label =
+    initialDownloads === null
+      ? 'valvejs on npm, download count unavailable'
+      : `valvejs on npm, ${initialDownloads.toLocaleString('en')} downloads in the last 30 days`;
+  await expect(
+    page.getByRole('banner').getByRole('link', { name: label, exact: true }),
+  ).toBeVisible();
+});
+
+test('header keeps npm downloads visible on narrow phones and tablets', async ({
+  page,
+}) => {
+  await page.route(
+    'https://api.npmjs.org/downloads/point/last-month/valvejs',
+    (route) =>
+      route.fulfill({ json: { package: 'valvejs', downloads: 1234567 } }),
+  );
+  await page.route('https://api.github.com/repos/ksaurav24/valve', (route) =>
+    route.fulfill({ json: { stargazers_count: 1234567 } }),
+  );
+  await page.goto('/');
+  for (const width of [320, 768, 1024]) {
+    await page.setViewportSize({ width, height: 800 });
+    await expect(
+      page.getByRole('banner').getByRole('link', {
+        name: 'valvejs on npm, 1,234,567 downloads in the last 30 days',
+      }),
+    ).toBeVisible();
+    expect(
+      await page.evaluate(
+        () => document.documentElement.scrollWidth > innerWidth,
+      ),
+      `width ${width}`,
+    ).toBe(false);
+  }
+});
+
 test('contributors page renders people and the root guide', async ({
   page,
 }) => {

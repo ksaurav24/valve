@@ -3,6 +3,7 @@ import type { ReactNode } from 'react';
 import { SiteNav } from '@/components/shared/site-nav';
 import { navLinks } from '@/lib/nav';
 import { stars } from '@/lib/github';
+import { monthlyDownloads } from '@/lib/npm';
 import { site } from '@/lib/site';
 
 export default function MarketingLayout({ children }: { children: ReactNode }) {
@@ -14,7 +15,7 @@ export default function MarketingLayout({ children }: { children: ReactNode }) {
       >
         Skip to content
       </a>
-      <SiteNav stars={stars} />
+      <SiteNav stars={stars} downloads={monthlyDownloads} />
       <main id="main-content" tabIndex={-1} className="flex-1 outline-none">
         {children}
       </main>
@@ -41,6 +42,12 @@ export default function MarketingLayout({ children }: { children: ReactNode }) {
                 {label}
               </Link>
             ))}
+            <a
+              href={site.npm}
+              className="text-muted-foreground hover:text-foreground"
+            >
+              npm
+            </a>
             <a
               href="/api/index.html"
               className="text-muted-foreground hover:text-foreground"
