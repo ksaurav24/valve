@@ -35,6 +35,7 @@ jobs:
       - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803
         with:
           fetch-depth: 0
+          persist-credentials: false
       - uses: pnpm/action-setup@0977fd99725f1db4007ccb2928dbb4e90d06cc86
       - uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38
         with:
@@ -42,12 +43,15 @@ jobs:
           cache: pnpm
       - run: pnpm install --frozen-lockfile
       - run: pnpm --filter valvejs build
+      - name: Check out the PR baseline without credentials
+        uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803
+        with:
+          ref: ${{ github.event.pull_request.base.sha }}
+          path: .benchmark-baseline
+          persist-credentials: false
       - name: Prepare the PR baseline before timing
-        env:
-          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+        working-directory: .benchmark-baseline
         run: |
-          git worktree add --detach /tmp/valve-footprint-baseline "$BASE_SHA"
-          cd /tmp/valve-footprint-baseline
           pnpm install --frozen-lockfile
           pnpm --dir packages/valve build
       - name: Paired bundle, startup, and shared-store controls
@@ -56,10 +60,10 @@ jobs:
           VALKEY_URL: redis://127.0.0.1:6380
         run: |
           mkdir -p /tmp/valve-footprint-results
-          node scripts/bundle-footprint.mjs /tmp/valve-footprint-baseline /tmp/valve-footprint-results/baseline-size.json
+          node scripts/bundle-footprint.mjs "$GITHUB_WORKSPACE/.benchmark-baseline" /tmp/valve-footprint-results/baseline-size.json
           node scripts/bundle-footprint.mjs "$PWD" /tmp/valve-footprint-results/current-size.json
-          node scripts/footprint-startup.mjs /tmp/valve-footprint-baseline "$PWD" /tmp/valve-footprint-results/startup.json
-          node scripts/paired-footprint-controls.mjs /tmp/valve-footprint-baseline /tmp/valve-footprint-results
+          node scripts/footprint-startup.mjs "$GITHUB_WORKSPACE/.benchmark-baseline" "$PWD" /tmp/valve-footprint-results/startup.json
+          node scripts/paired-footprint-controls.mjs "$GITHUB_WORKSPACE/.benchmark-baseline" /tmp/valve-footprint-results
       - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         if: always()
         with:
@@ -73,6 +77,7 @@ jobs:
       - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803
         with:
           fetch-depth: 0
+          persist-credentials: false
       - uses: pnpm/action-setup@0977fd99725f1db4007ccb2928dbb4e90d06cc86
       - uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38
         with:
@@ -86,16 +91,22 @@ jobs:
           VALVE_BENCH_LIBRARY: ${{ github.workspace }}/packages/valve/dist/index.js
           VALVE_BENCH_OUT: /tmp/current.json
           VALVE_BENCH_SKIP_BOTTLENECK: '1'
+      - name: Check out the PR baseline without credentials
+        if: github.event_name == 'pull_request'
+        uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803
+        with:
+          ref: ${{ github.event.pull_request.base.sha }}
+          path: .benchmark-baseline
+          persist-credentials: false
       - name: Compare with the PR base on the same runner
         if: github.event_name == 'pull_request'
         env:
           BASE_SHA: ${{ github.event.pull_request.base.sha }}
         run: |
           if git cat-file -e "$BASE_SHA:packages/valve/src/index.ts" 2>/dev/null; then
-            git worktree add --detach /tmp/valve-baseline "$BASE_SHA"
-            pnpm --dir /tmp/valve-baseline install --frozen-lockfile
-            pnpm --dir /tmp/valve-baseline --filter valvejs build
-            node scripts/paired-benchmarks.mjs /tmp/valve-baseline/packages/valve/dist/index.js /tmp/base.json /tmp/current.json
+            pnpm --dir "$GITHUB_WORKSPACE/.benchmark-baseline" install --frozen-lockfile
+            pnpm --dir "$GITHUB_WORKSPACE/.benchmark-baseline" --filter valvejs build
+            node scripts/paired-benchmarks.mjs "$GITHUB_WORKSPACE/.benchmark-baseline/packages/valve/dist/index.js" /tmp/base.json /tmp/current.json
             node scripts/compare-benchmarks.mjs /tmp/base.json /tmp/current.json
           else
             VALVE_BENCH_LIBRARY="$PWD/packages/valve/dist/index.js" VALVE_BENCH_SKIP_BOTTLENECK=1 VALVE_BENCH_OUT=/tmp/current.json pnpm bench
@@ -110,6 +121,8 @@ jobs:
         ports: ['6379:6379']
     steps:
       - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803
+        with:
+          persist-credentials: false
       - uses: pnpm/action-setup@0977fd99725f1db4007ccb2928dbb4e90d06cc86
       - uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38
         with:
