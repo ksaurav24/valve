@@ -163,6 +163,18 @@ describe('scoped atomic memory admission', () => {
 });
 
 describe('scoped scheduler and wrappers', () => {
+  it('admits zero maxWait scoped jobs once and rejects blocked ones', async () => {
+    vi.useFakeTimers();
+    const api = createValve({ id: 'zero', rate: rate.slice(1) });
+    const scopes = { recipient: 'A' };
+    expect(await api.run(() => 'A', { scopes, maxWait: 0 })).toBe('A');
+    await expect(
+      api.run(() => 'again', { scopes, maxWait: 0 }),
+    ).rejects.toMatchObject({ code: 'MAX_WAIT_EXCEEDED' });
+    expect(api.stats().queued).toBe(0);
+    await api.close();
+    expect(vi.getTimerCount()).toBe(0);
+  });
   it('lets B and C pass A2, then wakes A2 with one eligibility timer', async () => {
     vi.useFakeTimers();
     const api = createValve({ id: 'sparse', rate: rate.slice(1) });
@@ -217,18 +229,6 @@ describe('scoped scheduler and wrappers', () => {
     expect(await timeout).toBe('MAX_WAIT_EXCEEDED');
     await Promise.all([first, other]);
     await api.idle();
-    await api.close();
-    expect(vi.getTimerCount()).toBe(0);
-  });
-  it('admits zero maxWait scoped jobs once and rejects blocked ones', async () => {
-    vi.useFakeTimers();
-    const api = createValve({ id: 'zero', rate: rate.slice(1) });
-    const scopes = { recipient: 'A' };
-    expect(await api.run(() => 'A', { scopes, maxWait: 0 })).toBe('A');
-    await expect(
-      api.run(() => 'again', { scopes, maxWait: 0 }),
-    ).rejects.toMatchObject({ code: 'MAX_WAIT_EXCEEDED' });
-    expect(api.stats().queued).toBe(0);
     await api.close();
     expect(vi.getTimerCount()).toBe(0);
   });
