@@ -5,7 +5,7 @@ type Segment =
   | { type: 'cubic'; p: [Point, Point, Point, Point] };
 type SampledPath = { pts: Point[]; len: number };
 
-// Valve flow — geometry. Pure functions; no rendering.
+// Valve flow - geometry. Pure functions; no rendering.
 function vfCubic(p0: Point, p1: Point, p2: Point, p3: Point, t: number): Point {
   const a = 1 - t,
     b0 = a * a * a,

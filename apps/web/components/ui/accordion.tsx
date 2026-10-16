@@ -103,13 +103,13 @@ type AccordionGroupMultipleProps = {
 type AccordionGroupProps = HTMLAttributes<HTMLDivElement> & {
   children: ReactNode;
   /** Pins the group's rows to one step of the size ladder (default 36px,
-   *  compact 28px — see /docs/sizes). Omitted, they follow the surrounding
+   *  compact 28px - see /docs/sizes). Omitted, they follow the surrounding
    *  SizeProvider. */
   size?: SizeVariant;
   /** What an open item tints. "item" paints the row and its panel as one
    *  block, and holds while it stays open. "trigger" scopes the fill to the
    *  row and shows it on hover only, leaving the panel on the page's own
-   *  surface — the way a sidebar row highlights without colouring its
+   *  surface - the way a sidebar row highlights without colouring its
    *  sub-tree. @default "item" */
   highlight?: 'trigger' | 'item';
 } & (AccordionGroupSingleProps | AccordionGroupMultipleProps);
@@ -169,7 +169,7 @@ const AccordionGroup = forwardRef<HTMLDivElement, AccordionGroupProps>(
         });
       });
       // Skip the state update when nothing moved (mirrors the fluid hover
-      // hook's measureItems guard) — this runs per animation frame via
+      // hook's measureItems guard) - this runs per animation frame via
       // onUpdate, and an unconditional set would invalidate the group
       // context and re-render every item even on no-op remeasures.
       const prev = openItemRectsRef.current;
@@ -417,7 +417,7 @@ const AccordionGroup = forwardRef<HTMLDivElement, AccordionGroupProps>(
                   // Fade in from the item's current rect: with initial={false}
                   // a newly-opened item's background would pop in at full
                   // opacity mid-layout-shift while the previous item's bg is
-                  // still fading out — reads as a glitch when switching items
+                  // still fading out - reads as a glitch when switching items
                   // (especially under /demo's scaled card). Geometry still
                   // snaps (duration 0) so the bg hugs the animating item.
                   initial={{
@@ -496,7 +496,7 @@ interface AccordionProps extends HTMLAttributes<HTMLDivElement> {
   value?: string | string[];
   onValueChange?: ((value: string) => void) | ((value: string[]) => void);
   /** Pins the accordion's rows to one step of the size ladder (default 36px,
-   *  compact 28px — see /docs/sizes). Omitted, they follow the surrounding
+   *  compact 28px - see /docs/sizes). Omitted, they follow the surrounding
    *  SizeProvider. */
   size?: SizeVariant;
 }
@@ -763,7 +763,7 @@ const AccordionTrigger = forwardRef<HTMLButtonElement, AccordionTriggerProps>(
             </span>
           </span>
 
-          {/* Chevron — right when collapsed, rotates 90° down when expanded */}
+          {/* Chevron - right when collapsed, rotates 90° down when expanded */}
           <motion.span
             className="shrink-0 inline-flex items-center justify-center"
             animate={{ rotate: isOpen ? 90 : 0 }}
@@ -806,7 +806,7 @@ const AccordionTrigger = forwardRef<HTMLButtonElement, AccordionTriggerProps>(
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
               // The expanded tint rides the moderate tier, like the grouped
-              // one — it marks a state, where the hover fill below tracks the
+              // one - it marks a state, where the hover fill below tracks the
               // pointer and stays fast.
               exit={{ opacity: 0, transition: spring.moderate.exit }}
               transition={{ duration: 0.12 }}
@@ -852,21 +852,21 @@ const AccordionContent = forwardRef<HTMLDivElement, AccordionContentProps>(
     // `height: "auto"`: framer resolves an "auto" target by measuring the
     // element's *visual* (transformed) size, so under a scaled ancestor
     // (e.g. /demo's 1.7x card) the animation overshoots to scale× the real
-    // height and snaps back when the final "auto" lands — a visible height
+    // height and snaps back when the final "auto" lands - a visible height
     // reduction at the end of every open. offsetHeight and ResizeObserver
     // are transform-immune.
     const innerRef = useRef<HTMLDivElement | null>(null);
     const roRef = useRef<ResizeObserver | null>(null);
     const [contentHeight, setContentHeight] = useState<number | null>(null);
     // Height springs only when THIS panel toggles. When contentHeight
-    // changes underneath it instead — anything collapsible nested inside
-    // the panel, another accordion included — it must snap: a spring
+    // changes underneath it instead - anything collapsible nested inside
+    // the panel, another accordion included - it must snap: a spring
     // re-targeted every frame chases the child's own animation, lands
     // after it, and drags everything below the item along late. Same rule
     // as SidebarGroup / SidebarMenuSub; see motion-guidelines.md.
     // Items open at mount render `initial: "auto"` and receive their first
     // pixel target a commit later. That hand-off is not a toggle, so it
-    // snaps too — it must: framer would measure a spring's numeric start
+    // snaps too - it must: framer would measure a spring's numeric start
     // visually (scaled) and play a shrink. Items that open later spring.
     const [prevOpen, setPrevOpen] = useState(isOpen);
     const [toggling, setToggling] = useState(false);
@@ -920,7 +920,7 @@ const AccordionContent = forwardRef<HTMLDivElement, AccordionContentProps>(
           }}
           // spring.fast lands with the trigger's chevron, and its bounce: 0
           // keeps pure height from overshooting its content. A close is a
-          // decision already made, so it takes the quicker exit tier — the
+          // decision already made, so it takes the quicker exit tier - the
           // target flip has no `exit` prop to carry it. Opacity runs ahead of
           // the height on its own timing: the body dissolves rather than being
           // sliced by the clip edge, which is what stops the rows below

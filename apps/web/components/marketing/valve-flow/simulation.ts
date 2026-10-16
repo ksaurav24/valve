@@ -25,7 +25,7 @@ export type FlowSimulation = {
   step: (dt: number) => void;
 };
 
-// Valve flow — deterministic scheduling simulation (seeded, with small simulation steps).
+// Valve flow - deterministic scheduling simulation (seeded, with small simulation steps).
 function vfRng(seed: number) {
   let a = seed >>> 0;
   return () => {
