@@ -23,6 +23,11 @@ describe('redis store', () => {
     const adapter = { evalsha: vi.fn(), eval: vi.fn() };
     expect(() => redisStore({ adapter, prefix: '{bad}' })).toThrow();
     expect(() => redisStore({ adapter, timeout: -1 })).toThrow();
+    for (const timeout of [0, '0ms', 0.5] as const)
+      expect(() => redisStore({ adapter, timeout })).toThrow(
+        'redis timeout must be at least 1ms',
+      );
+    expect(() => redisStore({ adapter, timeout: 1 })).not.toThrow();
   });
   it('uses node-redis and keeps rules cached with string arguments', async () => {
     const client = {

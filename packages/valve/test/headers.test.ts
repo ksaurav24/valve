@@ -8,7 +8,7 @@ import {
   xRateLimit,
 } from '../src/headers/index.js';
 import type { FeedbackSignal } from '../src/headers/index.js';
-import { compound, header, number } from '../src/headers/parse.js';
+import { compound, header, items, number } from '../src/headers/parse.js';
 const response = (
   headers: Record<string, string | number | readonly string[] | undefined>,
   status = 429,
@@ -80,6 +80,38 @@ describe('feedback', () => {
     expect(f(response({ 'ratelimit-reset': '4' }))).toEqual({ resetMs: 4000 });
     expect(f(response({ ratelimit: 'invalid;r=no;t=-1' }))).toBeUndefined();
     expect(f(response({}))).toBeUndefined();
+  });
+  it('splits RateLimit lists only on commas outside quoted strings', () => {
+    expect(items('"a,b";r=1, "c\\",d";r=0, e')).toEqual([
+      '"a,b";r=1',
+      ' "c\\",d";r=0',
+      ' e',
+    ]);
+    expect(items(',\\')).toEqual(['', '\\']);
+    expect(items('"open,')).toEqual(['"open,']);
+    const f = ietfRateLimit();
+    expect(f(response({ ratelimit: '"a,b";r=5, "c\\",d";r=0;t=2' }))).toEqual({
+      remaining: 0,
+      resetMs: 2000,
+    });
+  });
+  it('splits pathological RateLimit fields linearly and ignores oversized ones', () => {
+    const f = ietfRateLimit();
+    expect(
+      f(response({ ratelimit: ','.repeat(8000) + '\\' + ',"x";r=0' })),
+    ).toEqual({ remaining: 0 });
+    expect(
+      f(
+        response({
+          ratelimit: '"x";r=0;t=1,' + ' '.repeat(8192),
+          'ratelimit-remaining': '7',
+        }),
+      ),
+    ).toEqual({ remaining: 7 });
+    const started = performance.now();
+    for (let i = 0; i < 20; i++)
+      defaultFeedback(response({ ratelimit: ','.repeat(8191) + '\\' }, 200));
+    expect(performance.now() - started).toBeLessThan(500);
   });
   it('reads draft-11 service limits without an effective window', () => {
     const f = ietfRateLimit();
