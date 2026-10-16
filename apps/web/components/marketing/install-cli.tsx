@@ -30,7 +30,7 @@ export function InstallCli({ published }: { published: boolean }) {
   const pending = !published && tab.label !== 'source';
 
   return (
-    <div className="overflow-hidden rounded-xl border border-border bg-card">
+    <div data-ui className="overflow-hidden rounded-lg bg-background">
       <div className="flex items-center justify-between gap-2 border-b border-border px-2 py-1.5">
         <TabsSubtle
           selectedIndex={selected}
@@ -45,7 +45,9 @@ export function InstallCli({ published }: { published: boolean }) {
         <CopyButton value={tab.command} label={`Copy ${tab.label} command`} />
       </div>
       <div
+        id={`install-panel-${selected}`}
         role="tabpanel"
+        aria-labelledby={`install-tab-${selected}`}
         className="flex gap-3 overflow-x-auto px-4 py-4 font-mono text-[13px] leading-6"
       >
         <Terminal

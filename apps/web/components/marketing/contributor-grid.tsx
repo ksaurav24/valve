@@ -7,12 +7,12 @@ export function ContributorGrid({
   contributors: Contributor[];
 }) {
   return (
-    <ul className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
+    <ul className="grid grid-cols-1 gap-x-10 gap-y-3 sm:grid-cols-2 xl:grid-cols-3">
       {contributors.map((person) => (
         <li key={person.login}>
           <a
             href={person.url}
-            className="group flex items-center gap-3 rounded-xl border border-border bg-card p-3 hover:border-ring hover:bg-accent"
+            className="group flex min-h-20 items-center gap-4 rounded-md p-3 hover:bg-muted"
           >
             <img
               src={`${person.avatar}&s=96`}
@@ -20,13 +20,13 @@ export function ContributorGrid({
               width={40}
               height={40}
               loading="lazy"
-              className="size-10 rounded-full border border-border grayscale-[35%] transition-[filter] duration-150 group-hover:grayscale-0"
+              className="size-10 rounded-md grayscale-[35%] transition-[filter] duration-150 group-hover:grayscale-0"
             />
             <span className="min-w-0">
-              <span className="block truncate font-mono text-sm text-foreground">
+              <span className="block truncate text-base font-medium text-foreground">
                 {person.login}
               </span>
-              <span className="text-xs text-muted-foreground tabular-nums">
+              <span className="text-sm text-muted-foreground tabular-nums">
                 {person.contributions}{' '}
                 {person.contributions === 1 ? 'contribution' : 'contributions'}
               </span>

@@ -39,8 +39,8 @@ export function SiteNav({
   );
 
   return (
-    <header className="sticky top-0 z-40 border-b border-border bg-background/80 backdrop-blur-md supports-[backdrop-filter]:bg-background/65">
-      <div className="mx-auto flex h-14 max-w-[90rem] items-center gap-2 px-4 sm:gap-4 sm:px-6">
+    <header className="sticky top-0 z-40 bg-background">
+      <div className="page-gutter flex h-14 w-full items-center gap-2 sm:gap-4">
         <Link
           href="/"
           className="shrink-0 font-mono text-[15px] font-semibold tracking-tight text-foreground"
@@ -64,14 +64,14 @@ export function SiteNav({
                 data-fluid-hover-index={index}
                 aria-current={index === activeIndex ? 'page' : undefined}
                 className={cn(
-                  'relative z-10 rounded-md px-3 py-1.5 font-mono text-[13px] text-muted-foreground hover:text-foreground aria-[current=page]:text-foreground',
+                  'relative z-10 rounded-md px-3 py-2 text-sm text-muted-foreground hover:text-foreground aria-[current=page]:text-foreground',
                 )}
               >
                 {label}
                 {index === activeIndex && (
                   <span
                     aria-hidden="true"
-                    className="absolute inset-x-3 -bottom-[11px] h-px bg-foreground"
+                    className="absolute inset-x-3 -bottom-1 h-0.5 bg-foreground"
                   />
                 )}
               </Link>

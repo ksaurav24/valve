@@ -1,12 +1,14 @@
 import type { Metadata } from 'next';
 import Link from 'next/link';
 import type { ReactNode } from 'react';
-import { ArrowRight, ArrowUpRight, BookOpen } from 'lucide-react';
+import { ArrowRight, ArrowUpRight } from 'lucide-react';
 import { ChangelogSections } from '@/components/marketing/changelog-entry';
 import { CodeTabs } from '@/components/marketing/code-tabs';
 import { AvatarStack } from '@/components/marketing/contributor-grid';
-import { FeatureGrid, FeatureList } from '@/components/marketing/feature-grid';
+import { FeatureList } from '@/components/marketing/feature-grid';
+import { ValveFlow } from '@/components/marketing/valve-flow';
 import { HeroActions } from '@/components/marketing/hero-actions';
+import { HeroHeading, HeroReveal } from '@/components/marketing/hero-reveal';
 import { InstallCli } from '@/components/marketing/install-cli';
 import { highlight } from '@/components/shared/highlight';
 import { VersionBadge } from '@/components/shared/version-badge';
@@ -96,179 +98,222 @@ export default async function HomePage() {
   const recent = changelogEntries.slice(0, 3);
 
   return (
-    <div className="mx-auto grid max-w-[90rem] lg:grid-cols-[minmax(0,5fr)_minmax(0,7fr)]">
-      <aside className="relative border-border lg:sticky lg:top-14 lg:h-[calc(100dvh-3.5rem)] lg:border-r">
-        <div
-          aria-hidden="true"
-          className="bg-grid absolute inset-0 [mask-image:radial-gradient(ellipse_at_top_left,black_20%,transparent_70%)]"
-        />
-        <div className="relative flex h-full flex-col justify-between gap-12 px-4 py-12 sm:px-6 lg:px-10 lg:py-14">
-          <div className="space-y-7">
-            <VersionBadge />
-            <h1 className="text-balance text-4xl font-semibold leading-[1.05] tracking-tight sm:text-5xl xl:text-[3.6rem]">
-              Shared rate limits for outbound API calls.
+    <div className="marketing-home">
+      <header className="home-hero">
+        <div className="page-gutter hero-layout">
+          <div className="hero-copy">
+            <h1 className="hero-title">
+              <HeroHeading lines={['Many workers.', 'One rate limit.']} />
             </h1>
-            <p className="max-w-md text-pretty text-[15px] leading-relaxed text-muted-foreground">
-              Coordinate calls under one quota, even when many processes use the
-              same credential. valve shares the rate budget and provider pauses
-              across every worker.
-            </p>
-            <p className="max-w-md text-sm text-muted-foreground">
-              Beta until 1.0. APIs may change between releases.
-            </p>
-            <HeroActions />
+            <HeroReveal delay={0.16}>
+              <p className="hero-description">
+                A TypeScript library for outbound API calls. Share one rate
+                budget and provider pauses across every worker.
+              </p>
+            </HeroReveal>
+            <HeroReveal delay={0.26} className="space-y-5">
+              <HeroActions />
+              <p className="text-sm text-muted-foreground">
+                Beta until 1.0. APIs may change between releases.
+              </p>
+            </HeroReveal>
           </div>
-          <dl className="grid max-w-md grid-cols-3 gap-4 border-t border-border pt-6 font-mono text-xs">
-            <Stat label="runtime deps" value="0" />
-            <Stat label="stores" value="memory · redis" />
-            <Stat label="license" value="Apache 2.0" />
-          </dl>
+          <HeroReveal delay={0.2} from="right" className="hero-stage">
+            <ValveFlow />
+          </HeroReveal>
         </div>
-      </aside>
+        <HeroReveal delay={0.42} className="page-gutter hero-footer">
+          <dl className="hero-facts">
+            <Stat label="Runtime dependencies" value="0" />
+            <Stat label="Stores" value="Memory, Redis & Valkey" />
+            <Stat label="License" value="Apache 2.0" />
+            <div className="space-y-2">
+              <dt className="text-sm text-muted-foreground">Current version</dt>
+              <dd>
+                <VersionBadge className="h-auto min-h-7 max-w-full flex-wrap gap-y-1 py-1" />
+              </dd>
+            </div>
+          </dl>
+        </HeroReveal>
+      </header>
 
-      <div className="min-w-0 border-t border-border lg:border-t-0">
-        <Section index="00" title="README.md" id="readme">
-          <p className="max-w-2xl text-pretty text-[15px] leading-relaxed text-muted-foreground">
-            Start with an in-memory store for a script. Add Redis or Valkey when
-            calls span processes. Same API, same guarantees: rate bounds apply
-            at atomic store admission.
-          </p>
-        </Section>
-
-        <Section index="01" title="install" id="install">
-          <InstallCli published={current.state !== 'dev'} />
-        </Section>
-
-        <Section index="02" title="features" id="features">
-          <FeatureGrid />
-          <FeatureList />
-        </Section>
-
-        <Section index="03" title="usage" id="usage">
-          <CodeTabs tabs={tabs} />
-          <p className="mt-3 text-xs text-muted-foreground">
-            The Redis example expects your connected client. valve does not open
-            or close it.{' '}
-            <InlineLink href="/docs/guides/share-a-quota">
-              Share a quota
-            </InlineLink>
-          </p>
-        </Section>
-
-        <Section
-          index="04"
-          title="changelog"
-          id="changelog"
-          action={<InlineLink href="/changelog">All changes</InlineLink>}
-        >
-          <ol className="divide-y divide-border overflow-hidden rounded-xl border border-border bg-card">
-            {recent.map((entry) => (
-              <li
-                key={entry.version}
-                className="grid gap-3 p-4 sm:grid-cols-[8rem_1fr]"
-              >
-                <div className="flex items-start gap-2 font-mono text-sm sm:flex-col">
-                  <span className="text-foreground">v{entry.version}</span>
-                  <span className="text-xs text-muted-foreground">
-                    {versionState(entry.version) === 'dev'
-                      ? 'unreleased'
-                      : versionState(entry.version)}
-                  </span>
-                </div>
-                <ChangelogSections sections={entry.sections} limit={2} />
-              </li>
-            ))}
-          </ol>
-        </Section>
-
-        <Section
-          index="05"
-          title="contributors"
-          id="contributors"
-          action={<InlineLink href="/contributors">Contribute</InlineLink>}
-        >
-          <div className="flex flex-wrap items-center justify-between gap-4 rounded-xl border border-border bg-card p-4">
-            <AvatarStack contributors={contributors} />
-            <p className="text-sm text-muted-foreground">
-              Issues and pull requests welcome.{' '}
-              <InlineLink href="/contributors#guide">Read the guide</InlineLink>
+      <section
+        id="readme"
+        aria-labelledby="readme-title"
+        className="page-gutter section-space bg-card"
+      >
+        <div className="readme-layout">
+          <HeroReveal onView className="readme-note">
+            <h2 id="readme-title" className="section-title">
+              <code className="font-mono">README.md</code>
+            </h2>
+            <p className="mt-6 max-w-[28ch] text-2xl leading-snug tracking-tight">
+              Start local. Share when needed.
             </p>
-          </div>
-        </Section>
+            <p className="section-copy mt-6">
+              Start with an in-memory store for a script. Add Redis or Valkey
+              when calls span processes. Same API, same guarantees: rate bounds
+              apply at atomic store admission.
+            </p>
+            <InlineLink href="/docs/installation">
+              Installation guide
+            </InlineLink>
+          </HeroReveal>
+          <HeroReveal onView delay={0.08} className="min-w-0 space-y-6">
+            <div id="install" className="scroll-mt-24">
+              <InstallCli published={current.state !== 'dev'} />
+            </div>
+            <div id="usage" className="scroll-mt-24">
+              <CodeTabs tabs={tabs} />
+            </div>
+            <p className="max-w-[64ch] text-sm leading-relaxed text-muted-foreground">
+              The Redis example expects your connected client. valve does not
+              open or close it.{' '}
+              <Link
+                href="/docs/guides/share-a-quota"
+                className="text-foreground underline decoration-ring underline-offset-4"
+              >
+                Share a quota
+              </Link>
+            </p>
+          </HeroReveal>
+        </div>
+      </section>
 
-        <Section index="06" title="next" id="next">
-          <div className="grid gap-3 sm:grid-cols-3">
-            <NextLink href="/docs/quickstart" title="Quickstart">
+      <section
+        id="features"
+        aria-labelledby="features-title"
+        className="page-gutter section-space"
+      >
+        <div className="capabilities-layout">
+          <HeroReveal onView className="capabilities-intro">
+            <h2 id="features-title" className="section-title">
+              Control the
+              <br />
+              shared budget.
+            </h2>
+            <p className="section-copy mt-6">
+              Space starts, share quotas, and respect the provider’s backoff.
+              Keep the scheduling rules in one place.
+            </p>
+            <InlineLink href="/docs/guarantees">Read the guarantees</InlineLink>
+          </HeroReveal>
+          <HeroReveal onView delay={0.08} className="min-w-0">
+            <FeatureList />
+          </HeroReveal>
+        </div>
+      </section>
+
+      <section
+        id="changelog"
+        aria-labelledby="changelog-title"
+        className="page-gutter section-space bg-card"
+      >
+        <HeroReveal onView className="section-heading-row">
+          <h2 id="changelog-title" className="section-title">
+            Changes, in the open.
+          </h2>
+          <InlineLink href="/changelog">All changes</InlineLink>
+        </HeroReveal>
+        <ol className="release-index">
+          {recent.map((entry) => (
+            <li key={entry.version} className="release-row">
+              <HeroReveal onView>
+                <Link
+                  href="/changelog"
+                  className="font-mono text-xl tracking-tight hover:text-live"
+                >
+                  v{entry.version}
+                </Link>
+                <p className="mt-2 text-sm text-muted-foreground">
+                  {versionState(entry.version) === 'dev'
+                    ? 'Unreleased'
+                    : versionState(entry.version)}
+                </p>
+              </HeroReveal>
+              <HeroReveal onView delay={0.06} className="min-w-0">
+                <ChangelogSections sections={entry.sections} limit={2} />
+              </HeroReveal>
+            </li>
+          ))}
+        </ol>
+      </section>
+
+      <section
+        id="contributors"
+        aria-labelledby="contributors-title"
+        className="page-gutter section-space"
+      >
+        <div className="community-layout">
+          <HeroReveal onView>
+            <h2 id="contributors-title" className="section-title">
+              Built in the open.
+            </h2>
+            <p className="section-copy mt-5">
+              Code, docs, benchmarks, and careful bug reports. Every
+              contribution counts.
+            </p>
+          </HeroReveal>
+          <HeroReveal
+            onView
+            delay={0.08}
+            className="flex flex-col items-start gap-7"
+          >
+            <AvatarStack contributors={contributors} />
+            <InlineLink href="/contributors">Meet the contributors</InlineLink>
+          </HeroReveal>
+        </div>
+      </section>
+
+      <section
+        id="next"
+        aria-labelledby="next-title"
+        className="page-gutter section-space bg-card"
+      >
+        <div className="next-layout">
+          <HeroReveal onView>
+            <h2 id="next-title" className="section-title">
+              Make your first call.
+            </h2>
+            <p className="section-copy mt-5">
+              Start with a limited fetch. Keep the same API as your workload
+              grows.
+            </p>
+          </HeroReveal>
+          <HeroReveal onView delay={0.08} className="docs-index">
+            <NextLink href="/docs/quickstart" title="Read the quickstart">
               A limited fetch in five minutes.
             </NextLink>
-            <NextLink href="/docs/guarantees" title="Guarantees">
-              What valve promises, and what it does not.
+            <NextLink href="/docs/guarantees" title="Understand the guarantees">
+              What valve promises, and where the bounds apply.
             </NextLink>
             <NextLink
               href="/docs/migration/from-bottleneck"
-              title="From Bottleneck"
+              title="Moving from Bottleneck?"
             >
               Map options and behavior one to one.
             </NextLink>
-          </div>
-        </Section>
-      </div>
+          </HeroReveal>
+        </div>
+      </section>
     </div>
-  );
-}
-
-function Section({
-  index,
-  title,
-  id,
-  action,
-  children,
-}: {
-  index: string;
-  title: string;
-  id: string;
-  action?: ReactNode;
-  children: ReactNode;
-}) {
-  return (
-    <section
-      id={id}
-      aria-labelledby={`${id}-title`}
-      className="border-b border-border px-4 py-10 sm:px-6 lg:px-10"
-    >
-      <div className="mb-5 flex items-baseline justify-between gap-4">
-        <h2
-          id={`${id}-title`}
-          className="font-mono text-xs uppercase tracking-[0.18em] text-muted-foreground"
-        >
-          <span className="text-foreground/40">{index}</span>
-          <span className="mx-2 text-foreground/25">/</span>
-          {title}
-        </h2>
-        {action}
-      </div>
-      {children}
-    </section>
   );
 }
 
 function Stat({ label, value }: { label: string; value: string }) {
   return (
-    <div className="space-y-1">
-      <dt className="text-muted-foreground">{label}</dt>
-      <dd className="text-foreground">{value}</dd>
+    <div className="space-y-2">
+      <dt className="text-sm text-muted-foreground">{label}</dt>
+      <dd className="text-base font-medium tracking-tight">{value}</dd>
     </div>
   );
 }
 
 function InlineLink({ href, children }: { href: string; children: ReactNode }) {
   return (
-    <Link
-      href={href}
-      className="group inline-flex items-center gap-0.5 font-mono text-xs text-foreground"
-    >
+    <Link href={href} className="inline-doc-link">
       {children}
-      <ArrowUpRight className="size-3 transition-transform duration-150 group-hover:-translate-y-px group-hover:translate-x-px" />
+      <ArrowUpRight aria-hidden="true" className="size-4" />
     </Link>
   );
 }
@@ -283,18 +328,19 @@ function NextLink({
   children: ReactNode;
 }) {
   return (
-    <Link
-      href={href}
-      className="group rounded-xl border border-border bg-card p-4 hover:border-ring hover:bg-accent"
-    >
-      <span className="flex items-center gap-2 text-sm font-medium">
-        <BookOpen className="size-3.5 text-muted-foreground" />
-        {title}
-        <ArrowRight className="ml-auto size-3.5 text-muted-foreground transition-transform duration-150 group-hover:translate-x-0.5 group-hover:text-foreground" />
+    <Link href={href} className="docs-index-link group">
+      <span>
+        <span className="block text-lg font-medium tracking-tight">
+          {title}
+        </span>
+        <span className="mt-2 block text-sm leading-relaxed text-muted-foreground">
+          {children}
+        </span>
       </span>
-      <span className="mt-1.5 block text-xs leading-relaxed text-muted-foreground">
-        {children}
-      </span>
+      <ArrowRight
+        aria-hidden="true"
+        className="mt-1 size-5 shrink-0 transition-transform group-hover:translate-x-1 motion-reduce:transform-none"
+      />
     </Link>
   );
 }

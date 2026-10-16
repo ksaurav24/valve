@@ -17,13 +17,14 @@ export function CodeTabs({ tabs }: { tabs: CodeTab[] }) {
   const [selected, setSelected] = useState(0);
   const tab = tabs[selected]!;
   return (
-    <div className="overflow-hidden rounded-xl border border-border bg-card">
+    <div data-ui className="overflow-hidden rounded-lg bg-background">
       <div className="flex items-center justify-between gap-2 border-b border-border px-2 py-1.5">
         <TabsSubtle
           selectedIndex={selected}
           onSelect={setSelected}
           size="compact"
           idPrefix="code"
+          className="code-tab-list"
         >
           {tabs.map(({ file }, index) => (
             <TabsSubtleItem
@@ -37,7 +38,9 @@ export function CodeTabs({ tabs }: { tabs: CodeTab[] }) {
         <CopyButton value={tab.code} label={`Copy ${tab.file}`} />
       </div>
       <div
+        id={`code-panel-${selected}`}
         role="tabpanel"
+        aria-labelledby={`code-tab-${selected}`}
         aria-label={tab.file}
         className="code-html overflow-x-auto px-4 py-4 text-[13px] leading-6"
         dangerouslySetInnerHTML={{ __html: tab.html }}

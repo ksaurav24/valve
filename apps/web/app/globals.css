@@ -33,7 +33,7 @@
   --color-grid: var(--grid);
 }
 
-/* Monochrome, dark first. One muted green marks live and published states. */
+/* Monochrome, dark first. The favicon's valve red marks live and published states. */
 :root {
   --radius: 0.5rem;
   --background: #ffffff;
@@ -54,7 +54,7 @@
   --border: #e6e6e6;
   --input: #e6e6e6;
   --ring: #a3a3a3;
-  --live: #15803d;
+  --live: #b3322a;
   --grid: rgb(0 0 0 / 0.07);
 }
 
@@ -78,7 +78,7 @@
   --border: #1f1f1f;
   --input: #262626;
   --ring: #525252;
-  --live: #4ade80;
+  --live: #d2463a;
   --grid: rgb(255 255 255 / 0.05);
   --focus-ring: #8fb0ff;
   --shadow-color: rgb(0 0 0 / 0.4);
@@ -179,7 +179,7 @@ body {
 
 /* Docs */
 #nd-docs-layout {
-  --fd-layout-width: 90rem;
+  --fd-layout-width: 100%;
 }
 #nd-sidebar {
   background: var(--background);
@@ -279,6 +279,243 @@ body {
   background-size: 18px 18px;
 }
 
+/* Marketing compositions share the palette and the flow illustration's geometry. */
+.page-gutter {
+  padding-inline: clamp(1rem, 2.5vw, 3rem);
+}
+.section-space {
+  padding-block: clamp(4.5rem, 7.5vw, 8rem);
+}
+.home-hero {
+  position: relative;
+  display: flex;
+  min-height: calc(100svh - 3.5rem);
+  flex-direction: column;
+  overflow-x: clip;
+}
+.hero-layout {
+  display: grid;
+  flex: 1;
+  align-content: center;
+  align-items: center;
+  gap: 2rem;
+  padding-block: 2rem;
+}
+.hero-copy {
+  display: grid;
+  align-content: center;
+  gap: 1.75rem;
+}
+.hero-title {
+  font-size: clamp(2.75rem, 5vw, 6.25rem);
+  font-weight: 550;
+  letter-spacing: -0.055em;
+  line-height: 1.02;
+}
+.hero-description {
+  max-width: 43ch;
+  font-size: clamp(1rem, 1.3vw, 1.125rem);
+  line-height: 1.6;
+  text-wrap: pretty;
+}
+.hero-stage {
+  display: grid;
+  min-width: 0;
+  align-content: center;
+  padding: clamp(1rem, 2.5vw, 3rem);
+}
+.hero-footer {
+  padding-block: 1.5rem 2rem;
+}
+.hero-facts {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  align-items: start;
+  gap: 1.75rem 1rem;
+}
+.section-title {
+  max-width: 19ch;
+  font-size: clamp(2rem, 3.4vw, 3.75rem);
+  font-weight: 500;
+  letter-spacing: -0.045em;
+  line-height: 1.1;
+  text-wrap: balance;
+}
+.section-copy {
+  max-width: 48ch;
+  font-size: 1rem;
+  line-height: 1.7;
+  text-wrap: pretty;
+}
+.readme-layout,
+.capabilities-layout,
+.community-layout,
+.next-layout {
+  display: grid;
+  align-items: start;
+  gap: 2.5rem;
+}
+.primary-doc-link {
+  display: inline-flex;
+  min-height: 44px;
+  align-items: center;
+  gap: 0.75rem;
+  border-radius: 0.375rem;
+  background: var(--foreground);
+  color: var(--background);
+  padding: 0.75rem 1rem;
+  font-size: 0.875rem;
+  font-weight: 500;
+}
+.primary-doc-link:hover {
+  background: color-mix(in oklab, var(--foreground) 85%, var(--background));
+}
+.primary-doc-link:active {
+  transform: translateY(1px);
+}
+.inline-doc-link {
+  display: inline-flex;
+  min-height: 44px;
+  align-items: center;
+  gap: 0.5rem;
+  margin-top: 1rem;
+  font-size: 0.875rem;
+  font-weight: 500;
+}
+.inline-doc-link:hover {
+  color: var(--live);
+}
+.capability {
+  border-radius: 0.375rem;
+}
+.capability-summary {
+  min-height: 4.5rem;
+  gap: 1rem;
+  padding: 1.25rem;
+  font-size: clamp(1.0625rem, 1.5vw, 1.375rem);
+  font-weight: 500;
+  letter-spacing: -0.025em;
+  line-height: 1.3;
+}
+.capability-summary > span:first-child {
+  font-size: inherit;
+}
+.capability-panel > div {
+  padding: 0;
+}
+.capability-body {
+  padding: 0 1.25rem 1.25rem;
+  font-size: 1rem;
+  line-height: 1.7;
+}
+.capability-code {
+  overflow-x: auto;
+  margin-top: 1.25rem;
+  border-radius: 0.25rem;
+  background: var(--background);
+  padding: 1rem;
+  font-family: var(--font-mono);
+  font-size: 13px;
+  line-height: 1.8;
+}
+.section-heading-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: end;
+  justify-content: space-between;
+  gap: 1rem 2rem;
+}
+.section-heading-row .inline-doc-link {
+  margin-top: 0;
+}
+.release-index {
+  margin-top: clamp(2.5rem, 5vw, 5rem);
+}
+.release-row {
+  display: grid;
+  align-items: start;
+  gap: 1.5rem;
+}
+.release-row + .release-row {
+  margin-top: 3rem;
+}
+.docs-index-link {
+  display: flex;
+  min-height: 5.5rem;
+  align-items: start;
+  justify-content: space-between;
+  gap: 1.5rem;
+  padding-block: 1.25rem;
+}
+.docs-index-link:hover {
+  color: var(--live);
+}
+.docs-index-link:active,
+.inline-doc-link:active {
+  transform: translateY(1px);
+}
+@media (max-width: 40rem) {
+  .code-tab-list [role='tab'] {
+    padding-inline: 0.45rem;
+  }
+  .code-tab-list [role='tab'] svg {
+    display: none;
+  }
+}
+@media (min-width: 48rem) {
+  .hero-facts {
+    grid-template-columns: 0.9fr 1.3fr 0.9fr 1fr;
+  }
+  .release-row {
+    grid-template-columns: minmax(0, 1fr) minmax(0, 3fr);
+    gap: 3rem;
+  }
+}
+@media (min-width: 64rem) {
+  .hero-layout {
+    grid-template-columns: minmax(0, 5fr) minmax(0, 7fr);
+    gap: 2.5rem;
+    padding-block: 3rem;
+  }
+  .hero-stage {
+    min-height: clamp(25rem, 33vw, 35rem);
+  }
+  .hero-footer {
+    padding-block: 1.5rem 2.5rem;
+  }
+  .readme-layout,
+  .capabilities-layout {
+    grid-template-columns: minmax(0, 5fr) minmax(0, 7fr);
+    gap: clamp(2rem, 4vw, 5rem);
+  }
+  .readme-note,
+  .capabilities-intro {
+    position: sticky;
+    top: 6rem;
+  }
+  .community-layout,
+  .next-layout {
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+    gap: 5rem;
+  }
+  .community-layout {
+    align-items: center;
+  }
+}
+
+/* Reserve the supplied flow illustration's proportions before hydration. */
+.valve-flow-figure {
+  container-type: inline-size;
+}
+.valve-flow {
+  aspect-ratio: 640 / 300;
+}
+@container (min-width: 760px) {
+  .valve-flow {
+    aspect-ratio: 1200 / 330;
+  }
+}
+
 /* Shiki output outside docs: both themes ship, CSS picks one. */
 .code-html pre {
   background: transparent !important;
@@ -310,6 +547,14 @@ button {
     animation-iteration-count: 1 !important;
     transition-duration: 0.01ms !important;
     scroll-behavior: auto !important;
+  }
+}
+
+/* Keep the hero readable without scripting and skip its entrance when requested. */
+@media (scripting: none), (prefers-reduced-motion: reduce) {
+  .hero-reveal {
+    opacity: 1 !important;
+    transform: none !important;
   }
 }
 

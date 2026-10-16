@@ -1,0 +1,16 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32">
+  <style>
+    .body { fill: #1C1A19; stroke: #1C1A19; }
+    .wheel { fill: #B3322A; }
+    @media (prefers-color-scheme: dark) {
+      .body { fill: #EFEAE6; stroke: #EFEAE6; }
+      .wheel { fill: #D2463A; }
+    }
+  </style>
+  <g class="body" stroke-width="1.5" stroke-linejoin="round">
+    <path d="M4 10 16 19 4 28Z"/>
+    <path d="M28 10 16 19 28 28Z"/>
+  </g>
+  <rect class="wheel" x="15" y="6" width="2" height="13"/>
+  <rect class="wheel" x="9.5" y="3" width="13" height="3.2" rx="1.6"/>
+</svg>
