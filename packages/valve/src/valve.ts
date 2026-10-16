@@ -111,17 +111,20 @@ export function createValve(options: ValveOptions): Valve {
       })
     : undefined;
 
+  /** Cancel the current wake hint without resetting the separate outage backoff deadline. */
   function clearWake() {
     if (wake !== undefined) clearTimeout(wake);
     wake = undefined;
     wakeAt = Infinity;
   }
+  /** Coalesce wake requests into one scheduler microtask. */
   function schedule() {
     if (!scheduled) {
       scheduled = true;
       queueMicrotask(pump);
     }
   }
+  /** Keep the earliest wake hint and cap its timer delay at the platform maximum. */
   function arm(at: number) {
     if (!waiting.size || at >= wakeAt) return;
     clearWake();
@@ -135,6 +138,7 @@ export function createValve(options: ValveOptions): Valve {
       Math.min(2147483647, Math.max(1, Math.ceil(at - Date.now()))),
     );
   }
+  /** Spread retries by up to 25ms, bounded by ten percent of the supplied delay. */
   function jitter(ms: number) {
     return Math.random() * Math.min(25, ms * 0.1);
   }
@@ -225,6 +229,7 @@ export function createValve(options: ValveOptions): Valve {
       events.emit('store-error', { error, policy: config.policy });
     }
   }
+  /** Requeue live jobs with their original priority and submission sequence. */
   function enqueueAgain(job: Job) {
     if (job.state === 'queued') {
       job.location = 'queue';
