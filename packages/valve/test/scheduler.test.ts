@@ -520,6 +520,27 @@ describe('cancellation and lifecycle', () => {
     await close;
     await valve[Symbol.asyncDispose]();
   });
+  it('falls back to the registered dispose symbol on older Node 20 releases', async () => {
+    const real = Symbol;
+    const legacy = new Proxy(() => {}, {
+      apply: (_, __, args: [string?]) => real(...args),
+      get: (_, key) =>
+        key === 'asyncDispose' ? undefined : Reflect.get(real, key),
+    });
+    vi.stubGlobal('Symbol', legacy);
+    let valve: Valve;
+    try {
+      valve = make({ id: 'x', concurrency: 1 });
+    } finally {
+      vi.unstubAllGlobals();
+    }
+    const dispose = (valve as unknown as Record<symbol, () => Promise<void>>)[
+      Symbol.for('nodejs.asyncDispose')
+    ];
+    expect(dispose).toBeTypeOf('function');
+    await dispose!();
+    await expect(valve.run(() => 1)).rejects.toMatchObject({ code: 'CLOSED' });
+  });
   it.each([false, true])(
     'releases grants from an in-flight admission before close resolves (scoped=%s)',
     async (scoped) => {
