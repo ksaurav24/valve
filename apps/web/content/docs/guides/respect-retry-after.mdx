@@ -37,6 +37,10 @@ For an eligible request receiving a 429, or a 503 with a valid `Retry-After`:
 4. Once the configured retry limit is exhausted, it returns the final response
    unchanged.
 
+If the retry cannot be queued, because the valve was closed without draining or
+`maxQueue` is full, valve returns the rate limit response unread instead of
+rejecting. `close({ drain: true })` lets accepted requests finish their retries.
+
 The `retries` option specifies additional attempts after the initial request.
 The default of `2` permits up to three total requests.
 

@@ -15,6 +15,70 @@ afterEach(async () => {
   vi.useRealTimers();
 });
 describe('fetch wrapping', () => {
+  const limitedOnce = () => {
+    let calls = 0;
+    return vi.fn<(input: string) => Promise<Response>>(async () => {
+      await new Promise((resolve) => setTimeout(resolve, 20));
+      return ++calls === 1
+        ? new Response('limited', { status: 429 })
+        : new Response('ok');
+    });
+  };
+  it('finishes retries of an accepted request while draining', async () => {
+    const valve = make({ id: 'drain-retry', concurrency: 1, maxPause: 0 });
+    const fake = limitedOnce();
+    const response = valve.wrapFetch(fake)('https://example.com');
+    await new Promise((resolve) => setTimeout(resolve, 5));
+    const closing = valve.close({ drain: true });
+    expect((await response).status).toBe(200);
+    await closing;
+    expect(fake).toHaveBeenCalledTimes(2);
+  });
+  it('returns the unread response when close rejects the retry', async () => {
+    const valve = make({ id: 'close-retry', concurrency: 1, maxPause: 0 });
+    const fake = limitedOnce();
+    const response = valve.wrapFetch(fake)('https://example.com');
+    await new Promise((resolve) => setTimeout(resolve, 5));
+    await valve.close();
+    const result = await response;
+    expect(result.status).toBe(429);
+    expect(await (result as Response).text()).toBe('limited');
+    expect(fake).toHaveBeenCalledTimes(1);
+  });
+  it('returns the unread response when the queue has no room for the retry', async () => {
+    const valve = make({
+      id: 'full-retry',
+      concurrency: 1,
+      maxQueue: 1,
+      maxPause: 0,
+    });
+    const fake = limitedOnce();
+    const response = valve.wrapFetch(fake)('https://example.com');
+    await new Promise((resolve) => setTimeout(resolve, 5));
+    const other = valve.run(() => 'queued');
+    const result = await response;
+    expect(result.status).toBe(429);
+    expect(await (result as Response).text()).toBe('limited');
+    expect(await other).toBe('queued');
+  });
+  it('counts resolver errors as rejections', async () => {
+    const valve = make({ id: 'resolver', concurrency: 1 });
+    const codes: string[] = [];
+    valve.on('reject', ({ code }) => codes.push(code));
+    const fetchLimited = valve.wrapFetch(vi.fn(), {
+      cost: () => {
+        throw new Error('bad cost');
+      },
+    });
+    await expect(fetchLimited('https://example.com')).rejects.toThrow(
+      'bad cost',
+    );
+    await expect(
+      valve.wrapFetch(vi.fn(), { scopes: { tenant: 't' } })('https://x'),
+    ).rejects.toMatchObject({ code: 'INVALID_OPTIONS' });
+    expect(codes).toEqual(['INVALID_OPTIONS', 'INVALID_OPTIONS']);
+    expect(valve.stats().totals.rejected).toBe(2);
+  });
   it.each(['POST', 'PATCH', 'post', 'CUSTOM'])(
     'returns %s responses without replaying, even with an idempotency key',
     async (method) => {

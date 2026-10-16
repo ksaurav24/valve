@@ -199,7 +199,9 @@ export interface WrapFetchOptions<F extends FetchLike = typeof fetch> {
    * Additional attempts after the initial request, following a 429 or a 503
    * with a valid `Retry-After`. Each retry waits for any shared pause and
    * re-enters the queue at its original position. Integer, `0` or more.
-   * Default `2`, permitting up to three total requests.
+   * Default `2`, permitting up to three total requests. A retry that cannot be
+   * queued, because the valve closed without draining or `maxQueue` is full,
+   * returns the last response unread instead of rejecting.
    * Only GET, HEAD, OPTIONS, PUT and DELETE retry by default.
    * Requests with a stream passed as `init.body` are never retried.
    * Inherited Request bodies retry only within `maxReplayBodySize`.
@@ -230,7 +232,7 @@ export interface WrapFetchOptions<F extends FetchLike = typeof fetch> {
   cost?: number | ((...args: Parameters<F>) => number);
   /** Priority per request. A number or a function of the fetch arguments. Default `0`. */
   priority?: number | ((...args: Parameters<F>) => number);
-  /** Max queue wait per request. Defaults to the valve's `maxWait`. */
+  /** Max queue wait for each attempt. Defaults to the valve's `maxWait`. */
   maxWait?: Duration;
 }
 
@@ -417,7 +419,10 @@ export interface Valve extends AsyncDisposable {
    *
    * With `drain: false` (default) queued jobs reject with `CLOSED` and the
    * promise resolves when running jobs finish. With `drain: true` queued
-   * jobs still run first. Never closes the user's store client.
+   * jobs still run first, including retries of accepted `wrapFetch` requests.
+   * With global concurrency, the promise also waits up to `leaseTtl` for an
+   * in-flight store admission and releases any leases it grants. Never closes
+   * the user's store client.
    * Calling `close` twice returns the same promise.
    *
    * @example
