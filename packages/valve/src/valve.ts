@@ -201,8 +201,19 @@ export function createValve(options: ValveOptions): Valve {
       events.emit('store-error', { error, policy: config.policy });
     }
   }
+  /** Reject a `maxWait: 0` job instead of requeueing it after its single admission attempt. */
+  function missed(job: Job) {
+    if (job.waitMs) return false;
+    rejectJob(
+      job,
+      'MAX_WAIT_EXCEEDED',
+      'job could not start immediately with maxWait 0ms.',
+    );
+    return true;
+  }
+  /** Requeue live work, rejecting zero-wait jobs after their sole admission attempt. */
   function enqueueAgain(job: Job) {
-    if (job.state === 'queued') {
+    if (job.state === 'queued' && !missed(job)) {
       job.location = 'queue';
       queue.push(job);
     }
@@ -224,12 +235,13 @@ export function createValve(options: ValveOptions): Valve {
     finishIdle();
     schedule();
   }
+  /** Start a grant unless cancelled or past a positive queue-wait deadline. */
   function start(job: Job) {
     if (job.state !== 'queued') {
       if (job.lease) leases!.release(job.lease);
       return;
     }
-    if (job.deadline <= Date.now()) {
+    if (job.waitMs && job.deadline <= Date.now()) {
       rejectJob(
         job,
         'MAX_WAIT_EXCEEDED',
@@ -443,7 +455,7 @@ export function createValve(options: ValveOptions): Valve {
     }
     for (const entry of result.blocked) {
       const job = heads[entry.index]!;
-      if (job.state !== 'queued') continue;
+      if (job.state !== 'queued' || missed(job)) continue;
       if (version !== noticeVersion) enqueueAgain(job);
       else {
         job.location = 'delayed';
@@ -501,7 +513,7 @@ export function createValve(options: ValveOptions): Valve {
       const delay = Math.min(5000, 100 * 2 ** Math.min(storeFailures++, 6));
       const at = Date.now() + delay + jitter(delay);
       for (const job of heads) {
-        if (delayed && job.state === 'queued') {
+        if (delayed && job.state === 'queued' && !missed(job)) {
           job.location = 'delayed';
           delayed.add(job, at);
         } else enqueueAgain(job);
@@ -548,7 +560,8 @@ export function createValve(options: ValveOptions): Valve {
     for (const job of heads) job.location = 'acquire';
     const live: Job[] = [];
     for (const job of heads) {
-      if (job.deadline <= now)
+      // A zero maxWait gets one admission attempt instead of a deadline.
+      if (job.waitMs && job.deadline <= now)
         rejectJob(
           job,
           'MAX_WAIT_EXCEEDED',
@@ -724,6 +737,8 @@ export function createValve(options: ValveOptions): Valve {
         active = true;
         if (maxWait !== Infinity) {
           const expire = () => {
+            // The pending admission settles a zero-wait job.
+            if (!maxWait && job.location === 'acquire') return;
             const left = job.deadline - Date.now();
             if (left > 0) {
               job.timer = setTimeout(expire, Math.min(2147483647, left));
