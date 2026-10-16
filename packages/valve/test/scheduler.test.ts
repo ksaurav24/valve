@@ -405,10 +405,58 @@ describe('cancellation and lifecycle', () => {
     expect(await first).toBe(1);
     expect(vi.getTimerCount()).toBe(0);
   });
-  it('rejects a zero maxWait before starting', async () => {
+  it('runs a zero maxWait job only when capacity is free immediately', async () => {
     const valve = make({ id: 'x', concurrency: 1 });
-    const promise = valve.run(() => 1, { maxWait: 0 });
-    const check = expect(promise).rejects.toMatchObject({
+    expect(await valve.run(() => 1, { maxWait: 0 })).toBe(1);
+    let release!: () => void;
+    const busy = valve.run(() => new Promise<void>((r) => (release = r)));
+    const queued = valve.run(() => 2, { maxWait: 0 });
+    const check = expect(queued).rejects.toMatchObject({
+      code: 'MAX_WAIT_EXCEEDED',
+    });
+    await tick();
+    await check;
+    release();
+    await busy;
+    expect(vi.getTimerCount()).toBe(0);
+  });
+  it('rejects a zero maxWait job the store denies instead of requeueing it', async () => {
+    const valve = make({ id: 'x', rate: { limit: 1, interval: 1000 } });
+    expect(await valve.run(() => 1, { maxWait: 0 })).toBe(1);
+    const denied = valve.run(() => 2, { maxWait: 0 });
+    const check = expect(denied).rejects.toMatchObject({
+      code: 'MAX_WAIT_EXCEEDED',
+    });
+    await tick();
+    await check;
+    expect(valve.stats().queued).toBe(0);
+  });
+  it('lets a slow store answer a zero maxWait admission', async () => {
+    const valve = make({
+      id: 'x',
+      concurrency: 1,
+      store: failing(
+        () =>
+          new Promise((resolve) =>
+            setTimeout(
+              () => resolve({ granted: 1, retryAfterMs: 0, pausedMs: 0 }),
+              20,
+            ),
+          ),
+      ),
+    });
+    const job = valve.run(() => 1, { maxWait: 0 });
+    await vi.advanceTimersByTimeAsync(20);
+    expect(await job).toBe(1);
+  });
+  it('rejects a zero maxWait job during a store outage', async () => {
+    const valve = make({
+      id: 'x',
+      concurrency: 1,
+      store: failing(() => Promise.reject(new Error('down'))),
+    });
+    const job = valve.run(() => 1, { maxWait: 0 });
+    const check = expect(job).rejects.toMatchObject({
       code: 'MAX_WAIT_EXCEEDED',
     });
     await tick();

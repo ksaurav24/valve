@@ -39,8 +39,8 @@ reconfigures them.
 
 ## Timeouts and reconnection
 
-`timeout` bounds how long valve waits for a store operation. It does not cancel
-or remove the underlying client command. A timeout has an **unknown outcome**:
+`timeout` bounds how long valve waits for a store operation and must be at
+least 1ms. It does not cancel or remove the underlying client command. A timeout has an **unknown outcome**:
 Redis may already have executed the script, or the client may send it after
 reconnecting. Successful reconnection does not make the earlier call successful.
 

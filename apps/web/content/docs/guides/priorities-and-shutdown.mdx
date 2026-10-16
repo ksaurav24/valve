@@ -49,7 +49,8 @@ const crm = createValve({
   rejects with `QUEUE_FULL`.
 - `maxWait` limits how long a job may wait before starting. An expired job
   rejects with `MAX_WAIT_EXCEEDED`. It does **not** limit how long the job
-  runs. Override it per job with `run(fn, { maxWait })`.
+  runs. Override it per job with `run(fn, { maxWait })`. `maxWait: 0` runs a
+  job only if capacity is free on its first admission attempt.
 
 Both turn an overloaded queue into fast, explicit errors that you can handle,
 instead of unbounded memory and latency.
