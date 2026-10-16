@@ -237,7 +237,8 @@ describe('scoped Redis adapter', () => {
   it('deduplicates keys and decodes indexed grants and leases', async () => {
     const evalsha = vi
       .fn()
-      .mockResolvedValue([[0], [[1, 1000]], [[0, 'owner:0']]]);
+      .mockResolvedValueOnce([[0], [[1, 1000]], [[0, 'owner:0']], 0])
+      .mockResolvedValue([[0], [[1, 1000]], [], 0]);
     const store = redisStore({ adapter: { evalsha, eval: vi.fn() } });
     expect(
       await store.acquireScoped!({
@@ -255,13 +256,30 @@ describe('scoped Redis adapter', () => {
       blocked: [{ index: 1, retryAfterMs: 1000 }],
     });
   });
-  it.each(['CONFIG_MISMATCH', null, [0, 1, 2]])(
-    'rejects invalid scoped reply %j',
-    async (raw) => {
-      const store = redisStore({
-        adapter: { evalsha: vi.fn().mockResolvedValue(raw), eval: vi.fn() },
-      });
-      await expect(store.acquireScoped!(scopedRequest)).rejects.toThrow();
-    },
-  );
+  it('reports a shared pause on scoped replies', async () => {
+    const evalsha = vi.fn().mockResolvedValue([[], [[0, 250]], [], 250]);
+    const store = redisStore({ adapter: { evalsha, eval: vi.fn() } });
+    expect(
+      await store.acquireScoped!({
+        ...scopedRequest,
+        jobs: scopedRequest.jobs.slice(0, 1),
+      }),
+    ).toEqual({
+      grantedIndexes: [],
+      blocked: [{ index: 0, retryAfterMs: 250 }],
+      pausedMs: 250,
+    });
+  });
+  it.each([
+    'CONFIG_MISMATCH',
+    null,
+    [0, 1, 2],
+    [[0], [[1, 1000]], []],
+    [[0], [[1, 1000]], [], -1],
+  ])('rejects invalid scoped reply %j', async (raw) => {
+    const store = redisStore({
+      adapter: { evalsha: vi.fn().mockResolvedValue(raw), eval: vi.fn() },
+    });
+    await expect(store.acquireScoped!(scopedRequest)).rejects.toThrow();
+  });
 });

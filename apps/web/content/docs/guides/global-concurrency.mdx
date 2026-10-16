@@ -36,9 +36,10 @@ await reports.run(({ signal }) =>
 ```
 
 Use the same `limit` and `leaseTtl` in every worker that shares the id.
-Redis rejects mismatched rate rules or global concurrency settings with
-`INVALID_OPTIONS`. To change them, follow
+Redis and a shared `memoryStore()` reject mismatched rate rules or global
+concurrency settings with `INVALID_OPTIONS`. To change them, follow
 [Changing a shared quota](/docs/guides/share-a-quota/#changing-a-shared-quota).
+The memory store forgets an id's settings once its rate and lease state expire.
 
 ## How leases work
 

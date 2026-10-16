@@ -85,7 +85,7 @@ describe('global concurrency', () => {
     expect(
       store.acquireSync!({
         id: 'x',
-        rules: [],
+        rules,
         costs: [1],
         lease: { limit: 1, ttlMs: 90, owner: 'second' },
       }).granted,
@@ -101,6 +101,90 @@ describe('global concurrency', () => {
       }).granted,
     ).toBe(1);
     await store.close();
+  });
+  it('rejects valves that share an id with different global limits', async () => {
+    const store = memoryStore();
+    const strict = createValve({
+      id: 'x',
+      concurrency: { limit: 1, scope: 'global' },
+      store,
+    });
+    const loose = createValve({
+      id: 'x',
+      concurrency: { limit: 5, scope: 'global' },
+      store,
+    });
+    expect(await strict.run(() => 1)).toBe(1);
+    await expect(loose.run(() => 2)).rejects.toMatchObject({
+      code: 'INVALID_OPTIONS',
+    });
+    await Promise.all([strict.close(), loose.close()]);
+  });
+  it('checks static rules, lease limit, and lease TTL together', () => {
+    const store = memoryStore();
+    const rules = normalize({
+      id: 'x',
+      rate: { limit: 2, interval: 100 },
+    }).rules;
+    const lease = { limit: 2, ttlMs: 100, owner: 'a' };
+    expect(
+      store.acquireSync!({ id: 'x', rules, costs: [1], lease }).granted,
+    ).toBe(1);
+    // A separately normalized but identical policy shares the id.
+    const equivalent = normalize({
+      id: 'x',
+      rate: { limit: 2, interval: 100 },
+    }).rules;
+    expect(() =>
+      store.acquireSync!({
+        id: 'x',
+        rules: equivalent,
+        costs: [1],
+        lease: { ...lease, owner: 'b' },
+      }),
+    ).not.toThrow();
+    for (const request of [
+      { rules: [], lease },
+      { rules, lease: { ...lease, limit: 3 } },
+      { rules, lease: { ...lease, ttlMs: 200 } },
+      { rules },
+    ])
+      expect(() =>
+        store.acquireSync!({ id: 'x', costs: [1], ...request }),
+      ).toThrow(/configuration does not match/);
+  });
+  it('retries after the lease TTL when more jobs than free slots ask an empty slot set', () => {
+    const store = memoryStore({ clock: () => 1000 });
+    expect(
+      store.acquireSync!({
+        id: 'x',
+        rules: [],
+        costs: [1, 1],
+        lease: { limit: 1, ttlMs: 250, owner: 'o' },
+      }),
+    ).toEqual({ granted: 1, retryAfterMs: 250, pausedMs: 0, leases: ['o:0'] });
+  });
+  it('forgets static policies once their rate and lease state expires', () => {
+    let now = 0;
+    const store = memoryStore({ clock: () => now });
+    const rules = normalize({
+      id: 'old',
+      rate: { limit: 1, interval: 10 },
+    }).rules;
+    const changed = normalize({
+      id: 'old',
+      rate: { limit: 2, interval: 10 },
+    }).rules;
+    store.acquireSync!({ id: 'old', rules, costs: [1] });
+    expect(() =>
+      store.acquireSync!({ id: 'old', rules: changed, costs: [1] }),
+    ).toThrow(/configuration does not match/);
+    now = 1000;
+    for (let i = 0; i < 1024; i++)
+      store.acquireSync!({ id: `short-${i}`, rules, costs: [1] });
+    expect(
+      store.acquireSync!({ id: 'old', rules: changed, costs: [1] }).granted,
+    ).toBe(1);
   });
   it('signals lease loss when renewal fails and releases on settlement', async () => {
     vi.useFakeTimers();

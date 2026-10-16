@@ -63,6 +63,10 @@ a stable `key`: `${algorithm}:${intervalMs}` for unnamed rules or
   does not fit.
 - **No partial spends.** If a job does not fit one rule, spend nothing for it
   in the others.
+- **Pinned policy.** Reject a request with `INVALID_OPTIONS` when its rules,
+  lease limit, or lease TTL differ from the policy other workers use for the id.
+- **Finite retry hints.** When more jobs ask for leases than slots are free,
+  return a finite `retryAfterMs`, such as the lease TTL when no slot is held.
 
 The memory store's source, `packages/valve/src/memory-store.ts`, is a compact
 reference implementation. The Redis Lua scripts in `packages/valve/src/redis/`
@@ -78,6 +82,7 @@ rejects unsupported stores. Exported `ScopedAcquireRequest` and
 ```ts
 interface ScopedAcquireResult {
   grantedIndexes: readonly number[];
+  pausedMs?: number; // Ms left on an active pause. When above 0, every job is blocked.
   blocked: readonly { index: number; retryAfterMs: number }[];
   leases?: readonly { index: number; token: string }[];
 }
@@ -86,8 +91,10 @@ interface ScopedAcquireResult {
 The request contains `id`, immutable normalized `rules`, ordered `jobs` with
 `cost` and `scopes`, and optional `lease` settings. Indexes are zero-based into
 `jobs`. Every job must appear exactly once in grants or denials. Retry hints
-must be positive safe integers. Global requests need one unique lease token
-per admitted index, released and renewed through the existing methods.
+must be positive safe integers. Report an active shared pause in `pausedMs` so
+valves without a subscriber can show it in `stats()` and emit `pause`. Global
+requests need one unique lease token per admitted index, released and renewed
+through the existing methods.
 
 Validate the complete request before mutation. Use one store clock and one
 atomic operation to check the shared pause, every applicable rule, and lease

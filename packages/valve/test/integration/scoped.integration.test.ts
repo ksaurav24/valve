@@ -62,8 +62,17 @@ suite('scoped Redis/Valkey admission', () => {
         step.expected.grantedIndexes,
         step.expected.blocked.map((b) => [b.index, b.retryAfterMs]),
         [],
+        0,
       ]);
     }
+  });
+  it('reports a shared pause on scoped admission', async () => {
+    const request = make(randomUUID(), ['A']);
+    await store.pause(request.id, 1000);
+    const result = await store.acquireScoped!(request);
+    expect(result.grantedIndexes).toEqual([]);
+    expect(result.pausedMs).toBeGreaterThan(900);
+    expect(result.blocked[0]!.retryAfterMs).toBe(result.pausedMs);
   });
   it('expires inactive scoped keys automatically and restores their budgets', async () => {
     const id = 'expiry';
@@ -286,6 +295,7 @@ suite('scoped Redis/Valkey admission', () => {
           expected.grantedIndexes,
           expected.blocked.map((b) => [b.index, b.retryAfterMs]),
           [],
+          expected.pausedMs ?? 0,
         ]);
       }
       await memory.close();
