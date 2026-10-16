@@ -15,6 +15,26 @@ afterEach(async () => {
   vi.useRealTimers();
 });
 describe('fetch wrapping', () => {
+  it('retries ahead of requests queued during the first attempt', async () => {
+    const valve = make({ id: 'retry-order', concurrency: 1, maxPause: 0 });
+    const calls: string[] = [];
+    let limited = true;
+    const fake = vi.fn(async (url: string) => {
+      calls.push(url);
+      if (url === 'a' && limited) {
+        limited = false;
+        return new Response(null, { status: 429 });
+      }
+      return new Response(null);
+    });
+    const fetchLimited = valve.wrapFetch(fake);
+    await Promise.all([
+      fetchLimited('a'),
+      fetchLimited('b'),
+      fetchLimited('c'),
+    ]);
+    expect(calls).toEqual(['a', 'a', 'b', 'c']);
+  });
   const limitedOnce = () => {
     let calls = 0;
     return vi.fn<(input: string) => Promise<Response>>(async () => {

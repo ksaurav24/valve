@@ -141,6 +141,15 @@ describe('queue', () => {
     q.push(job(5));
     expect(q.take(1)[0]?.seq).toBe(5);
   });
+  it('keeps call order when earlier jobs are requeued behind later ones', () => {
+    const q = new JobQueue<Queued>();
+    for (let i = 0; i < 6; i++) q.push(job(i));
+    const [first, ...denied] = q.take(3);
+    expect(first?.seq).toBe(0);
+    for (const j of denied) q.push(j);
+    q.push(job(6));
+    expect(q.take(10).map((j) => j.seq)).toEqual([1, 2, 3, 4, 5, 6]);
+  });
   it('lazily removes cancelled jobs in ring and heap', () => {
     const q = new JobQueue<Queued>();
     const a = job(0);
