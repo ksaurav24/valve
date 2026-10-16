@@ -4,12 +4,14 @@ import { VersionBadge } from '@/components/shared/version-badge';
 import { changelogSource } from '@/lib/source';
 import { getMDXComponents } from '@/mdx-components';
 import { site } from '@/lib/site';
+import { pageMetadata } from '@/lib/metadata';
 
-export const metadata: Metadata = {
+export const metadata: Metadata = pageMetadata({
   title: 'Changelog',
   description:
     'Version history and package changes for valve, generated from the package changelog.',
-};
+  path: '/changelog',
+});
 
 export default function ChangelogPage() {
   const page = changelogSource.getPage([]);

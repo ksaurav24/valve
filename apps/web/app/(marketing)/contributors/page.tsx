@@ -6,11 +6,13 @@ import { contributors } from '@/lib/github';
 import { site } from '@/lib/site';
 import { contributingSource } from '@/lib/source';
 import { getMDXComponents } from '@/mdx-components';
+import { pageMetadata } from '@/lib/metadata';
 
-export const metadata: Metadata = {
+export const metadata: Metadata = pageMetadata({
   title: 'Contributors',
   description: 'The people building valve, and how to contribute.',
-};
+  path: '/contributors',
+});
 
 const starters = [
   {

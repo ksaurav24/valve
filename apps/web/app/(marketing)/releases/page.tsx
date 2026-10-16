@@ -6,11 +6,13 @@ import { ChangelogSections } from '@/components/marketing/changelog-entry';
 import { GitHubIcon } from '@/components/shared/icons';
 import { VersionBadge } from '@/components/shared/version-badge';
 import { current, releases } from '@/lib/releases';
+import { pageMetadata } from '@/lib/metadata';
 
-export const metadata: Metadata = {
+export const metadata: Metadata = pageMetadata({
   title: 'Releases',
   description: 'Published valve versions on npm, with their release notes.',
-};
+  path: '/releases',
+});
 
 const date = new Intl.DateTimeFormat('en', { dateStyle: 'medium' });
 

@@ -14,12 +14,14 @@ import { highlight } from '@/components/shared/highlight';
 import { VersionBadge } from '@/components/shared/version-badge';
 import { contributors } from '@/lib/github';
 import { changelogEntries, current, versionState } from '@/lib/releases';
+import { pageMetadata } from '@/lib/metadata';
+import { site } from '@/lib/site';
 
-export const metadata: Metadata = {
-  title: { absolute: 'valve: Shared rate limits for outbound API calls' },
-  description:
-    'A TypeScript library for outbound API rate limits, atomic shared and scoped budgets, and provider backoff. Memory, Redis, and Valkey stores with zero runtime dependencies.',
-};
+export const metadata: Metadata = pageMetadata({
+  title: site.title,
+  path: '/',
+  absoluteTitle: true,
+});
 
 const samples = [
   {
@@ -99,6 +101,35 @@ export default async function HomePage() {
 
   return (
     <div className="marketing-home">
+      <script
+        type="application/ld+json"
+        dangerouslySetInnerHTML={{
+          __html: JSON.stringify({
+            '@context': 'https://schema.org',
+            '@graph': [
+              {
+                '@type': 'WebSite',
+                '@id': `${site.url}/#website`,
+                name: site.name,
+                url: `${site.url}/`,
+                description: site.description,
+                inLanguage: 'en',
+              },
+              {
+                '@type': 'SoftwareSourceCode',
+                name: site.packageName,
+                alternateName: site.name,
+                url: `${site.url}/`,
+                description: site.description,
+                codeRepository: site.repository,
+                programmingLanguage: 'TypeScript',
+                license: 'https://www.apache.org/licenses/LICENSE-2.0',
+                version: site.version,
+              },
+            ],
+          }).replace(/</g, '\\u003c'),
+        }}
+      />
       <header className="home-hero">
         <div className="page-gutter hero-layout">
           <div className="hero-copy">

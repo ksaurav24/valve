@@ -5,6 +5,7 @@
   "scripts": {
     "sync": "node scripts/sync-content.mjs && node scripts/sync-metadata.mjs",
     "sync:snapshot": "node scripts/sync-metadata.mjs --write-snapshot",
+    "social:images": "node scripts/generate-social-images.mjs",
     "dev": "pnpm sync && next dev --hostname 127.0.0.1 --port 4321",
     "build": "pnpm sync && pnpm --filter valvejs docs:api && next build --webpack",
     "preview": "python3 -m http.server 4321 --bind 127.0.0.1 --directory out",
