@@ -117,4 +117,4 @@ if p.lease then
   local last = redis.call('ZRANGE', KEYS[3], -1, -1, 'WITHSCORES')
   if #last > 0 then redis.call('PEXPIREAT', KEYS[3], math.ceil(number(last[2]))) end
 end
-return {granted, blocked, tokens}
+return {granted, blocked, tokens, pause}

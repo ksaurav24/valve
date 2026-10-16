@@ -278,3 +278,21 @@ export function normalize(options: ValveOptions) {
     batch: integer(options.batch ?? 32, id, 'batch'),
   };
 }
+/** Canonical versioned fingerprint of static rules that ignores rule order.
+ * @param rules Normalized rules from one static policy.
+ * @returns The fingerprint shared stores compare across workers.
+ */
+export function ruleFingerprint(rules: readonly NormalizedRule[]) {
+  return `${rules.some((rule) => rule.name) ? 'named-v1' : 'v1'}:[${rules
+    .map((rule) =>
+      JSON.stringify([
+        rule.algorithm,
+        rule.intervalMs,
+        rule.limit,
+        rule.burst,
+        ...(rule.name ? [rule.name] : []),
+      ]),
+    )
+    .sort()
+    .join(',')}]`;
+}

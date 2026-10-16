@@ -105,6 +105,8 @@ export interface ScopedAcquireRequest {
 /** Zero-based job indexes partitioned into grants and denials. */
 export interface ScopedAcquireResult {
   readonly grantedIndexes: readonly number[];
+  /** Ms left on an active pause, or 0. When above 0, every job is blocked. Optional for custom stores. */
+  readonly pausedMs?: number;
   readonly blocked: readonly {
     readonly index: number;
     readonly retryAfterMs: number;

@@ -220,6 +220,46 @@ describe('scoped scheduler and wrappers', () => {
     await api.close();
     expect(vi.getTimerCount()).toBe(0);
   });
+  it('reports shared pauses from scoped admission without a subscriber', async () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(0);
+    const base = memoryStore();
+    const store: Store = { ...base };
+    delete store.subscribe;
+    const api = createValve({ id: 'paused', rate: rate.slice(1), store });
+    const paused = vi.fn();
+    api.on('pause', paused);
+    await store.pause('paused', 500);
+    const job = api.run(() => 'ran', { scopes: { recipient: 'A' } });
+    await vi.advanceTimersByTimeAsync(0);
+    expect(paused).toHaveBeenCalledWith({ durationMs: 500, reason: 'store' });
+    expect(api.stats().pausedUntil).toBe(500);
+    await vi.advanceTimersByTimeAsync(500);
+    expect(await job).toBe('ran');
+    await api.close();
+    await base.close();
+  });
+  it('rejects invalid scoped pause durations from custom stores', async () => {
+    const base = memoryStore();
+    const store: Store = {
+      ...base,
+      acquireScoped: async (request) => ({
+        ...(await base.acquireScoped!(request)),
+        pausedMs: -1,
+      }),
+    };
+    delete store.acquireScopedSync;
+    const api = createValve({
+      id: 'bad-pause',
+      rate: rate.slice(1),
+      store,
+      onStoreError: 'throw',
+    });
+    await expect(
+      api.run(() => 1, { scopes: { recipient: 'A' } }),
+    ).rejects.toMatchObject({ code: 'STORE_UNAVAILABLE' });
+    await api.close();
+  });
   it('snapshots identities and resolves fetch scopes once across retries', async () => {
     vi.useFakeTimers();
     const api = createValve({
@@ -667,7 +707,7 @@ it('skips high-priority delayed identities across batches and cancels all their 
   expect(vi.getTimerCount()).toBe(0);
 });
 
-it('retains static policy ownership through pause, counter cleanup and close', async () => {
+it('retains static policy ownership through pause and releases it with expired state', async () => {
   let now = 0;
   const store = memoryStore({ clock: () => now });
   const id = 'static-owner';
@@ -679,11 +719,14 @@ it('retains static policy ownership through pause, counter cleanup and close', a
   now = 100;
   expect(store.acquireSync!({ id, rules, costs: [1] }).granted).toBe(1);
   now = 1000;
-  // Trigger the static sweeper after the original rate state has expired.
+  // The static sweeper releases ownership once the id's rate state expired.
   for (let i = 0; i < 1024; i++)
     store.acquireSync!({ id: 'sweep', rules: [], costs: [1] });
-  expect(() => store.acquireScopedSync!(scoped)).toThrow(/Cannot mix/);
-  await store.close();
   expect(store.acquireScopedSync!(scoped).grantedIndexes).toEqual([0]);
+  expect(() => store.acquireSync!({ id, rules, costs: [1] })).toThrow(
+    /Cannot mix/,
+  );
+  await store.close();
+  expect(store.acquireSync!({ id, rules, costs: [1] }).granted).toBe(1);
   await store.close();
 });

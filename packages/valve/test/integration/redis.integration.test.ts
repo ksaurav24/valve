@@ -165,6 +165,21 @@ suite('real Redis/Valkey', () => {
     }
     await store.close();
   });
+  it('retries after the lease TTL when more jobs than free slots ask an empty slot set', async () => {
+    const store = redisStore({ client: io, prefix });
+    const id = `empty-slots-${process.pid}`;
+    const result = await store.acquire({
+      id,
+      rules: [],
+      costs: [1, 1],
+      lease: { limit: 1, ttlMs: 1000, owner: 'o' },
+    });
+    expect(result).toMatchObject({ granted: 1, pausedMs: 0, leases: ['o:0'] });
+    expect(result.retryAfterMs).toBeGreaterThan(900);
+    expect(result.retryAfterMs).toBeLessThanOrEqual(1000);
+    await io.del(...(await io.keys(`${prefix}:{${id}}:*`)));
+    await store.close();
+  });
   it('starts a fresh budget when Redis loses valve keys', async () => {
     // Documented limit: a flush, eviction, or stale failover erases admission
     // history, and Redis answers normally afterwards.

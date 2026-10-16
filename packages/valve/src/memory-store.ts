@@ -1,5 +1,6 @@
 // A synchronous memory budget with lazy expiry and bounded periodic sweeping.
 import { prepareScoped } from './scoped.js';
+import { ruleFingerprint } from './rules.js';
 import { failure } from './errors.js';
 import { acquireBatch } from './algorithms.js';
 import type { RuleState } from './algorithms.js';
@@ -25,8 +26,9 @@ export function memoryStore(options: MemoryStoreOptions = {}): Store {
   const states = new Map<string, Map<string, RuleState>>();
   const scopedStates = new Map<string, Map<string, RuleState>>();
   const policies = new Map<string, string>();
-  // Ownership outlives rate state and zero-grant admissions; close releases it.
-  const staticIds = new Set<string>();
+  // Static policy fingerprints, pruned with the id's rate, lease, and pause state.
+  const staticIds = new Map<string, string>();
+  const fingerprints = new WeakMap<AcquireRequest['rules'], string>();
   const pauses = new Map<string, number>();
   const leases = new Map<string, Map<string, number>>();
   const listeners = new Map<string, Set<(notice: StoreNotification) => void>>();
@@ -45,7 +47,6 @@ export function memoryStore(options: MemoryStoreOptions = {}): Store {
         'INVALID_OPTIONS',
         'Cannot mix static and scoped policies under one Valve id.',
       );
-    staticIds.add(request.id);
     const now = clock();
     if (++acquires % 1024 === 0) {
       for (const [id, entries] of states) {
@@ -59,7 +60,24 @@ export function memoryStore(options: MemoryStoreOptions = {}): Store {
         if (!slots.size) leases.delete(id);
       }
       for (const [id, end] of pauses) if (end <= now) pauses.delete(id);
+      for (const id of staticIds.keys())
+        if (!states.has(id) && !leases.has(id) && !pauses.has(id))
+          staticIds.delete(id);
     }
+    let rules = fingerprints.get(request.rules);
+    if (rules === undefined) {
+      rules = ruleFingerprint(request.rules);
+      fingerprints.set(request.rules, rules);
+    }
+    const policy = `${rules}:${request.lease ? `${request.lease.limit}:${request.lease.ttlMs}` : 'local'}`;
+    const owned = staticIds.get(request.id);
+    if (owned !== undefined && owned !== policy)
+      throw failure(
+        request.id,
+        'INVALID_OPTIONS',
+        'Shared quota configuration does not match. Use identical rate and global concurrency settings for every valve that shares this id.',
+      );
+    staticIds.set(request.id, policy);
     const end = pauses.get(request.id) ?? 0;
     if (end > now)
       return {
@@ -87,8 +105,16 @@ export function memoryStore(options: MemoryStoreOptions = {}): Store {
         0,
         Math.min(capacity, request.lease.limit - slots.size),
       );
+      // Slots granted by this call are added below, so the set can still be empty.
       if (capacity < request.costs.length)
-        leaseRetry = Math.max(1, Math.ceil(Math.min(...slots.values()) - now));
+        leaseRetry = Math.max(
+          1,
+          Math.ceil(
+            (slots.size
+              ? Math.min(...slots.values())
+              : now + request.lease.ttlMs) - now,
+          ),
+        );
     }
     const result = acquireBatch(
       request.rules,
@@ -208,12 +234,17 @@ export function memoryStore(options: MemoryStoreOptions = {}): Store {
         }
         const [domain, entries, key] = next.value;
         if ((entries.get(key)?.expires ?? 0) <= now) entries.delete(key);
-        if (!entries.size) scopedStates.delete(domain);
+        if (!entries.size) {
+          scopedStates.delete(domain);
+          if (!leases.has(domain) && !pauses.has(domain))
+            policies.delete(domain);
+        }
       }
     }
     return {
       grantedIndexes,
       blocked,
+      ...(pause ? { pausedMs: pause } : {}),
       ...(request.lease ? { leases: tokens } : {}),
     };
   }

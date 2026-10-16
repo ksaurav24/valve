@@ -49,8 +49,9 @@ for cidx = 1, nc do
   idx = idx + 1
   retry = 0
   if leaseLimit and slots + granted >= leaseLimit then
+    -- Slots granted by this call are added below, so the set can still be empty.
     local earliest = redis.call('ZRANGE', slotKey, 0, 0, 'WITHSCORES')
-    retry = math.max(1, math.ceil(tonumber(earliest[2]) - now))
+    retry = math.max(1, math.ceil((tonumber(earliest[2]) or (now + leaseTtl)) - now))
     break
   end
   for i = 1, nr do

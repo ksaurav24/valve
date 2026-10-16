@@ -388,6 +388,8 @@ export function createValve(options: ValveOptions): Valve {
       !Array.isArray(result.grantedIndexes) ||
       !Array.isArray(result.blocked) ||
       !result.grantedIndexes.every(validIndex) ||
+      (result.pausedMs !== undefined &&
+        !(Number.isSafeInteger(result.pausedMs) && result.pausedMs >= 0)) ||
       !result.blocked.every(
         (entry) =>
           entry &&
@@ -424,6 +426,12 @@ export function createValve(options: ValveOptions): Valve {
     }
     storeFailures = 0;
     const now = Date.now();
+    if (result.pausedMs && version === noticeVersion) {
+      if (pausedUntil <= now)
+        events.emit('pause', { durationMs: result.pausedMs, reason: 'store' });
+      pausedUntil = Math.max(pausedUntil, now + result.pausedMs);
+      arm(pausedUntil);
+    }
     const tokens = new Map(
       result.leases?.map((entry) => [entry.index, entry.token]),
     );

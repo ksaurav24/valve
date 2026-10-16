@@ -1,6 +1,7 @@
 // Shared Redis and Valkey budgets with script-cache recovery and timeouts.
 import { prepareScoped } from '../scoped.js';
 import { duration } from '../duration.js';
+import { ruleFingerprint } from '../rules.js';
 import { failure, invalid } from '../errors.js';
 import type { AcquireRequest, Store } from '../store.js';
 import { subscriptions } from './subscriptions.js';
@@ -125,14 +126,22 @@ export function redisStore(options: RedisStoreOptions): Store {
           'INVALID_OPTIONS',
           'Shared scoped quota configuration does not match Redis. Drain workers and follow the shared quota migration procedure.',
         );
-      if (!Array.isArray(raw) || raw.length !== 3 || !raw.every(Array.isArray))
+      if (
+        !Array.isArray(raw) ||
+        raw.length !== 4 ||
+        !raw.slice(0, 3).every(Array.isArray) ||
+        !Number.isSafeInteger(Number(raw[3])) ||
+        Number(raw[3]) < 0
+      )
         throw new Error('valve: invalid scoped acquire result.');
-      const [granted, blocked, tokens] = raw as [
+      const [granted, blocked, tokens, pausedMs] = raw as [
         number[],
         [number, number][],
         [number, string][],
+        number,
       ];
       return {
+        ...(Number(pausedMs) ? { pausedMs: Number(pausedMs) } : {}),
         grantedIndexes: granted,
         blocked: blocked.map(([index, retryAfterMs]) => ({
           index,
@@ -259,17 +268,6 @@ function prepareRules(rules: AcquireRequest['rules']) {
       String(rule.limit),
       String(rule.burst),
     ]),
-    fingerprint: `${rules.some((rule) => rule.name) ? 'named-v1' : 'v1'}:[${rules
-      .map((rule) =>
-        JSON.stringify([
-          rule.algorithm,
-          rule.intervalMs,
-          rule.limit,
-          rule.burst,
-          ...(rule.name ? [rule.name] : []),
-        ]),
-      )
-      .sort()
-      .join(',')}]`,
+    fingerprint: ruleFingerprint(rules),
   };
 }
