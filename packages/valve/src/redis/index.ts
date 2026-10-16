@@ -99,6 +99,7 @@ export function redisStore(options: RedisStoreOptions): Store {
   }
   return {
     kind: 'redis',
+    /** Execute atomic scoped admission and decode grants, retry causes, leases and pauses. */
     acquireScoped: async (request) => {
       const plan = prepareScoped(request);
       const base = `${prefix}:{${request.id}}`;

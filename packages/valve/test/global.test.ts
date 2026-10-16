@@ -468,9 +468,11 @@ describe('global concurrency', () => {
     ]);
   });
   describe('store call budget', () => {
+    /** Count admission calls while optionally hiding notifications to test fallback polling. */
     const counted = (base: Store, subscribe = true) => {
       const store: Store = {
         ...base,
+        /** Record each admission before forwarding it to the backing store. */
         acquireSync: (request) => {
           calls.count++;
           return base.acquireSync!(request);
@@ -620,6 +622,7 @@ describe('global concurrency', () => {
       const base = memoryStore();
       const store: Store = {
         ...base,
+        /** Simulate an outage and count attempts that should respect the backoff deadline. */
         acquire: () => {
           failures++;
           return Promise.reject(new Error('down'));
