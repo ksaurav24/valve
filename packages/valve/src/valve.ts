@@ -211,6 +211,7 @@ export function createValve(options: ValveOptions): Valve {
     );
     return true;
   }
+  /** Requeue live work, rejecting zero-wait jobs after their sole admission attempt. */
   function enqueueAgain(job: Job) {
     if (job.state === 'queued' && !missed(job)) {
       job.location = 'queue';
@@ -234,6 +235,7 @@ export function createValve(options: ValveOptions): Valve {
     finishIdle();
     schedule();
   }
+  /** Start a grant unless cancelled or past a positive queue-wait deadline. */
   function start(job: Job) {
     if (job.state !== 'queued') {
       if (job.lease) leases!.release(job.lease);

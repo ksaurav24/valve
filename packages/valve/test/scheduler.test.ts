@@ -449,6 +449,29 @@ describe('cancellation and lifecycle', () => {
     await vi.advanceTimersByTimeAsync(20);
     expect(await job).toBe(1);
   });
+  it('rejects a zero maxWait job when a pending store reports a pause', async () => {
+    const acquire = vi.fn(
+      () =>
+        new Promise<AcquireResult>((resolve) =>
+          setTimeout(
+            () => resolve({ granted: 0, retryAfterMs: 100, pausedMs: 100 }),
+            20,
+          ),
+        ),
+    );
+    const valve = make({ id: 'x', concurrency: 1, store: failing(acquire) });
+    const fn = vi.fn(() => 1);
+    const check = expect(valve.run(fn, { maxWait: 0 })).rejects.toMatchObject({
+      code: 'MAX_WAIT_EXCEEDED',
+    });
+    // The zero-wait timer fires while admission is pending; the reply must settle it.
+    await vi.advanceTimersByTimeAsync(20);
+    expect(valve.stats().queued).toBe(0);
+    await check;
+    expect(acquire).toHaveBeenCalledTimes(1);
+    expect(fn).not.toHaveBeenCalled();
+    expect(vi.getTimerCount()).toBe(0);
+  });
   it('rejects a zero maxWait job during a store outage', async () => {
     const valve = make({
       id: 'x',
