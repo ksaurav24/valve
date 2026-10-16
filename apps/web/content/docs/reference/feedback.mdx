@@ -40,6 +40,9 @@ Import them from `valvejs/headers`.
 | `combine(...readers)`  | Keeps the longest explicit pause and exhausted quota window; keeps remaining/reset paired. |
 | `defaultFeedback`      | `combine(retryAfter(), ietfRateLimit(), xRateLimit())`.                                    |
 
+`ietfRateLimit()` ignores a `RateLimit` field longer than 8192 characters and
+falls back to the legacy fields.
+
 ### Conflicting quotas
 
 `combine()` treats each reader's quota as applicable to the observed request.

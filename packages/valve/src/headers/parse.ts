@@ -46,6 +46,23 @@ export function retryAfterMs(headers: HeadersLike): number | undefined {
     ? pauseMs
     : undefined;
 }
+/** Split a structured-field list on commas outside quoted strings in one pass. */
+export function items(value: string): string[] {
+  const parts: string[] = [];
+  let start = 0;
+  let quoted = false;
+  for (let i = 0; i < value.length; i++) {
+    const char = value[i];
+    if (quoted && char === '\\') i++;
+    else if (char === '"') quoted = !quoted;
+    else if (char === ',' && !quoted) {
+      parts.push(value.slice(start, i));
+      start = i + 1;
+    }
+  }
+  parts.push(value.slice(start));
+  return parts;
+}
 export function compound(value: string | undefined): number | undefined {
   if (!value || !/^(?:\d+(?:\.\d+)?(?:ms|s|m|h))+$/.test(value))
     return undefined;
