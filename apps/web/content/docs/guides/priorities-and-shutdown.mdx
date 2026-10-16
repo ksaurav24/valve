@@ -88,6 +88,11 @@ twice returns the same promise.
 | `close()`                | Rejected with `CLOSED` | Awaited      |
 | `close({ drain: true })` | Run to completion      | Awaited      |
 
+With global concurrency, `close` also waits up to `leaseTtl` for an admission
+already sent to the store and releases any leases it grants. A `wrapFetch`
+request that receives a rate limit response while closing returns that
+response, or retries when draining.
+
 ```ts
 process.on('SIGTERM', async () => {
   await crm.close({ drain: true });

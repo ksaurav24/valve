@@ -84,6 +84,12 @@ export function createValve(options: ValveOptions): Valve {
   let closePromise: Promise<void> | undefined;
   let closeResolve: (() => void) | undefined;
   let closingStore = false;
+  let draining = false;
+  // Bounds how long close() waits for an in-flight global admission.
+  let closeWait: ReturnType<typeof setTimeout> | undefined;
+  let waitedOut = false;
+  // wrapFetch calls between a retryable response and queueing the retry.
+  let retrying = 0;
   let active = false;
   const costs: number[] = [];
   const owner = config.global ? globalThis.crypto.randomUUID() : '';
@@ -131,7 +137,7 @@ export function createValve(options: ValveOptions): Valve {
     job.abort = undefined;
   }
   function finishIdle() {
-    if (waiting.size || running) return;
+    if (waiting.size || running || retrying) return;
     clearWake();
     if (active) {
       active = false;
@@ -140,7 +146,17 @@ export function createValve(options: ValveOptions): Valve {
     const resolvers = idleResolvers;
     idleResolvers = [];
     for (const resolve of resolvers) resolve();
+    // A pending global admission can still return leases that must be released.
     if (closed && closeResolve && !closingStore) {
+      if (inFlight && leases && !waitedOut) {
+        // Leases granted by a store that never answers expire within leaseTtl.
+        closeWait ??= setTimeout(() => {
+          waitedOut = true;
+          finishIdle();
+        }, config.leaseTtl);
+        return;
+      }
+      clearTimeout(closeWait);
       closingStore = true;
       unsubscribe?.();
       void (leases?.close() ?? Promise.resolve())
@@ -170,6 +186,12 @@ export function createValve(options: ValveOptions): Valve {
     events.emit('reject', { code });
     if (!waiting.size) clearWake();
     finishIdle();
+  }
+  function refuse(error: unknown) {
+    totals.rejected++;
+    events.emit('reject', {
+      code: (error as { code?: ValveErrorCode })?.code ?? 'INVALID_OPTIONS',
+    });
   }
   function reportStore(error: unknown) {
     totals.storeErrors++;
@@ -627,16 +649,19 @@ export function createValve(options: ValveOptions): Valve {
   /**
    * Validate and snapshot one submission before enqueueing it with cancellation and a deadline.
    * @param originalSeq Reuse the logical request's submission order for fetch retries.
+   * @param retry Admit a fetch retry while draining and after its queue slot was checked.
    * @returns The job result, or a rejection for invalid options, cancellation, or execution failure.
    */
   function submit<R>(
     fn: (ctx: JobContext) => R,
     jobOptions: RunOptions<Awaited<R>> = {},
     originalSeq?: number,
+    retry = false,
   ): Promise<Awaited<R>> {
     return new Promise<Awaited<R>>((resolve, reject) => {
       try {
-        if (closed) throw failure(id, 'CLOSED', 'valve is closed.');
+        if (closed && !(retry && draining))
+          throw failure(id, 'CLOSED', 'valve is closed.');
         if (typeof fn !== 'function')
           invalid(id, 'job must be a function', fn, 'Pass a function to run');
         const scopes =
@@ -672,7 +697,7 @@ export function createValve(options: ValveOptions): Valve {
             'job was aborted before starting.',
             jobOptions.signal.reason,
           );
-        if (waiting.size >= config.maxQueue)
+        if (!retry && waiting.size >= config.maxQueue)
           throw failure(
             id,
             'QUEUE_FULL',
@@ -731,13 +756,7 @@ export function createValve(options: ValveOptions): Valve {
         }
         schedule();
       } catch (error) {
-        totals.rejected++;
-        events.emit('reject', {
-          code:
-            error instanceof Error && 'code' in error
-              ? (error.code as ValveErrorCode)
-              : 'INVALID_OPTIONS',
-        });
+        refuse(error);
         reject(error);
       }
     });
@@ -838,23 +857,25 @@ export function createValve(options: ValveOptions): Valve {
         stream || !retryable || (inheritedBody && maxReplayBodySize === 0)
           ? 0
           : retries;
-      const cost =
-        typeof fetchOptions.cost === 'function'
-          ? fetchOptions.cost(...args)
-          : fetchOptions.cost;
-      const priority =
-        typeof fetchOptions.priority === 'function'
-          ? fetchOptions.priority(...args)
-          : fetchOptions.priority;
+      /** Read a fixed option or call its resolver with the fetch arguments. */
+      const option = <T>(value: T | ((...a: Parameters<F>) => T)) =>
+        typeof value === 'function'
+          ? (value as (...a: Parameters<F>) => T)(...args)
+          : value;
+      let cost, priority, scopes;
+      try {
+        cost = option(fetchOptions.cost);
+        priority = option(fetchOptions.priority);
+        const identities = option(fetchOptions.scopes);
+        scopes =
+          config.scoped || identities !== undefined
+            ? scopeSnapshot(id, config.scopes, identities)
+            : undefined;
+      } catch (error) {
+        refuse(error);
+        throw error;
+      }
       const signal = init?.signal ?? request?.signal;
-      const identities =
-        typeof fetchOptions.scopes === 'function'
-          ? fetchOptions.scopes(...args)
-          : fetchOptions.scopes;
-      const scopes =
-        config.scoped || identities !== undefined
-          ? scopeSnapshot(id, config.scopes, identities)
-          : undefined;
       const originalSeq = seq++;
       const runOptions: RunOptions<ResponseLike> = {
         ...(scopes ? { scopes } : {}),
@@ -865,9 +886,18 @@ export function createValve(options: ValveOptions): Valve {
           ? {}
           : { maxWait: fetchOptions.maxWait }),
       };
+      // Holds close() and idle() open from a retryable response until its retry is queued.
+      let held = false;
+      const release = () => {
+        if (held) {
+          held = false;
+          retrying--;
+          finishIdle();
+        }
+      };
       for (let attempt = 0; ; attempt++) {
         const callArgs = [...args] as Parameters<F>;
-        const response = await submit(
+        const pending = submit(
           async (ctx) => {
             if (inheritedBody && attempts > 0) {
               if (
@@ -881,28 +911,41 @@ export function createValve(options: ValveOptions): Valve {
               (callArgs as unknown[])[1] = { ...init, signal: ctx.signal };
             const res = await impl(...(callArgs as never[]));
             observe(res);
+            if (
+              attempt < attempts &&
+              (res.status === 429 ||
+                (res.status === 503 && retryAfterMs(res.headers) !== undefined))
+            ) {
+              held = true;
+              retrying++;
+            }
             return res;
           },
           runOptions,
           originalSeq,
+          attempt > 0,
         );
-        if (
-          attempt >= attempts ||
-          (response.status !== 429 &&
-            !(
-              response.status === 503 &&
-              retryAfterMs(response.headers) !== undefined
-            ))
-        )
-          return response;
-        const body = (response as Response).body;
-        if (body) {
-          try {
-            await body.cancel();
-          } catch {
-            /* A body already consumed by the client needs no cleanup. */
-          }
+        release();
+        let response: ResponseLike;
+        try {
+          response = await pending;
+        } catch (error) {
+          release();
+          throw error;
         }
+        if (!held) return response;
+        // Return the provider response when its retry cannot be queued.
+        if ((closed && !draining) || waiting.size >= config.maxQueue) {
+          release();
+          return response;
+        }
+        // Queue the retry before anything else can close the valve; cancel the
+        // discarded body in the background.
+        Promise.resolve()
+          .then(() => (response as Response).body?.cancel())
+          .catch(() => {
+            /* A body already consumed by the client needs no cleanup. */
+          });
         totals.retried++;
       }
     };
@@ -911,6 +954,7 @@ export function createValve(options: ValveOptions): Valve {
   function close(closeOptions: { drain?: boolean } = {}): Promise<void> {
     if (closePromise) return closePromise;
     closed = true;
+    draining = !!closeOptions.drain;
     closePromise = new Promise((resolve) => {
       closeResolve = resolve;
     });
@@ -989,7 +1033,7 @@ export function createValve(options: ValveOptions): Valve {
     on: events.on,
     idle: () =>
       new Promise((resolve) => {
-        if (!waiting.size && !running) queueMicrotask(resolve);
+        if (!waiting.size && !running && !retrying) queueMicrotask(resolve);
         else idleResolvers.push(resolve);
       }),
     close,

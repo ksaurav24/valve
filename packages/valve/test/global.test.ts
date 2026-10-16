@@ -175,11 +175,44 @@ describe('global concurrency', () => {
     const job = valve.run(() => 42);
     const rejected = expect(job).rejects.toMatchObject({ code: 'CLOSED' });
     await tick();
-    await valve.close();
+    let closed = false;
+    const closing = valve.close().then(() => {
+      closed = true;
+    });
     await rejected;
-    finish();
     await tick();
+    expect(closed).toBe(false);
+    finish();
+    await closing;
     expect(release).toHaveBeenCalled();
+  });
+  it('stops waiting for an unanswered global admission after leaseTtl', async () => {
+    vi.useFakeTimers();
+    const backing = memoryStore();
+    const store: Store = {
+      ...backing,
+      acquire: () => new Promise(() => {}),
+    };
+    delete store.acquireSync;
+    const valve = createValve({
+      id: 'hung-lease',
+      concurrency: { limit: 1, scope: 'global', leaseTtl: 1000 },
+      store,
+    });
+    const rejected = expect(valve.run(() => 42)).rejects.toMatchObject({
+      code: 'CLOSED',
+    });
+    await tick();
+    let closed = false;
+    const closing = valve.close().then(() => {
+      closed = true;
+    });
+    await rejected;
+    await vi.advanceTimersByTimeAsync(999);
+    expect(closed).toBe(false);
+    await vi.advanceTimersByTimeAsync(1);
+    await closing;
+    expect(vi.getTimerCount()).toBe(0);
   });
   it('wakes another valve immediately after shared resume', async () => {
     vi.useFakeTimers();

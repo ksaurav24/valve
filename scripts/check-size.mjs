@@ -9,7 +9,9 @@ const base = new URL('../packages/valve/', import.meta.url);
 for (const [entry, budget] of [
   // Scoped admission adds the delayed heap, validation and a second Lua script.
   // Measured costs and the prior ceilings are recorded in bench/SCOPED.md.
-  ['index', 12000],
+  // Raised by 100 bytes for queue-order and shutdown fixes (#76, #77), which
+  // together measured 12006 bytes.
+  ['index', 12100],
   ['redis/index', 6200],
   ['headers/index', 2048],
 ]) {

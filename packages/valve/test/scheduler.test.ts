@@ -498,6 +498,56 @@ describe('cancellation and lifecycle', () => {
     await close;
     await valve[Symbol.asyncDispose]();
   });
+  it.each([false, true])(
+    'releases grants from an in-flight admission before close resolves (scoped=%s)',
+    async (scoped) => {
+      const base = memoryStore();
+      const released: string[] = [];
+      const store: Store = {
+        kind: base.kind,
+        pause: base.pause,
+        resume: base.resume,
+        renew: base.renew!,
+        subscribe: base.subscribe!,
+        close: base.close,
+        acquire: (request) =>
+          new Promise((resolve) =>
+            setTimeout(() => resolve(base.acquireSync!(request)), 50),
+          ),
+        acquireScoped: (request) =>
+          new Promise((resolve) =>
+            setTimeout(() => resolve(base.acquireScopedSync!(request)), 50),
+          ),
+        release: (id, tokens) => {
+          released.push(...tokens);
+          return base.release!(id, tokens);
+        },
+      };
+      const valve = make({
+        id: 'closing',
+        concurrency: { limit: 1, scope: 'global' },
+        ...(scoped
+          ? {
+              rate: { name: 'r', scope: 'tenant', limit: 5, interval: 1000 },
+            }
+          : {}),
+        store,
+      });
+      const job = valve.run(() => 1, scoped ? { scopes: { tenant: 't' } } : {});
+      const check = expect(job).rejects.toMatchObject({ code: 'CLOSED' });
+      await tick();
+      let closed = false;
+      const closing = valve.close().then(() => {
+        closed = true;
+      });
+      await check;
+      await tick();
+      expect(closed).toBe(false);
+      await vi.advanceTimersByTimeAsync(50);
+      await closing;
+      expect(released).toHaveLength(1);
+    },
+  );
   it('never closes a user-owned store', async () => {
     const store = memoryStore();
     const spy = vi.spyOn(store, 'close');
