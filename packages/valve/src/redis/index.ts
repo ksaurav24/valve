@@ -56,6 +56,13 @@ export function redisStore(options: RedisStoreOptions): Store {
     ? subscriptions(options.subscriber, prefix)
     : undefined;
   const timeout = duration(options.timeout ?? '2s', undefined, 'redis timeout');
+  if (timeout < 1)
+    invalid(
+      undefined,
+      'redis timeout must be at least 1ms',
+      options.timeout,
+      'Use a timeout of 1ms or more',
+    );
   const prepared = new WeakMap<
     AcquireRequest['rules'],
     { args: string[]; fingerprint: string }

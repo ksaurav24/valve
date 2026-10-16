@@ -1,5 +1,12 @@
 // Provider feedback readers that never read or consume response bodies.
-import { compound, header, number, reference, retryAfterMs } from './parse.js';
+import {
+  compound,
+  header,
+  items,
+  number,
+  reference,
+  retryAfterMs,
+} from './parse.js';
 import type { Feedback, FeedbackSignal } from './types.js';
 export type {
   Feedback,
@@ -22,7 +29,8 @@ export function retryAfter(): Feedback {
  * Verified against draft-ietf-httpapi-ratelimit-headers-11, sections 4.1.1 and 4.1.2.
  * https://datatracker.ietf.org/doc/html/draft-ietf-httpapi-ratelimit-headers-11#section-4.1
  * The effective window is a quota hint, not a guarantee of full replenishment.
- * Also supports legacy remaining/reset fields.
+ * Also supports legacy remaining/reset fields. RateLimit fields longer than
+ * 8192 characters are ignored.
  * @returns A feedback reader for exhausted quota windows.
  * @example createValve({ id: 'api', concurrency: 2, feedback: ietfRateLimit() });
  */
@@ -30,8 +38,8 @@ export function ietfRateLimit(): Feedback {
   return (response) => {
     const field = header(response.headers, 'ratelimit');
     let signal: FeedbackSignal | undefined;
-    if (field) {
-      for (const item of field.split(/,(?=(?:[^"\\]*"[^"\\]*")*[^"\\]*$)/)) {
+    if (field && field.length <= 8192) {
+      for (const item of items(field)) {
         const remaining = number(/(?:^|;)\s*r\s*=\s*([^;\s]+)/.exec(item)?.[1]);
         const window = /(?:^|;)\s*t(?:\s*=\s*([^;\s]*))?(?=;|\s|$)/.exec(item);
         const seconds = number(window?.[1]);
