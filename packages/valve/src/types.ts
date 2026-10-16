@@ -125,7 +125,8 @@ export interface ValveOptions {
   /**
    * Default max time a job may wait in the queue before it is rejected
    * with `MAX_WAIT_EXCEEDED`. Default: no limit. Does not limit how long
-   * the job runs once started.
+   * the job runs once started. `0` runs a job only if its first admission
+   * attempt is granted.
    */
   maxWait?: Duration;
   /**
