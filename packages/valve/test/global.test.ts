@@ -549,6 +549,71 @@ describe('global concurrency', () => {
       expect(calls.count / 60).toBeLessThan(10);
       await Promise.all(valves.map((valve) => valve.close()));
     });
+    it('wakes scoped lease waits after a release without polling rate-only waits', async () => {
+      vi.useFakeTimers();
+      const { store, calls } = counted(memoryStore());
+      const acquire = store.acquireScopedSync!;
+      store.acquireScopedSync = (request) => {
+        calls.count++;
+        return acquire(request);
+      };
+      const options = {
+        id: 'scoped-release',
+        concurrency: { limit: 1, scope: 'global' as const },
+        rate: {
+          name: 'recipient',
+          scope: 'recipient',
+          limit: 1,
+          interval: 2000,
+        },
+        store,
+      };
+      const holder = createValve(options);
+      const waiter = createValve(options);
+      let release!: () => void;
+      const held = holder.run(() => new Promise<void>((r) => (release = r)), {
+        scopes: { recipient: 'A' },
+      });
+      await vi.advanceTimersByTimeAsync(0);
+      const waiting = waiter.run(() => 'B', { scopes: { recipient: 'B' } });
+      await vi.advanceTimersByTimeAsync(0);
+      release();
+      await held;
+      await vi.advanceTimersByTimeAsync(60);
+      expect(waiter.stats().totals.started).toBe(1);
+      expect(await waiting).toBe('B');
+      const rateWait = waiter.run(() => 'B again', {
+        scopes: { recipient: 'B' },
+      });
+      await vi.advanceTimersByTimeAsync(0);
+      const before = calls.count;
+      await store.release!(options.id, []);
+      await vi.advanceTimersByTimeAsync(1000);
+      expect(calls.count).toBe(before);
+      await vi.advanceTimersByTimeAsync(1100);
+      expect(await rateWait).toBe('B again');
+      await Promise.all([holder.close(), waiter.close()]);
+    });
+    it('continues scoped global jobs after a fully granted batch releases its slots', async () => {
+      vi.useFakeTimers();
+      const api = createValve({
+        id: 'scoped-batches',
+        concurrency: { limit: 1, scope: 'global' },
+        rate: {
+          name: 'recipient',
+          scope: 'recipient',
+          limit: 1,
+          interval: '2s',
+        },
+      });
+      const jobs = ['A', 'B', 'C'].map((recipient) =>
+        api.run(() => recipient, { scopes: { recipient } }),
+      );
+      await vi.advanceTimersByTimeAsync(100);
+      expect(api.stats().totals.succeeded).toBe(3);
+      expect(await Promise.all(jobs)).toEqual(['A', 'B', 'C']);
+      await api.close();
+    });
     it('does not let aborts bypass store outage backoff', async () => {
       vi.useFakeTimers();
       let failures = 0;

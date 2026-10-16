@@ -105,6 +105,7 @@ export function createValve(options: ValveOptions): Valve {
   const leases = config.global
     ? leaseManager(store, id, config.leaseTtl, reportStore, () => {
         if (!leaseWait) return;
+        delayed?.wake();
         clearWake();
         schedule();
       })
@@ -140,6 +141,7 @@ export function createValve(options: ValveOptions): Valve {
   /** Spread re-polls caused by shared notices so waiting valves do not answer at once.
    * Valves that keep losing lease races widen their window, up to the 50ms poll. */
   function soon() {
+    delayed?.wake();
     if (!contention) {
       clearWake();
       schedule();
@@ -374,7 +376,8 @@ export function createValve(options: ValveOptions): Valve {
         start(job);
       } else enqueueAgain(job);
     }
-    if (result.granted < heads.length && version !== noticeVersion) soon();
+    if (result.granted < heads.length && version !== noticeVersion && leaseWait)
+      soon();
     else if (result.granted < heads.length)
       arm(
         now +
@@ -481,6 +484,16 @@ export function createValve(options: ValveOptions): Valve {
         version,
       );
     }
+    if (config.global) {
+      leaseWait =
+        !result.blocked.length ||
+        result.blocked.some((entry) => entry.leaseBlocked !== false);
+      contention = result.grantedIndexes.length
+        ? 0
+        : leaseWait
+          ? Math.min(contention + 1, 6)
+          : contention;
+    }
     for (const entry of result.blocked) {
       const job = heads[entry.index]!;
       if (job.state !== 'queued') continue;
@@ -494,7 +507,10 @@ export function createValve(options: ValveOptions): Valve {
       }
     }
     arm(delayed!.next);
-    if (queue.size) schedule();
+    if (queue.size) {
+      if (config.global && version !== noticeVersion) soon();
+      else schedule();
+    }
     finishIdle();
   }
   /** Reject configuration failures; apply the outage policy to other store errors.

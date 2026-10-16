@@ -9,7 +9,7 @@ const base = new URL('../packages/valve/', import.meta.url);
 for (const [entry, budget] of [
   // Scoped admission adds the delayed heap, validation and a second Lua script.
   // Measured costs and the prior ceilings are recorded in bench/SCOPED.md.
-  // Queue-order, shutdown, admission, store-contract and parsing fixes (#76–81)
+  // Queue-order, shutdown, admission, store-contract and parsing fixes (#76-81)
   // together measure 12570 bytes for core and 6235 bytes for Redis (+gzip).
   // Keep the shared ceilings tight while allowing these fixes to merge together.
   ['index', 12600],
