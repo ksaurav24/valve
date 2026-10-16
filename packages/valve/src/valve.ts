@@ -231,6 +231,7 @@ export function createValve(options: ValveOptions): Valve {
       queue.push(job);
     }
   }
+  /** Record an outcome; leased replacements wake after the store releases the slot. */
   function settle(job: Job, ok: boolean, result: unknown) {
     job.state = 'settled';
     running--;
@@ -306,6 +307,7 @@ export function createValve(options: ValveOptions): Valve {
     }
     settle(job, true, result);
   }
+  /** Apply static grants and schedule denied work using its rate or lease retry hint. */
   function handle(
     heads: Job[],
     result: AcquireResult,
