@@ -1,4 +1,5 @@
-// A FIFO ring that promotes to a priority heap when priorities differ.
+// A FIFO ring that promotes to a priority heap when priorities differ or a
+// requeued job would otherwise land behind later submissions.
 export interface Queued {
   seq: number;
   priority: number;
@@ -9,6 +10,7 @@ export class JobQueue<T extends Queued> {
   private head = 0;
   private heap = false;
   private priority = 0;
+  private last = -1;
   private cancelled = false;
   size = 0;
   private better(a: T, b: T) {
@@ -23,7 +25,11 @@ export class JobQueue<T extends Queued> {
       this.heap = false;
       this.cancelled = false;
     }
-    if (!this.heap && this.size > 0 && job.priority !== this.priority) {
+    if (
+      !this.heap &&
+      this.size > 0 &&
+      (job.priority !== this.priority || job.seq < this.last)
+    ) {
       this.items = this.items
         .slice(this.head)
         .filter((j) => j.state === 'queued');
@@ -35,6 +41,7 @@ export class JobQueue<T extends Queued> {
       for (const item of all) this.insert(item);
     }
     this.priority = job.priority;
+    this.last = job.seq;
     this.size++;
     if (this.heap) this.insert(job);
     else this.items.push(job);

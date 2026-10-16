@@ -58,6 +58,28 @@ describe('queue and execution', () => {
     await Promise.all(tasks);
     expect(order).toEqual([2, 0, 1, 3]);
   });
+  it('keeps call order for equal priorities when a batch is denied and requeued', async () => {
+    const store = memoryStore();
+    const acquire = store.acquireSync!;
+    let denials = 2;
+    store.acquireSync = (request) =>
+      denials-- > 0
+        ? { granted: 0, retryAfterMs: 10, pausedMs: 0 }
+        : acquire(request);
+    const valve = make({
+      id: 'requeue',
+      rate: { limit: 1, interval: 10 },
+      store,
+      batch: 4,
+    });
+    const order: number[] = [];
+    const tasks = Array.from({ length: 10 }, (_, i) =>
+      valve.run(() => order.push(i)),
+    );
+    await vi.runAllTimersAsync();
+    await Promise.all(tasks);
+    expect(order).toEqual([0, 1, 2, 3, 4, 5, 6, 7, 8, 9]);
+  });
   it('enforces the local concurrency limit for asynchronous jobs', async () => {
     const valve = make({ id: 'x', concurrency: 2 });
     let running = 0;
