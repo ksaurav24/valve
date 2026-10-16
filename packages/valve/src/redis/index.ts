@@ -106,6 +106,7 @@ export function redisStore(options: RedisStoreOptions): Store {
   }
   return {
     kind: 'redis',
+    /** Execute atomic scoped admission and decode grants, retry causes, leases and pauses. */
     acquireScoped: async (request) => {
       const plan = prepareScoped(request);
       const base = `${prefix}:{${request.id}}`;
@@ -143,16 +144,17 @@ export function redisStore(options: RedisStoreOptions): Store {
         throw new Error('valve: invalid scoped acquire result.');
       const [granted, blocked, tokens, pausedMs] = raw as [
         number[],
-        [number, number][],
+        [number, number, number][],
         [number, string][],
         number,
       ];
       return {
         ...(Number(pausedMs) ? { pausedMs: Number(pausedMs) } : {}),
         grantedIndexes: granted,
-        blocked: blocked.map(([index, retryAfterMs]) => ({
+        blocked: blocked.map(([index, retryAfterMs, leaseBlocked]) => ({
           index,
           retryAfterMs,
+          ...(request.lease ? { leaseBlocked: leaseBlocked === 1 } : {}),
         })),
         ...(request.lease
           ? { leases: tokens.map(([index, token]) => ({ index, token })) }
@@ -200,7 +202,8 @@ export function redisStore(options: RedisStoreOptions): Store {
         );
       if (
         !Array.isArray(raw) ||
-        (raw.length !== 3 && raw.length !== 4) ||
+        raw.length < 3 ||
+        raw.length > 5 ||
         raw
           .slice(0, 3)
           .some(
@@ -218,7 +221,12 @@ export function redisStore(options: RedisStoreOptions): Store {
       )
         throw new Error('valve: redis returned invalid lease tokens.');
       return {
-        ...(request.lease ? { leases: (raw[3] ?? []) as string[] } : {}),
+        ...(request.lease
+          ? {
+              leases: (raw[3] ?? []) as string[],
+              leaseBlocked: Number(raw[4]) === 1,
+            }
+          : {}),
         granted: Number(raw[0]),
         retryAfterMs: Number(raw[1]),
         pausedMs: Number(raw[2]),

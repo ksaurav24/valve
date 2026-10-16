@@ -96,6 +96,8 @@ stalls or network partitions, validate fencing tokens in the external system.
 Valve does not guarantee exactly-once side effects.
 
 Without a subscriber, global-slot waiters poll at most every 50ms plus jitter.
+With one, they recheck at least once a second. Waits caused by rate rules
+follow the store's retry hint.
 
 ## Store failures
 

@@ -255,6 +255,7 @@ describe('scoped scheduler and wrappers', () => {
     const base = memoryStore();
     const store: Store = {
       ...base,
+      /** Return an invalid pause duration to exercise custom-store reply validation. */
       acquireScoped: async (request) => ({
         ...(await base.acquireScoped!(request)),
         pausedMs: -1,

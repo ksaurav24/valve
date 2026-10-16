@@ -45,6 +45,8 @@ export interface AcquireResult {
   readonly pausedMs: number;
   /** One unique slot token per grant when lease was requested. */
   readonly leases?: readonly string[];
+  /** With a lease request: whether a full lease set, rather than a rate rule, denied the first ungranted job. Optional for custom stores. */
+  readonly leaseBlocked?: boolean;
 }
 
 /** A store change that should wake waiting valves.
@@ -110,6 +112,8 @@ export interface ScopedAcquireResult {
   readonly blocked: readonly {
     readonly index: number;
     readonly retryAfterMs: number;
+    /** With a lease request: whether the lease set set the retry hint. Optional for custom stores. */
+    readonly leaseBlocked?: boolean;
   }[];
   readonly leases?: readonly {
     readonly index: number;

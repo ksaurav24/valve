@@ -67,8 +67,9 @@ local granted = {}
 local blocked = {}
 local tokens = {}
 for j, job in ipairs(p.jobs) do
-  local retry = pause
-  if p.lease and slots + #granted >= p.lease.limit then retry = math.max(retry, math.ceil((earliest or (now + p.lease.ttlMs)) - now), 1) end
+  local leaseRetry = 0
+  if p.lease and slots + #granted >= p.lease.limit then leaseRetry = math.max(math.ceil((earliest or (now + p.lease.ttlMs)) - now), 1) end
+  local retry = math.max(pause, leaseRetry)
   for _, zero in ipairs(job.refs) do
     local r = p.rules[zero+1]
     if r.algorithm == 'gcra' then
@@ -81,7 +82,7 @@ for j, job in ipairs(p.jobs) do
     end
   end
   if retry > 0 then
-    blocked[#blocked+1] = {j-1, retry}
+    blocked[#blocked+1] = p.lease and {j-1, retry, retry == leaseRetry and 1 or 0} or {j-1, retry}
   else
     granted[#granted+1] = j-1
     for _, zero in ipairs(job.refs) do

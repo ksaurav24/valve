@@ -162,7 +162,13 @@ describe('global concurrency', () => {
         costs: [1, 1],
         lease: { limit: 1, ttlMs: 250, owner: 'o' },
       }),
-    ).toEqual({ granted: 1, retryAfterMs: 250, pausedMs: 0, leases: ['o:0'] });
+    ).toEqual({
+      granted: 1,
+      retryAfterMs: 250,
+      pausedMs: 0,
+      leases: ['o:0'],
+      leaseBlocked: true,
+    });
   });
   it('forgets static policies once their rate and lease state expires', () => {
     let now = 0;
@@ -380,7 +386,7 @@ describe('global concurrency', () => {
     await waiting.close();
     await valve.close();
   });
-  it('rechecks immediately when release arrives during a denied acquire', async () => {
+  it('rechecks soon when release arrives during a denied acquire', async () => {
     vi.useFakeTimers();
     const backing = memoryStore();
     let notify!: Parameters<NonNullable<Store['subscribe']>>[1];
@@ -414,9 +420,239 @@ describe('global concurrency', () => {
     await tick();
     finish();
     await tick();
+    // The recheck waits a short jittered window instead of a 30s retry hint.
+    expect(calls).toBe(1);
+    await vi.advanceTimersByTimeAsync(50);
     expect(calls).toBe(2);
     expect(await job).toBe(42);
     await valve.close();
     expect(vi.getTimerCount()).toBe(0);
+  });
+  it('reports whether leases or rate rules denied an admission', () => {
+    let now = 1000;
+    const store = memoryStore({ clock: () => now });
+    const rules = normalize({
+      id: 'x',
+      rate: { limit: 1, interval: 1000 },
+    }).rules;
+    const lease = { limit: 1, ttlMs: 500, owner: 'a' };
+    expect(
+      store.acquireSync!({ id: 'x', rules, costs: [1], lease }),
+    ).toMatchObject({ granted: 1, leaseBlocked: false });
+    expect(
+      store.acquireSync!({ id: 'x', rules, costs: [1], lease }),
+    ).toMatchObject({ granted: 0, leaseBlocked: true, retryAfterMs: 500 });
+    now += 600;
+    expect(
+      store.acquireSync!({ id: 'x', rules, costs: [1], lease }),
+    ).toMatchObject({ granted: 0, leaseBlocked: false, retryAfterMs: 400 });
+    const scopedRules = normalize({
+      id: 'y',
+      rate: { name: 'r', scope: 'tenant', limit: 1, interval: 1000 },
+    }).rules;
+    const jobs = [
+      { cost: 1, scopes: { tenant: 'a' } },
+      { cost: 1, scopes: { tenant: 'a' } },
+      { cost: 1, scopes: { tenant: 'b' } },
+    ];
+    expect(
+      store.acquireScopedSync!({
+        id: 'y',
+        rules: scopedRules,
+        jobs,
+        lease: { limit: 1, ttlMs: 500, owner: 'b' },
+      }).blocked,
+    ).toEqual([
+      { index: 1, retryAfterMs: 1000, leaseBlocked: false },
+      { index: 2, retryAfterMs: 500, leaseBlocked: true },
+    ]);
+  });
+  describe('store call budget', () => {
+    /** Count admission calls while optionally hiding notifications to test fallback polling. */
+    const counted = (base: Store, subscribe = true) => {
+      const store: Store = {
+        ...base,
+        /** Record each admission before forwarding it to the backing store. */
+        acquireSync: (request) => {
+          calls.count++;
+          return base.acquireSync!(request);
+        },
+      };
+      if (!subscribe) delete store.subscribe;
+      const calls = { count: 0 };
+      return { store, calls };
+    };
+    it.each([true, false])(
+      'follows the rate hint for a rate-blocked global valve (subscriber=%s)',
+      async (subscribe) => {
+        vi.useFakeTimers();
+        const { store, calls } = counted(memoryStore(), subscribe);
+        const valve = createValve({
+          id: 'rate-wait',
+          concurrency: { limit: 4, scope: 'global' },
+          rate: { limit: 1, interval: '2s' },
+          store,
+        });
+        const jobs = [valve.run(() => 1), valve.run(() => 2)];
+        await vi.advanceTimersByTimeAsync(1000);
+        expect(calls.count).toBeLessThanOrEqual(2);
+        await vi.advanceTimersByTimeAsync(1100);
+        expect(await Promise.all(jobs)).toEqual([1, 2]);
+        expect(calls.count).toBeLessThanOrEqual(3);
+        await valve.close();
+      },
+    );
+    it('polls lease waits every 50ms only without a subscriber', async () => {
+      vi.useFakeTimers();
+      for (const subscribe of [false, true]) {
+        const { store, calls } = counted(memoryStore(), subscribe);
+        const options = {
+          id: 'lease-wait',
+          concurrency: { limit: 1, scope: 'global' as const, leaseTtl: 10000 },
+          store,
+        };
+        const holder = createValve(options);
+        const valve = createValve(options);
+        let release!: () => void;
+        const held = holder.run(() => new Promise<void>((r) => (release = r)));
+        await vi.advanceTimersByTimeAsync(0);
+        calls.count = 0;
+        const waiting = valve.run(() => 2);
+        await vi.advanceTimersByTimeAsync(1000);
+        if (subscribe) expect(calls.count).toBeLessThanOrEqual(2);
+        else expect(calls.count).toBeGreaterThanOrEqual(15);
+        release();
+        await held;
+        await vi.advanceTimersByTimeAsync(60);
+        expect(await waiting).toBe(2);
+        await Promise.all([holder.close(), valve.close()]);
+      }
+    });
+    it('keeps release fan-out well below one admission per waiting valve', async () => {
+      vi.useFakeTimers();
+      const { store, calls } = counted(memoryStore());
+      const valves = Array.from({ length: 30 }, () =>
+        createValve({
+          id: 'fan-out',
+          concurrency: { limit: 1, scope: 'global' },
+          store,
+        }),
+      );
+      const done = Promise.all(
+        Array.from({ length: 60 }, (_, i) =>
+          valves[i % valves.length]!.run(
+            () => new Promise((resolve) => setTimeout(resolve, 5)),
+          ),
+        ),
+      );
+      await vi.advanceTimersByTimeAsync(5000);
+      await done;
+      // Every waiting valve used to answer each release: about 16 per job.
+      expect(calls.count / 60).toBeLessThan(10);
+      await Promise.all(valves.map((valve) => valve.close()));
+    });
+    it('wakes scoped lease waits after a release without polling rate-only waits', async () => {
+      vi.useFakeTimers();
+      const { store, calls } = counted(memoryStore());
+      const acquire = store.acquireScopedSync!;
+      store.acquireScopedSync = (request) => {
+        calls.count++;
+        return acquire(request);
+      };
+      const options = {
+        id: 'scoped-release',
+        concurrency: { limit: 1, scope: 'global' as const },
+        rate: {
+          name: 'recipient',
+          scope: 'recipient',
+          limit: 1,
+          interval: 2000,
+        },
+        store,
+      };
+      const holder = createValve(options);
+      const waiter = createValve(options);
+      let release!: () => void;
+      const held = holder.run(() => new Promise<void>((r) => (release = r)), {
+        scopes: { recipient: 'A' },
+      });
+      await vi.advanceTimersByTimeAsync(0);
+      const waiting = waiter.run(() => 'B', { scopes: { recipient: 'B' } });
+      await vi.advanceTimersByTimeAsync(0);
+      release();
+      await held;
+      await vi.advanceTimersByTimeAsync(60);
+      expect(waiter.stats().totals.started).toBe(1);
+      expect(await waiting).toBe('B');
+      const rateWait = waiter.run(() => 'B again', {
+        scopes: { recipient: 'B' },
+      });
+      await vi.advanceTimersByTimeAsync(0);
+      const before = calls.count;
+      await store.release!(options.id, []);
+      await vi.advanceTimersByTimeAsync(1000);
+      expect(calls.count).toBe(before);
+      await vi.advanceTimersByTimeAsync(1100);
+      expect(await rateWait).toBe('B again');
+      await Promise.all([holder.close(), waiter.close()]);
+    });
+    it('continues scoped global jobs after a fully granted batch releases its slots', async () => {
+      vi.useFakeTimers();
+      const api = createValve({
+        id: 'scoped-batches',
+        concurrency: { limit: 1, scope: 'global' },
+        rate: {
+          name: 'recipient',
+          scope: 'recipient',
+          limit: 1,
+          interval: '2s',
+        },
+      });
+      const jobs = ['A', 'B', 'C'].map((recipient) =>
+        api.run(() => recipient, { scopes: { recipient } }),
+      );
+      await vi.advanceTimersByTimeAsync(100);
+      expect(api.stats().totals.succeeded).toBe(3);
+      expect(await Promise.all(jobs)).toEqual(['A', 'B', 'C']);
+      await api.close();
+    });
+    it('does not let aborts bypass store outage backoff', async () => {
+      vi.useFakeTimers();
+      let failures = 0;
+      const base = memoryStore();
+      const store: Store = {
+        ...base,
+        /** Simulate an outage and count attempts that should respect the backoff deadline. */
+        acquire: () => {
+          failures++;
+          return Promise.reject(new Error('down'));
+        },
+      };
+      delete store.acquireSync;
+      const valve = createValve({
+        id: 'outage',
+        concurrency: { limit: 1, scope: 'global' },
+        store,
+      });
+      const controllers = Array.from(
+        { length: 5 },
+        () => new AbortController(),
+      );
+      const jobs = controllers.map((controller) =>
+        valve.run(() => 1, { signal: controller.signal }).catch((e) => e.code),
+      );
+      await vi.advanceTimersByTimeAsync(0);
+      expect(failures).toBe(1);
+      for (const controller of controllers.slice(0, 4)) {
+        controller.abort();
+        await vi.advanceTimersByTimeAsync(1);
+      }
+      expect(failures).toBe(1);
+      await vi.advanceTimersByTimeAsync(150);
+      expect(failures).toBe(2);
+      controllers[4]!.abort();
+      expect(await Promise.all(jobs)).toEqual(Array(5).fill('ABORTED'));
+      await valve.close();
+    });
   });
 });
