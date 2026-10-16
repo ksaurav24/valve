@@ -450,24 +450,25 @@ describe('cancellation and lifecycle', () => {
     expect(await job).toBe(1);
   });
   it('rejects a zero maxWait job when a pending store reports a pause', async () => {
+    let resolveAcquire!: (result: AcquireResult) => void;
     const acquire = vi.fn(
       () =>
-        new Promise<AcquireResult>((resolve) =>
-          setTimeout(
-            () => resolve({ granted: 0, retryAfterMs: 100, pausedMs: 100 }),
-            20,
-          ),
-        ),
+        new Promise<AcquireResult>((resolve) => {
+          resolveAcquire = resolve;
+        }),
     );
     const valve = make({ id: 'x', concurrency: 1, store: failing(acquire) });
     const fn = vi.fn(() => 1);
     const check = expect(valve.run(fn, { maxWait: 0 })).rejects.toMatchObject({
       code: 'MAX_WAIT_EXCEEDED',
     });
-    // The zero-wait timer fires while admission is pending; the reply must settle it.
-    await vi.advanceTimersByTimeAsync(20);
-    expect(valve.stats().queued).toBe(0);
+    // Expiration must leave the pending admission for the store reply to settle.
+    await vi.advanceTimersByTimeAsync(0);
+    expect(acquire).toHaveBeenCalledTimes(1);
+    expect(valve.stats().queued).toBe(1);
+    resolveAcquire({ granted: 0, retryAfterMs: 100, pausedMs: 100 });
     await check;
+    expect(valve.stats().queued).toBe(0);
     expect(acquire).toHaveBeenCalledTimes(1);
     expect(fn).not.toHaveBeenCalled();
     expect(vi.getTimerCount()).toBe(0);
