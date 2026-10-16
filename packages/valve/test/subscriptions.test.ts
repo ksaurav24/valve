@@ -109,6 +109,7 @@ describe('subscriptions', () => {
       retryAfterMs: 0,
       pausedMs: 0,
       leases: ['token'],
+      leaseBlocked: false,
     });
     client.evalsha.mockResolvedValueOnce([1, 0, 0, []]);
     await expect(store.acquire(request)).rejects.toThrow('invalid lease');

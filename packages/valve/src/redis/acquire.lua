@@ -44,6 +44,7 @@ local nc = tonumber(ARGV[idx])
 idx = idx + 1
 local granted = 0
 local retry = 0
+local leaseBlocked = 0
 for cidx = 1, nc do
   local cost = tonumber(ARGV[idx])
   idx = idx + 1
@@ -52,6 +53,7 @@ for cidx = 1, nc do
     -- Slots granted by this call are added below, so the set can still be empty.
     local earliest = redis.call('ZRANGE', slotKey, 0, 0, 'WITHSCORES')
     retry = math.max(1, math.ceil((tonumber(earliest[2]) or (now + leaseTtl)) - now))
+    leaseBlocked = 1
     break
   end
   for i = 1, nr do
@@ -102,6 +104,6 @@ if leaseLimit then
   end
   local last = redis.call('ZRANGE', slotKey, -1, -1, 'WITHSCORES')
   if #last > 0 then redis.call('PEXPIREAT', slotKey, math.ceil(tonumber(last[2]))) end
-  return {granted, math.max(0, retry), 0, tokens}
+  return {granted, math.max(0, retry), 0, tokens, leaseBlocked}
 end
 return {granted, math.max(0, retry), 0}

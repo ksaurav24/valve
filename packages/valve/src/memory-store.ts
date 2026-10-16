@@ -130,13 +130,13 @@ export function memoryStore(options: MemoryStoreOptions = {}): Store {
       for (const token of granted) slots.set(token, now + request.lease.ttlMs);
       if (slots.size) leases.set(request.id, slots);
       else leases.delete(request.id);
+      const leaseBlocked =
+        result.granted === capacity && capacity < request.costs.length;
       returnResult = {
         ...result,
         leases: granted,
-        retryAfterMs:
-          result.granted === capacity && capacity < request.costs.length
-            ? leaseRetry
-            : result.retryAfterMs,
+        retryAfterMs: leaseBlocked ? leaseRetry : result.retryAfterMs,
+        leaseBlocked,
       };
     }
     if (result.granted) {
@@ -183,18 +183,23 @@ export function memoryStore(options: MemoryStoreOptions = {}): Store {
     const slots = leases.get(request.id) ?? new Map<string, number>();
     for (const [token, expiry] of slots) if (expiry <= now) slots.delete(token);
     const grantedIndexes: number[] = [];
-    const blocked: { index: number; retryAfterMs: number }[] = [];
+    const blocked: {
+      index: number;
+      retryAfterMs: number;
+      leaseBlocked?: boolean;
+    }[] = [];
     const tokens: { index: number; token: string }[] = [];
     const pause = Math.max(0, Math.ceil((pauses.get(request.id) ?? 0) - now));
     for (let index = 0; index < plan.jobs.length; index++) {
       const job = plan.jobs[index]!;
-      let retry = pause;
+      let leaseRetry = 0;
       if (request.lease && slots.size >= request.lease.limit) {
         let earliest = Infinity;
         for (const expiry of slots.values())
           earliest = Math.min(earliest, expiry);
-        retry = Math.max(retry, Math.ceil(earliest - now), 1);
+        leaseRetry = Math.max(Math.ceil(earliest - now), 1);
       }
+      let retry = Math.max(pause, leaseRetry);
       {
         const result = acquireBatch(
           job.refs.map((i) => plan.rules[i]!),
@@ -204,7 +209,12 @@ export function memoryStore(options: MemoryStoreOptions = {}): Store {
         );
         retry = Math.max(retry, result.retryAfterMs);
       }
-      if (retry) blocked.push({ index, retryAfterMs: retry });
+      if (retry)
+        blocked.push({
+          index,
+          retryAfterMs: retry,
+          ...(request.lease ? { leaseBlocked: retry === leaseRetry } : {}),
+        });
       else {
         grantedIndexes.push(index);
         for (const i of job.refs) entries.set(plan.keys[i]!, current[i]!);

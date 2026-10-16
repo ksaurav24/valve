@@ -45,6 +45,7 @@ interface AcquireResult {
   readonly retryAfterMs: number; // If not all were granted and not paused: ms until the next could be.
   readonly pausedMs: number; // Ms left on an active pause. When above 0, granted is 0.
   readonly leases?: readonly string[]; // One unique token per grant when lease was requested.
+  readonly leaseBlocked?: boolean; // With a lease: true if full slots, not a rate rule, denied the first ungranted job.
 }
 ```
 
@@ -52,6 +53,10 @@ Each `NormalizedRule` carries `algorithm`, `limit`, `intervalMs`, `burst`, and
 a stable `key`: `${algorithm}:${intervalMs}` for unnamed rules or
 `named:${name}` for named rules. Named and scoped rules also carry `name` and
 `scope` when configured.
+
+Set `leaseBlocked` on results for lease requests. Valves poll lease waits at a
+short interval but wait out rate denials for the full `retryAfterMs`. A store
+that omits it is treated as lease-blocked.
 
 ## Requirements
 
@@ -83,7 +88,11 @@ rejects unsupported stores. Exported `ScopedAcquireRequest` and
 interface ScopedAcquireResult {
   grantedIndexes: readonly number[];
   pausedMs?: number; // Ms left on an active pause. When above 0, every job is blocked.
-  blocked: readonly { index: number; retryAfterMs: number }[];
+  blocked: readonly {
+    index: number;
+    retryAfterMs: number;
+    leaseBlocked?: boolean; // With a lease: true if full slots set the retry hint.
+  }[];
   leases?: readonly { index: number; token: string }[];
 }
 ```

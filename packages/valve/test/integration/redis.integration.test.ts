@@ -180,6 +180,34 @@ suite('real Redis/Valkey', () => {
     await io.del(...(await io.keys(`${prefix}:{${id}}:*`)));
     await store.close();
   });
+  it('reports whether leases or rate rules denied an admission', async () => {
+    const store = redisStore({ client: io, prefix });
+    const id = `lease-blocked-${process.pid}`;
+    const rules = normalize({ id, rate: { limit: 1, interval: 60000 } }).rules;
+    const lease = { limit: 1, ttlMs: 60000, owner: 'a' };
+    expect(await store.acquire({ id, rules, costs: [1], lease })).toMatchObject(
+      { granted: 1, leaseBlocked: false },
+    );
+    expect(
+      await store.acquire({
+        id,
+        rules,
+        costs: [1],
+        lease: { ...lease, owner: 'c' },
+      }),
+    ).toMatchObject({ granted: 0, leaseBlocked: true });
+    await store.release!(id, ['a:0']);
+    expect(
+      await store.acquire({
+        id,
+        rules,
+        costs: [1],
+        lease: { ...lease, owner: 'b' },
+      }),
+    ).toMatchObject({ granted: 0, leaseBlocked: false });
+    await io.del(...(await io.keys(`${prefix}:{${id}}:*`)));
+    await store.close();
+  });
   it('starts a fresh budget when Redis loses valve keys', async () => {
     // Documented limit: a flush, eviction, or stale failover erases admission
     // history, and Redis answers normally afterwards.

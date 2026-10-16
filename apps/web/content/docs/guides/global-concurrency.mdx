@@ -71,14 +71,18 @@ the store would bypass lease ownership.
 
 Without a subscriber, a process notices shared changes on its next store call,
 and waiters for a global slot poll at most every 50ms. With a subscriber,
-pause, resume, and slot release publish a notification and waiting valves
-recheck the store at once.
+pause, resume, and slot release publish a notification. Waiting valves recheck
+the store after a short random delay, so one release does not send every waiter
+to the store at once. A valve that keeps losing slots to others waits up to
+50ms before it rechecks. Waits caused by rate rules follow the store's retry
+hint in both cases.
 
 - The subscriber must be a **separate** connection. Passing the command client
   is rejected.
 - With node-redis, call `connect()` on the duplicate before passing it in.
-- Notifications are hints. Redis remains the source of truth, and missed
-  messages fall back to normal polling.
+- Notifications are hints. Redis remains the source of truth. Global-slot
+  waiters still recheck at least once a second, so a missed message delays a
+  wake by about a second at most.
 
 ```ts
 // node-redis

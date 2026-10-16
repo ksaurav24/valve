@@ -77,6 +77,12 @@ export function createValve(options: ValveOptions): Valve {
   let pausedUntil = 0;
   let consecutive429 = 0;
   let storeFailures = 0;
+  // Outage backoff deadline, kept apart from the wake timer that aborts reset.
+  let backoffUntil = 0;
+  // Consecutive lease denials, which widen the window for answering release notices.
+  let contention = 0;
+  // False while a rate rule, which slot releases cannot change, blocks the queue head.
+  let leaseWait = true;
   let lastStoreEvent = -Infinity;
   let wake: ReturnType<typeof setTimeout> | undefined;
   let wakeAt = Infinity;
@@ -98,6 +104,7 @@ export function createValve(options: ValveOptions): Valve {
   let noticeVersion = 0;
   const leases = config.global
     ? leaseManager(store, id, config.leaseTtl, reportStore, () => {
+        if (!leaseWait) return;
         clearWake();
         schedule();
       })
@@ -129,6 +136,21 @@ export function createValve(options: ValveOptions): Valve {
   }
   function jitter(ms: number) {
     return Math.random() * Math.min(25, ms * 0.1);
+  }
+  /** Spread re-polls caused by shared notices so waiting valves do not answer at once.
+   * Valves that keep losing lease races widen their window, up to the 50ms poll. */
+  function soon() {
+    if (!contention) {
+      clearWake();
+      schedule();
+    } else arm(Date.now() + Math.random() * Math.min(50, 2 ** contention));
+  }
+  /** Poll lease waits every 50ms without a subscriber, and every second with
+   * one in case a release notice is missed. Rate waits follow the hint. */
+  function retryDelay(retryAfterMs: number, leaseBlocked?: boolean) {
+    return config.global && leaseBlocked !== false
+      ? Math.min(store.subscribe ? 1000 : 50, retryAfterMs)
+      : retryAfterMs;
   }
   function cleanup(job: Job) {
     if (job.timer !== undefined) clearTimeout(job.timer);
@@ -222,7 +244,8 @@ export function createValve(options: ValveOptions): Valve {
     if (ok) job.resolve(result);
     else job.reject(result);
     finishIdle();
-    schedule();
+    // A released lease wakes the valve once the store has the slot back.
+    if (!job.lease) schedule();
   }
   function start(job: Job) {
     if (job.state !== 'queued') {
@@ -302,6 +325,7 @@ export function createValve(options: ValveOptions): Valve {
       return;
     }
     storeFailures = 0;
+    backoffUntil = 0;
     if (result.pausedMs > 0 && version !== noticeVersion) {
       for (const job of heads) enqueueAgain(job);
       clearWake();
@@ -316,6 +340,15 @@ export function createValve(options: ValveOptions): Valve {
       arm(pausedUntil);
       finishIdle();
       return;
+    }
+    if (config.global) {
+      leaseWait =
+        result.granted === heads.length || result.leaseBlocked !== false;
+      contention = result.granted
+        ? 0
+        : leaseWait
+          ? Math.min(contention + 1, 6)
+          : contention;
     }
     for (let i = 0; i < heads.length; i++) {
       const job = heads[i]!;
@@ -341,16 +374,14 @@ export function createValve(options: ValveOptions): Valve {
         start(job);
       } else enqueueAgain(job);
     }
-    if (result.granted < heads.length && version !== noticeVersion) {
-      clearWake();
-      schedule();
-    } else if (result.granted < heads.length)
+    if (result.granted < heads.length && version !== noticeVersion) soon();
+    else if (result.granted < heads.length)
       arm(
         now +
           Math.max(
             1,
             config.global
-              ? Math.min(50, result.retryAfterMs)
+              ? retryDelay(result.retryAfterMs, result.leaseBlocked)
               : // The next rate check can overlap time spent obtaining the answer.
                 // Admission remains authoritative if this estimate wakes early.
                 result.retryAfterMs -
@@ -425,6 +456,7 @@ export function createValve(options: ValveOptions): Valve {
       return;
     }
     storeFailures = 0;
+    backoffUntil = 0;
     const now = Date.now();
     if (result.pausedMs && version === noticeVersion) {
       if (pausedUntil <= now)
@@ -457,13 +489,7 @@ export function createValve(options: ValveOptions): Valve {
         job.location = 'delayed';
         delayed!.add(
           job,
-          now +
-            Math.max(
-              1,
-              config.global
-                ? Math.min(50, entry.retryAfterMs)
-                : entry.retryAfterMs,
-            ),
+          now + Math.max(1, retryDelay(entry.retryAfterMs, entry.leaseBlocked)),
         );
       }
     }
@@ -508,6 +534,7 @@ export function createValve(options: ValveOptions): Valve {
     } else {
       const delay = Math.min(5000, 100 * 2 ** Math.min(storeFailures++, 6));
       const at = Date.now() + delay + jitter(delay);
+      backoffUntil = at;
       for (const job of heads) {
         if (delayed && job.state === 'queued') {
           job.location = 'delayed';
@@ -515,7 +542,6 @@ export function createValve(options: ValveOptions): Valve {
         } else enqueueAgain(job);
       }
       arm(at);
-      if (delayed && queue.size) schedule();
     }
     finishIdle();
   }
@@ -538,6 +564,10 @@ export function createValve(options: ValveOptions): Valve {
     }
     if (pausedUntil > now) {
       arm(pausedUntil);
+      return;
+    }
+    if (backoffUntil > now) {
+      arm(backoffUntil);
       return;
     }
     if (delayed) {
@@ -994,6 +1024,10 @@ export function createValve(options: ValveOptions): Valve {
       } else if (notice.type === 'resume') {
         pausedUntil = 0;
         events.emit('resume', { reason: 'manual' });
+      } else {
+        // Every subscribed valve hears each release; coalesce and spread them.
+        if (leaseWait) soon();
+        return;
       }
       clearWake();
       schedule();

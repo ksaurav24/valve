@@ -74,6 +74,18 @@ suite('scoped Redis/Valkey admission', () => {
     expect(result.pausedMs).toBeGreaterThan(900);
     expect(result.blocked[0]!.retryAfterMs).toBe(result.pausedMs);
   });
+  it('reports whether leases or rate rules denied scoped jobs', async () => {
+    const request = {
+      ...make(randomUUID(), ['A', 'A', 'B']),
+      lease: { limit: 1, ttlMs: 30000, owner: 'o' },
+    };
+    const result = await store.acquireScoped!(request);
+    expect(result.grantedIndexes).toEqual([0]);
+    expect(result.blocked.map((b) => [b.index, b.leaseBlocked])).toEqual([
+      [1, false],
+      [2, true],
+    ]);
+  });
   it('expires inactive scoped keys automatically and restores their budgets', async () => {
     const id = 'expiry';
     const rules = normalize({

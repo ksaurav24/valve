@@ -242,7 +242,7 @@ describe('scoped Redis adapter', () => {
       }),
     ).toEqual({
       grantedIndexes: [0],
-      blocked: [{ index: 1, retryAfterMs: 1000 }],
+      blocked: [{ index: 1, retryAfterMs: 1000, leaseBlocked: false }],
       leases: [{ index: 0, token: 'owner:0' }],
     });
     expect(evalsha.mock.calls[0]![1]).toHaveLength(4);
