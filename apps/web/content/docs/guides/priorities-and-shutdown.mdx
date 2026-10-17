@@ -52,7 +52,9 @@ const crm = createValve({
   runs. Override it per job with `run(fn, { maxWait })`. `maxWait: 0` runs a
   job only if capacity is free on its first admission attempt. With an
   asynchronous store such as Redis, zero-wait jobs queued behind an in-flight
-  store call are sent in a later batch instead of being rejected.
+  store call are sent in a later batch instead of being rejected. If
+  higher-priority work submitted meanwhile takes their place, they reject with
+  `MAX_WAIT_EXCEEDED` without an attempt.
 
 Both turn an overloaded queue into fast, explicit errors that you can handle,
 instead of unbounded memory and latency.
