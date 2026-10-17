@@ -1,5 +1,9 @@
 # Current benchmarks
 
+Raw results are not kept in the repository. Links to them point to commit
+[`1979020`](https://github.com/ksaurav24/valve/tree/197902098769e5abf396d16582a42d1b7a123ded/packages/valve/bench), the last revision
+that contained them; rerun the commands below to regenerate them.
+
 The follow-up [paced drift report](./DRIFT.md) measures asynchronous rate-wakeup
 deadlines against the merged PR #10 baseline. The results below retain PR #10's
 full comparison and historical evidence.
@@ -42,14 +46,14 @@ All six benchmark programs ran sequentially, including every Bottleneck case. Bu
 
 ## Paced execution
 
-200 queued promise-returning no-op jobs at 100/sec. Valve uses GCRA burst 1; Bottleneck uses minTime 10ms. Throughput is jobs divided by median elapsed time over five rounds. As in the previous comparison, latency percentiles and minimum callback gap are from the last measured round. All elapsed samples are in [comparison.json](./comparison.json).
+200 queued promise-returning no-op jobs at 100/sec. Valve uses GCRA burst 1; Bottleneck uses minTime 10ms. Throughput is jobs divided by median elapsed time over five rounds. As in the previous comparison, latency percentiles and minimum callback gap are from the last measured round. All elapsed samples are in [comparison.json](https://github.com/ksaurav24/valve/blob/197902098769e5abf396d16582a42d1b7a123ded/packages/valve/bench/comparison.json).
 
 | Library    | Jobs/sec | p99 spacing overshoot (ms) | p99 ideal-sequence delay (ms) | Minimum start gap (ms) |
 | ---------- | -------: | -------------------------: | ----------------------------: | ---------------------: |
 | valve      |    98.52 |                      1.299 |                        39.951 |                  9.162 |
 | Bottleneck |   100.33 |                      1.649 |                         0.189 |                  8.245 |
 
-Valve's p99 ideal-sequence delay falls from 283.320ms to 39.951ms (85.9% lower). The original 5ms target remains unmet. The PR #7 baseline and prior optimization experiments are consolidated in [optimization-history.json](./optimization-history.json).
+Valve's p99 ideal-sequence delay falls from 283.320ms to 39.951ms (85.9% lower). The original 5ms target remains unmet. The PR #7 baseline and prior optimization experiments are consolidated in [optimization-history.json](https://github.com/ksaurav24/valve/blob/197902098769e5abf396d16582a42d1b7a123ded/packages/valve/bench/optimization-history.json).
 
 Spacing overshoot is excess time beyond 10ms between callbacks. Ideal-sequence delay is `start[i] - start[0] - i * 10ms`. Small late admissions can accumulate across the queue: burst 1 schedules the next eligibility from the actual store admission and does not catch up by shortening admission spacing.
 
@@ -110,7 +114,7 @@ Elapsed, wait, service, and CPU columns are milliseconds. Wait/service percentil
 
 ## Header readers
 
-10,000 warmup reads, then five batches of 1,000,000 reads from a plain header object. These are parser operations, not scheduled jobs or network throughput. Raw samples: [headers.json](./headers.json).
+10,000 warmup reads, then five batches of 1,000,000 reads from a plain header object. These are parser operations, not scheduled jobs or network throughput. Raw samples: [headers.json](https://github.com/ksaurav24/valve/blob/197902098769e5abf396d16582a42d1b7a123ded/packages/valve/bench/headers.json).
 
 | Reader            |  Reads/sec | Median elapsed (ms) | Elapsed range (ms) |
 | ----------------- | ---------: | ------------------: | -----------------: |
@@ -123,7 +127,7 @@ Elapsed, wait, service, and CPU columns are milliseconds. Wait/service percentil
 
 Each case queues 200 jobs at 100/sec, with one 32-job warmup and five measured rounds. Eight valves here share a store inside one process. Redis uses an ioredis5 adapter without pub/sub. Injected RTT is requested sleep split before and after acquire, in addition to loopback latency; actual timer delivery may add delay. This is not a network emulator. Redis remains the clock authority.
 
-Throughput uses median elapsed time. The delay column is the median of each round's p99 ideal delay, not a pooled percentile. Script commands count actual outgoing EVALSHA/EVAL invocations, including fallback, but exclude connection setup and commands executed inside Lua. Raw samples, CPU, zero-grant acquires, callback gaps, queue wait, and per-valve completion times are in [paced.json](./paced.json).
+Throughput uses median elapsed time. The delay column is the median of each round's p99 ideal delay, not a pooled percentile. Script commands count actual outgoing EVALSHA/EVAL invocations, including fallback, but exclude connection setup and commands executed inside Lua. Raw samples, CPU, zero-grant acquires, callback gaps, queue wait, and per-valve completion times are in [paced.json](https://github.com/ksaurav24/valve/blob/197902098769e5abf396d16582a42d1b7a123ded/packages/valve/bench/paced.json).
 
 | Store  | Valves | Injected RTT (ms) | Jobs/sec | Median round p99 ideal delay (ms) | Script commands/job |
 | ------ | -----: | ----------------: | -------: | --------------------------------: | ------------------: |
@@ -140,7 +144,7 @@ Removing jitter can increase acquire collisions between workers. These measureme
 
 ## Long local benchmark
 
-A single run of 100,000 synchronous no-op jobs at concurrency 16, with a nonbinding Valve rate rule. This harness includes setup and has no warmup. It is a different workload from the repeated promise-returning comparison above. All four libraries ran, including Bottleneck. Raw output: [local.json](./local.json).
+A single run of 100,000 synchronous no-op jobs at concurrency 16, with a nonbinding Valve rate rule. This harness includes setup and has no warmup. It is a different workload from the repeated promise-returning comparison above. All four libraries ran, including Bottleneck. Raw output: [local.json](https://github.com/ksaurav24/valve/blob/197902098769e5abf396d16582a42d1b7a123ded/packages/valve/bench/local.json).
 
 | Library    | Elapsed (ms) | Jobs/sec |
 | ---------- | -----------: | -------: |
@@ -162,7 +166,7 @@ redis.ts ran against both Redis and Valkey. The backlog case admits 1,000 queued
 | valkey | backlog |       32 | 1000 |       0.0320 |
 | valkey |   light |       10 |   10 |       1.0000 |
 
-mitata.ts ran both adaptive 1,000-job local microbenchmarks. Its complete console output and both store-acquisition outputs are retained in [supplementary.json](./supplementary.json). Adaptive batch timings should not be read as per-job HTTP latency.
+mitata.ts ran both adaptive 1,000-job local microbenchmarks. Its complete console output and both store-acquisition outputs are retained in [supplementary.json](https://github.com/ksaurav24/valve/blob/197902098769e5abf396d16582a42d1b7a123ded/packages/valve/bench/supplementary.json). Adaptive batch timings should not be read as per-job HTTP latency.
 
 ```text
 clk: ~4.19 GHz

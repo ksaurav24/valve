@@ -1,5 +1,9 @@
 # Bundle footprint follow-up (#16)
 
+Raw results are not kept in the repository. Links to them point to commit
+[`1979020`](https://github.com/ksaurav24/valve/tree/197902098769e5abf396d16582a42d1b7a123ded/packages/valve/bench), the last revision
+that contained them; rerun the commands below to regenerate them.
+
 Baseline: `c512c22` (master, after #10 and #17). Current: the changes in this PR.
 Host: Linux x64, Intel Core i5-12450H. Sizes use esbuild 0.28.2, browser platform,
 ESM, ES2022, bundling, minification, and Node 24.21.0 default gzip compression.
@@ -31,8 +35,8 @@ existing exports and behavior.
 ## Sizes
 
 All values are minified plus gzip bytes. Module breakdowns and uncompressed
-sizes are in [baseline.json](footprint-results/baseline.json) and
-[current.json](footprint-results/current.json).
+sizes are in [baseline.json](https://github.com/ksaurav24/valve/blob/197902098769e5abf396d16582a42d1b7a123ded/packages/valve/bench/footprint-results/baseline.json) and
+[current.json](https://github.com/ksaurav24/valve/blob/197902098769e5abf396d16582a42d1b7a123ded/packages/valve/bench/footprint-results/current.json).
 
 | Input                                 | Baseline | Current | Change |
 | ------------------------------------- | -------: | ------: | -----: |
@@ -79,9 +83,9 @@ Median import / initialization time in milliseconds:
 
 These small differences do not establish a startup improvement. Raw samples
 retain CPU time, heap delta, RSS, and process peak RSS:
-[Node 20](footprint-results/startup-node-20.20.2.json.gz),
-[Node 22](footprint-results/startup-node-22.23.3.json.gz),
-[Node 24](footprint-results/startup-node-24.21.0.json.gz).
+[Node 20](https://github.com/ksaurav24/valve/blob/197902098769e5abf396d16582a42d1b7a123ded/packages/valve/bench/footprint-results/startup-node-20.20.2.json.gz),
+[Node 22](https://github.com/ksaurav24/valve/blob/197902098769e5abf396d16582a42d1b7a123ded/packages/valve/bench/footprint-results/startup-node-22.23.3.json.gz),
+[Node 24](https://github.com/ksaurav24/valve/blob/197902098769e5abf396d16582a42d1b7a123ded/packages/valve/bench/footprint-results/startup-node-24.21.0.json.gz).
 Heap deltas are sensitive to GC and are not allocation counts or peak heap.
 Peak RSS includes process startup and is not solely attributable to the import.
 
@@ -103,7 +107,7 @@ sample, bundle measurements, and startup measurements.
 
 The five Lua scripts compile to byte-for-byte identical stripped bytecode with
 the Lua 5.1 compiler linked to Redis 7.4.7. The checksums and source sizes are
-in [lua-bytecode.json](footprint-results/lua-bytecode.json). This confirms
+in [lua-bytecode.json](https://github.com/ksaurav24/valve/blob/197902098769e5abf396d16582a42d1b7a123ded/packages/valve/bench/footprint-results/lua-bytecode.json). This confirms
 unchanged server VM instructions; it does not replace runtime measurements or
 claim identical cold parsing costs.
 
@@ -117,7 +121,7 @@ existing 15% throughput regression gate. Valve throughput changes range from
 The desktop host's large throughput changes were not reproduced on this runner.
 These results support the footprint change without claiming a runtime speedup.
 
-The [CI summary](footprint-results/ci/summary.json) and all raw samples are
+The [CI summary](https://github.com/ksaurav24/valve/blob/197902098769e5abf396d16582a42d1b7a123ded/packages/valve/bench/footprint-results/ci/summary.json) and all raw samples are
 archived in this repository. CPU and per-job logical store calls remain
 comparable; each shared-rate control reports 0.03125 calls per job in both
 variants. Final-round p99 waits remain variable: local concurrency reports
@@ -126,15 +130,15 @@ gate is not a latency guarantee, and the report retains these values rather than
 claiming uniform improvement. No behavior, package, size, or runtime check failed.
 
 CI raw controls:
-[0 baseline](footprint-results/ci/control-0-baseline.json.gz),
-[0 current](footprint-results/ci/control-0-current.json.gz),
-[1 baseline](footprint-results/ci/control-1-baseline.json.gz),
-[1 current](footprint-results/ci/control-1-current.json.gz),
-[2 baseline](footprint-results/ci/control-2-baseline.json.gz),
-[2 current](footprint-results/ci/control-2-current.json.gz).
-CI [baseline sizes](footprint-results/ci/baseline-size.json.gz),
-[current sizes](footprint-results/ci/current-size.json.gz), and
-[startup samples](footprint-results/ci/startup.json.gz) are retained as well.
+[0 baseline](https://github.com/ksaurav24/valve/blob/197902098769e5abf396d16582a42d1b7a123ded/packages/valve/bench/footprint-results/ci/control-0-baseline.json.gz),
+[0 current](https://github.com/ksaurav24/valve/blob/197902098769e5abf396d16582a42d1b7a123ded/packages/valve/bench/footprint-results/ci/control-0-current.json.gz),
+[1 baseline](https://github.com/ksaurav24/valve/blob/197902098769e5abf396d16582a42d1b7a123ded/packages/valve/bench/footprint-results/ci/control-1-baseline.json.gz),
+[1 current](https://github.com/ksaurav24/valve/blob/197902098769e5abf396d16582a42d1b7a123ded/packages/valve/bench/footprint-results/ci/control-1-current.json.gz),
+[2 baseline](https://github.com/ksaurav24/valve/blob/197902098769e5abf396d16582a42d1b7a123ded/packages/valve/bench/footprint-results/ci/control-2-baseline.json.gz),
+[2 current](https://github.com/ksaurav24/valve/blob/197902098769e5abf396d16582a42d1b7a123ded/packages/valve/bench/footprint-results/ci/control-2-current.json.gz).
+CI [baseline sizes](https://github.com/ksaurav24/valve/blob/197902098769e5abf396d16582a42d1b7a123ded/packages/valve/bench/footprint-results/ci/baseline-size.json.gz),
+[current sizes](https://github.com/ksaurav24/valve/blob/197902098769e5abf396d16582a42d1b7a123ded/packages/valve/bench/footprint-results/ci/current-size.json.gz), and
+[startup samples](https://github.com/ksaurav24/valve/blob/197902098769e5abf396d16582a42d1b7a123ded/packages/valve/bench/footprint-results/ci/startup.json.gz) are retained as well.
 
 ### Full matrix
 
@@ -187,7 +191,7 @@ values; each run reports its final measured round for wait percentiles.
 | valkey/node-redis/global-16    | valve      |          93,701 |         75,982 | -18.9% |                  12.93 / 16.26 |              10.32 / 9.47 |
 | valkey/global-16               | Bottleneck |           7,018 |          4,455 | -36.5% |                137.59 / 141.74 |           156.38 / 219.88 |
 
-Raw samples: [0 baseline](footprint-results/comparison-0-baseline.json.gz), [0 current](footprint-results/comparison-0-current.json.gz), [1 baseline](footprint-results/comparison-1-baseline.json.gz), [1 current](footprint-results/comparison-1-current.json.gz), [2 baseline](footprint-results/comparison-2-baseline.json.gz), [2 current](footprint-results/comparison-2-current.json.gz).
+Raw samples: [0 baseline](https://github.com/ksaurav24/valve/blob/197902098769e5abf396d16582a42d1b7a123ded/packages/valve/bench/footprint-results/comparison-0-baseline.json.gz), [0 current](https://github.com/ksaurav24/valve/blob/197902098769e5abf396d16582a42d1b7a123ded/packages/valve/bench/footprint-results/comparison-0-current.json.gz), [1 baseline](https://github.com/ksaurav24/valve/blob/197902098769e5abf396d16582a42d1b7a123ded/packages/valve/bench/footprint-results/comparison-1-baseline.json.gz), [1 current](https://github.com/ksaurav24/valve/blob/197902098769e5abf396d16582a42d1b7a123ded/packages/valve/bench/footprint-results/comparison-1-current.json.gz), [2 baseline](https://github.com/ksaurav24/valve/blob/197902098769e5abf396d16582a42d1b7a123ded/packages/valve/bench/footprint-results/comparison-2-baseline.json.gz), [2 current](https://github.com/ksaurav24/valve/blob/197902098769e5abf396d16582a42d1b7a123ded/packages/valve/bench/footprint-results/comparison-2-current.json.gz).
 
 ### Longer controls
 
@@ -216,7 +220,7 @@ values; each run reports its final measured round for wait percentiles.
 | valkey/node-redis/fixed-window | valve   |         326,270 |        326,916 |  +0.2% |                  60.96 / 60.35 |             66.85 / 65.01 |
 | valkey/node-redis/multi-rule   | valve   |         225,943 |        244,849 |  +8.4% |                  85.92 / 81.11 |             68.66 / 57.03 |
 
-Raw samples: [0 baseline](footprint-results/control-0-baseline.json.gz), [0 current](footprint-results/control-0-current.json.gz), [1 baseline](footprint-results/control-1-baseline.json.gz), [1 current](footprint-results/control-1-current.json.gz), [2 baseline](footprint-results/control-2-baseline.json.gz), [2 current](footprint-results/control-2-current.json.gz).
+Raw samples: [0 baseline](https://github.com/ksaurav24/valve/blob/197902098769e5abf396d16582a42d1b7a123ded/packages/valve/bench/footprint-results/control-0-baseline.json.gz), [0 current](https://github.com/ksaurav24/valve/blob/197902098769e5abf396d16582a42d1b7a123ded/packages/valve/bench/footprint-results/control-0-current.json.gz), [1 baseline](https://github.com/ksaurav24/valve/blob/197902098769e5abf396d16582a42d1b7a123ded/packages/valve/bench/footprint-results/control-1-baseline.json.gz), [1 current](https://github.com/ksaurav24/valve/blob/197902098769e5abf396d16582a42d1b7a123ded/packages/valve/bench/footprint-results/control-1-current.json.gz), [2 baseline](https://github.com/ksaurav24/valve/blob/197902098769e5abf396d16582a42d1b7a123ded/packages/valve/bench/footprint-results/control-2-baseline.json.gz), [2 current](https://github.com/ksaurav24/valve/blob/197902098769e5abf396d16582a42d1b7a123ded/packages/valve/bench/footprint-results/control-2-current.json.gz).
 
 ## Verification
 
