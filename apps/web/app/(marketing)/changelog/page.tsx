@@ -1,4 +1,5 @@
 import type { Metadata } from 'next';
+import Link from 'next/link';
 import { PageHeader } from '@/components/marketing/page-header';
 import { VersionBadge } from '@/components/shared/version-badge';
 import { changelogSource } from '@/lib/source';
@@ -47,12 +48,12 @@ export default function ChangelogPage() {
             The package changelog is the source of truth. Published versions and
             development notes keep their original order.
           </p>
-          <a
+          <Link
             href="/releases"
-            className="inline-flex min-h-11 items-center text-sm font-medium hover:text-live"
+            className="inline-flex min-h-11 items-center text-sm font-medium hover:text-live-foreground"
           >
             View published releases
-          </a>
+          </Link>
         </aside>
         <div className="prose changelog-body min-w-0 max-w-[75ch]">
           <Content components={getMDXComponents()} />

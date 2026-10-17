@@ -252,7 +252,7 @@ export default async function HomePage() {
               <HeroReveal onView>
                 <Link
                   href="/changelog"
-                  className="font-mono text-xl tracking-tight hover:text-live"
+                  className="font-mono text-xl tracking-tight hover:text-live-foreground"
                 >
                   v{entry.version}
                 </Link>

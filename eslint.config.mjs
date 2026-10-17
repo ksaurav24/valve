@@ -11,6 +11,7 @@ export default tseslint.config(
       'node_modules/**',
       'pvt/**',
       '.codegraph/**',
+      '.agent/**',
       '.agents/**',
       '.taste-skill/**',
       '**/.next/**',

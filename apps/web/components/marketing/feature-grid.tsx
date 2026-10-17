@@ -99,7 +99,7 @@ export function FeatureList() {
               </pre>
               <Link
                 href={feature.href}
-                className="inline-flex min-h-11 items-center gap-2 text-sm font-medium hover:text-live"
+                className="inline-flex min-h-11 items-center gap-2 text-sm font-medium hover:text-live-foreground"
               >
                 Read the guide{' '}
                 <ArrowUpRight aria-hidden="true" className="size-4" />
