@@ -1,5 +1,22 @@
 # valvejs
 
+## 0.5.0
+
+### Minor Changes
+
+- 731813a: `memoryStore()` now rejects valves that share an id with different rate rules, global concurrency limit, or lease TTL with `INVALID_OPTIONS`, as the Redis store does. Mismatched configurations that previously ran with mixed limits now fail. The memory store also forgets an id's static policy once its rate, lease, and pause state expire, so short-lived ids no longer grow memory without bound.
+
+  `ScopedAcquireResult` gains an optional `pausedMs` field. Scoped valves now update `stats().pausedUntil` and emit `pause` when the store reports a shared pause, including Redis stores without a subscriber.
+
+  A direct `acquire` that asks for more jobs than free lease slots on an empty slot set now returns the lease TTL as its retry hint. The Redis script previously failed with a Lua error, and the memory store returned `Infinity`.
+
+- 1dd29f3: Waiting global valves call the store far less often. `AcquireResult` and scoped `blocked` entries gain an optional `leaseBlocked` field, which the memory and Redis stores set on lease requests, so a valve waits out rate denials for the full retry hint instead of polling every 50ms. Lease waits poll every 50ms only without a subscriber, and at least once a second with one. Release notices are coalesced and answered after a short random delay that widens for valves that keep losing slots, so one release no longer sends every waiting valve to the store at once. A valve no longer polls right after its own job settles, before its lease is released. Aborts and `maxWait` expiries no longer cut short the store outage backoff under `onStoreError: 'wait'`.
+
+### Patch Changes
+
+- 5fb6766: `ietfRateLimit()` and `defaultFeedback` now split `RateLimit` fields in linear time and ignore fields longer than 8192 characters, so a malformed header can no longer stall the event loop. Quoted strings may contain escaped quotes and commas. Valves also register their disposer under `Symbol.for('nodejs.asyncDispose')` on Node 20 releases that lack `Symbol.asyncDispose`, so `await using` works across the supported Node 20 range.
+- 2a83fc8: `maxWait: 0` now runs a job when its first admission attempt is granted and rejects it with `MAX_WAIT_EXCEEDED` otherwise. Previously every such job was rejected, even with free capacity. `redisStore` now rejects a `timeout` below 1ms with `INVALID_OPTIONS`, since a zero timeout failed every store call.
+
 ## 0.4.1
 
 ### Patch Changes
