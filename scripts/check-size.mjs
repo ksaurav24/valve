@@ -12,7 +12,8 @@ for (const [entry, budget] of [
   // Queue-order, shutdown, admission, store-contract and parsing fixes (#76-81)
   // together measure 12616 bytes for core and 6235 bytes for Redis (+gzip).
   // Keep the shared ceilings tight while allowing these fixes to merge together.
-  ['index', 12700],
+  // Holding zero-wait jobs behind an async admission (#92) measures 12735 bytes.
+  ['index', 12750],
   ['redis/index', 6300],
   ['headers/index', 2048],
 ]) {

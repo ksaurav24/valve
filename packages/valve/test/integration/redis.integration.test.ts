@@ -11,6 +11,7 @@ import { redisStore } from '../../src/redis/index.js';
 import { withLuaClock } from '../lua-clock.js';
 import { ACQUIRE } from '../../src/redis/scripts.js';
 import { normalize } from '../../src/rules.js';
+import type { Store } from '../../src/index.js';
 import type { RedisStoreOptions } from '../../src/redis/index.js';
 const url = process.env.REDIS_URL;
 const suite = url ? describe : describe.skip;
@@ -245,6 +246,67 @@ suite('real Redis/Valkey', () => {
     await io.del(...(await io.keys(`${prefix}:{${id}}:*`)));
     await store.close();
   });
+  it.each(['static', 'scoped'] as const)(
+    'sends every %s maxWait 0 job to Redis like the memory store',
+    async (policy) => {
+      const counts = async (redis: boolean) => {
+        const store = redis
+          ? redisStore({ client: io, prefix: `${prefix}-zero` })
+          : memoryStore();
+        let sent = 0;
+        const counted: Store = {
+          ...store,
+          acquire: (request: Parameters<typeof store.acquire>[0]) => {
+            sent += request.costs.length;
+            return store.acquire(request);
+          },
+          acquireScoped: (
+            request: Parameters<NonNullable<typeof store.acquireScoped>>[0],
+          ) => {
+            sent += request.jobs.length;
+            return store.acquireScoped!(request);
+          },
+        };
+        delete counted.acquireSync;
+        delete counted.acquireScopedSync;
+        const api = createValve({
+          id: `zero-${policy}-${redis}-${Date.now()}`,
+          rate:
+            policy === 'scoped'
+              ? [{ name: 'r', scope: 'recipient', limit: 1, interval: '24h' }]
+              : { limit: 1e9, interval: 1000, burst: 1e9 },
+          concurrency: 64,
+          batch: 32,
+          store: counted,
+        });
+        const outcomes: Record<string, number> = {};
+        await Promise.all(
+          Array.from({ length: 512 }, (_, i) =>
+            api
+              .run(() => undefined, {
+                maxWait: 0,
+                ...(policy === 'scoped'
+                  ? { scopes: { recipient: i % 2 ? `c${i}` : 'hot' } }
+                  : {}),
+              })
+              .then(
+                () => 'ok',
+                (error: { code: string }) => error.code,
+              )
+              .then((key) => (outcomes[key] = (outcomes[key] ?? 0) + 1)),
+          ),
+        );
+        await api.close();
+        if (!redis) await store.close();
+        return { sent, outcomes };
+      };
+      const memory = await counts(false);
+      const redis = await counts(true);
+      expect(memory.sent).toBe(512);
+      expect(redis).toEqual(memory);
+      expect(redis.outcomes.ok).toBe(policy === 'scoped' ? 257 : 512);
+    },
+  );
   it('keeps 5000 atomic admissions across eight child processes inside the global rolling bound', async () => {
     const id = `multiprocess-${process.pid}`;
     const script = fileURLToPath(new URL('./worker.mjs', import.meta.url));

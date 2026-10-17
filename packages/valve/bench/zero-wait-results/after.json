@@ -1,0 +1,4039 @@
+{
+  "jobs": 512,
+  "reps": 3,
+  "node": "v26.8.1",
+  "rows": [
+    {
+      "policy": "free",
+      "store": "memory",
+      "batch": 1,
+      "workers": 1,
+      "rep": 0,
+      "jobs": 512,
+      "storeCalls": 512,
+      "jobsSent": 512,
+      "ok": 512,
+      "rejected": 0,
+      "outcomes": {
+        "ok": 512
+      },
+      "ms": 5.434989000000002,
+      "settledPerSecond": 94204,
+      "usPerJob": 10.615212890625003
+    },
+    {
+      "policy": "free",
+      "store": "memory",
+      "batch": 1,
+      "workers": 1,
+      "rep": 1,
+      "jobs": 512,
+      "storeCalls": 512,
+      "jobsSent": 512,
+      "ok": 512,
+      "rejected": 0,
+      "outcomes": {
+        "ok": 512
+      },
+      "ms": 2.202764000000002,
+      "settledPerSecond": 232435,
+      "usPerJob": 4.302273437500004
+    },
+    {
+      "policy": "free",
+      "store": "memory",
+      "batch": 1,
+      "workers": 1,
+      "rep": 2,
+      "jobs": 512,
+      "storeCalls": 512,
+      "jobsSent": 512,
+      "ok": 512,
+      "rejected": 0,
+      "outcomes": {
+        "ok": 512
+      },
+      "ms": 1.2389049999999884,
+      "settledPerSecond": 413268,
+      "usPerJob": 2.4197363281249773
+    },
+    {
+      "policy": "free",
+      "store": "memory",
+      "batch": 1,
+      "workers": 4,
+      "rep": 0,
+      "jobs": 2048,
+      "storeCalls": 2048,
+      "jobsSent": 2048,
+      "ok": 2048,
+      "rejected": 0,
+      "outcomes": {
+        "ok": 2048
+      },
+      "ms": 8.072501000000017,
+      "settledPerSecond": 253701,
+      "usPerJob": 3.941650878906258
+    },
+    {
+      "policy": "free",
+      "store": "memory",
+      "batch": 1,
+      "workers": 4,
+      "rep": 1,
+      "jobs": 2048,
+      "storeCalls": 2048,
+      "jobsSent": 2048,
+      "ok": 2048,
+      "rejected": 0,
+      "outcomes": {
+        "ok": 2048
+      },
+      "ms": 8.596659999999986,
+      "settledPerSecond": 238232,
+      "usPerJob": 4.197587890624993
+    },
+    {
+      "policy": "free",
+      "store": "memory",
+      "batch": 1,
+      "workers": 4,
+      "rep": 2,
+      "jobs": 2048,
+      "storeCalls": 2048,
+      "jobsSent": 2048,
+      "ok": 2048,
+      "rejected": 0,
+      "outcomes": {
+        "ok": 2048
+      },
+      "ms": 5.846440999999999,
+      "settledPerSecond": 350299,
+      "usPerJob": 2.8547075195312495
+    },
+    {
+      "policy": "free",
+      "store": "memory",
+      "batch": 32,
+      "workers": 1,
+      "rep": 0,
+      "jobs": 512,
+      "storeCalls": 16,
+      "jobsSent": 512,
+      "ok": 512,
+      "rejected": 0,
+      "outcomes": {
+        "ok": 512
+      },
+      "ms": 0.9086320000000114,
+      "settledPerSecond": 563484,
+      "usPerJob": 1.7746718750000223
+    },
+    {
+      "policy": "free",
+      "store": "memory",
+      "batch": 32,
+      "workers": 1,
+      "rep": 1,
+      "jobs": 512,
+      "storeCalls": 16,
+      "jobsSent": 512,
+      "ok": 512,
+      "rejected": 0,
+      "outcomes": {
+        "ok": 512
+      },
+      "ms": 1.1467859999999916,
+      "settledPerSecond": 446465,
+      "usPerJob": 2.2398164062499837
+    },
+    {
+      "policy": "free",
+      "store": "memory",
+      "batch": 32,
+      "workers": 1,
+      "rep": 2,
+      "jobs": 512,
+      "storeCalls": 16,
+      "jobsSent": 512,
+      "ok": 512,
+      "rejected": 0,
+      "outcomes": {
+        "ok": 512
+      },
+      "ms": 0.9202920000000177,
+      "settledPerSecond": 556345,
+      "usPerJob": 1.7974453125000345
+    },
+    {
+      "policy": "free",
+      "store": "memory",
+      "batch": 32,
+      "workers": 4,
+      "rep": 0,
+      "jobs": 2048,
+      "storeCalls": 64,
+      "jobsSent": 2048,
+      "ok": 2048,
+      "rejected": 0,
+      "outcomes": {
+        "ok": 2048
+      },
+      "ms": 2.464686999999998,
+      "settledPerSecond": 830937,
+      "usPerJob": 1.203460449218749
+    },
+    {
+      "policy": "free",
+      "store": "memory",
+      "batch": 32,
+      "workers": 4,
+      "rep": 1,
+      "jobs": 2048,
+      "storeCalls": 64,
+      "jobsSent": 2048,
+      "ok": 2048,
+      "rejected": 0,
+      "outcomes": {
+        "ok": 2048
+      },
+      "ms": 2.634652999999986,
+      "settledPerSecond": 777332,
+      "usPerJob": 1.286451660156243
+    },
+    {
+      "policy": "free",
+      "store": "memory",
+      "batch": 32,
+      "workers": 4,
+      "rep": 2,
+      "jobs": 2048,
+      "storeCalls": 64,
+      "jobsSent": 2048,
+      "ok": 2048,
+      "rejected": 0,
+      "outcomes": {
+        "ok": 2048
+      },
+      "ms": 3.6145329999999944,
+      "settledPerSecond": 566602,
+      "usPerJob": 1.7649086914062473
+    },
+    {
+      "policy": "free",
+      "store": "memory",
+      "batch": 128,
+      "workers": 1,
+      "rep": 0,
+      "jobs": 512,
+      "storeCalls": 8,
+      "jobsSent": 512,
+      "ok": 512,
+      "rejected": 0,
+      "outcomes": {
+        "ok": 512
+      },
+      "ms": 1.0753839999999855,
+      "settledPerSecond": 476109,
+      "usPerJob": 2.1003593749999716
+    },
+    {
+      "policy": "free",
+      "store": "memory",
+      "batch": 128,
+      "workers": 1,
+      "rep": 1,
+      "jobs": 512,
+      "storeCalls": 8,
+      "jobsSent": 512,
+      "ok": 512,
+      "rejected": 0,
+      "outcomes": {
+        "ok": 512
+      },
+      "ms": 0.4906299999999817,
+      "settledPerSecond": 1043556,
+      "usPerJob": 0.9582617187499642
+    },
+    {
+      "policy": "free",
+      "store": "memory",
+      "batch": 128,
+      "workers": 1,
+      "rep": 2,
+      "jobs": 512,
+      "storeCalls": 8,
+      "jobsSent": 512,
+      "ok": 512,
+      "rejected": 0,
+      "outcomes": {
+        "ok": 512
+      },
+      "ms": 0.4777440000000013,
+      "settledPerSecond": 1071704,
+      "usPerJob": 0.9330937500000025
+    },
+    {
+      "policy": "free",
+      "store": "memory",
+      "batch": 128,
+      "workers": 4,
+      "rep": 0,
+      "jobs": 2048,
+      "storeCalls": 32,
+      "jobsSent": 2048,
+      "ok": 2048,
+      "rejected": 0,
+      "outcomes": {
+        "ok": 2048
+      },
+      "ms": 2.270485000000008,
+      "settledPerSecond": 902010,
+      "usPerJob": 1.1086352539062538
+    },
+    {
+      "policy": "free",
+      "store": "memory",
+      "batch": 128,
+      "workers": 4,
+      "rep": 1,
+      "jobs": 2048,
+      "storeCalls": 32,
+      "jobsSent": 2048,
+      "ok": 2048,
+      "rejected": 0,
+      "outcomes": {
+        "ok": 2048
+      },
+      "ms": 2.0185920000000124,
+      "settledPerSecond": 1014569,
+      "usPerJob": 0.985640625000006
+    },
+    {
+      "policy": "free",
+      "store": "memory",
+      "batch": 128,
+      "workers": 4,
+      "rep": 2,
+      "jobs": 2048,
+      "storeCalls": 32,
+      "jobsSent": 2048,
+      "ok": 2048,
+      "rejected": 0,
+      "outcomes": {
+        "ok": 2048
+      },
+      "ms": 2.974790999999982,
+      "settledPerSecond": 688452,
+      "usPerJob": 1.4525346679687412
+    },
+    {
+      "policy": "free",
+      "store": "memory-async",
+      "batch": 1,
+      "workers": 1,
+      "rep": 0,
+      "jobs": 512,
+      "storeCalls": 512,
+      "jobsSent": 512,
+      "ok": 512,
+      "rejected": 0,
+      "outcomes": {
+        "ok": 512
+      },
+      "ms": 1.3979300000000023,
+      "settledPerSecond": 366256,
+      "usPerJob": 2.7303320312500046
+    },
+    {
+      "policy": "free",
+      "store": "memory-async",
+      "batch": 1,
+      "workers": 1,
+      "rep": 1,
+      "jobs": 512,
+      "storeCalls": 512,
+      "jobsSent": 512,
+      "ok": 512,
+      "rejected": 0,
+      "outcomes": {
+        "ok": 512
+      },
+      "ms": 1.2045019999999909,
+      "settledPerSecond": 425072,
+      "usPerJob": 2.352542968749982
+    },
+    {
+      "policy": "free",
+      "store": "memory-async",
+      "batch": 1,
+      "workers": 1,
+      "rep": 2,
+      "jobs": 512,
+      "storeCalls": 512,
+      "jobsSent": 512,
+      "ok": 512,
+      "rejected": 0,
+      "outcomes": {
+        "ok": 512
+      },
+      "ms": 1.0770029999999906,
+      "settledPerSecond": 475393,
+      "usPerJob": 2.1035214843749817
+    },
+    {
+      "policy": "free",
+      "store": "memory-async",
+      "batch": 1,
+      "workers": 4,
+      "rep": 0,
+      "jobs": 2048,
+      "storeCalls": 2048,
+      "jobsSent": 2048,
+      "ok": 2048,
+      "rejected": 0,
+      "outcomes": {
+        "ok": 2048
+      },
+      "ms": 3.961332999999996,
+      "settledPerSecond": 516998,
+      "usPerJob": 1.934244628906248
+    },
+    {
+      "policy": "free",
+      "store": "memory-async",
+      "batch": 1,
+      "workers": 4,
+      "rep": 1,
+      "jobs": 2048,
+      "storeCalls": 2048,
+      "jobsSent": 2048,
+      "ok": 2048,
+      "rejected": 0,
+      "outcomes": {
+        "ok": 2048
+      },
+      "ms": 3.3917649999999924,
+      "settledPerSecond": 603815,
+      "usPerJob": 1.6561352539062462
+    },
+    {
+      "policy": "free",
+      "store": "memory-async",
+      "batch": 1,
+      "workers": 4,
+      "rep": 2,
+      "jobs": 2048,
+      "storeCalls": 2048,
+      "jobsSent": 2048,
+      "ok": 2048,
+      "rejected": 0,
+      "outcomes": {
+        "ok": 2048
+      },
+      "ms": 4.051007999999996,
+      "settledPerSecond": 505553,
+      "usPerJob": 1.9780312499999981
+    },
+    {
+      "policy": "free",
+      "store": "memory-async",
+      "batch": 32,
+      "workers": 1,
+      "rep": 0,
+      "jobs": 512,
+      "storeCalls": 16,
+      "jobsSent": 512,
+      "ok": 512,
+      "rejected": 0,
+      "outcomes": {
+        "ok": 512
+      },
+      "ms": 0.5164469999999994,
+      "settledPerSecond": 991389,
+      "usPerJob": 1.008685546874999
+    },
+    {
+      "policy": "free",
+      "store": "memory-async",
+      "batch": 32,
+      "workers": 1,
+      "rep": 1,
+      "jobs": 512,
+      "storeCalls": 16,
+      "jobsSent": 512,
+      "ok": 512,
+      "rejected": 0,
+      "outcomes": {
+        "ok": 512
+      },
+      "ms": 0.4193699999999865,
+      "settledPerSecond": 1220879,
+      "usPerJob": 0.8190820312499736
+    },
+    {
+      "policy": "free",
+      "store": "memory-async",
+      "batch": 32,
+      "workers": 1,
+      "rep": 2,
+      "jobs": 512,
+      "storeCalls": 16,
+      "jobsSent": 512,
+      "ok": 512,
+      "rejected": 0,
+      "outcomes": {
+        "ok": 512
+      },
+      "ms": 0.43135200000000395,
+      "settledPerSecond": 1186966,
+      "usPerJob": 0.8424843750000077
+    },
+    {
+      "policy": "free",
+      "store": "memory-async",
+      "batch": 32,
+      "workers": 4,
+      "rep": 0,
+      "jobs": 2048,
+      "storeCalls": 64,
+      "jobsSent": 2048,
+      "ok": 2048,
+      "rejected": 0,
+      "outcomes": {
+        "ok": 2048
+      },
+      "ms": 1.788330000000002,
+      "settledPerSecond": 1145203,
+      "usPerJob": 0.873208007812501
+    },
+    {
+      "policy": "free",
+      "store": "memory-async",
+      "batch": 32,
+      "workers": 4,
+      "rep": 1,
+      "jobs": 2048,
+      "storeCalls": 64,
+      "jobsSent": 2048,
+      "ok": 2048,
+      "rejected": 0,
+      "outcomes": {
+        "ok": 2048
+      },
+      "ms": 1.9966210000000046,
+      "settledPerSecond": 1025733,
+      "usPerJob": 0.9749125976562523
+    },
+    {
+      "policy": "free",
+      "store": "memory-async",
+      "batch": 32,
+      "workers": 4,
+      "rep": 2,
+      "jobs": 2048,
+      "storeCalls": 64,
+      "jobsSent": 2048,
+      "ok": 2048,
+      "rejected": 0,
+      "outcomes": {
+        "ok": 2048
+      },
+      "ms": 1.7249379999999803,
+      "settledPerSecond": 1187289,
+      "usPerJob": 0.8422548828124904
+    },
+    {
+      "policy": "free",
+      "store": "memory-async",
+      "batch": 128,
+      "workers": 1,
+      "rep": 0,
+      "jobs": 512,
+      "storeCalls": 8,
+      "jobsSent": 512,
+      "ok": 512,
+      "rejected": 0,
+      "outcomes": {
+        "ok": 512
+      },
+      "ms": 0.41121099999998023,
+      "settledPerSecond": 1245103,
+      "usPerJob": 0.8031464843749614
+    },
+    {
+      "policy": "free",
+      "store": "memory-async",
+      "batch": 128,
+      "workers": 1,
+      "rep": 1,
+      "jobs": 512,
+      "storeCalls": 8,
+      "jobsSent": 512,
+      "ok": 512,
+      "rejected": 0,
+      "outcomes": {
+        "ok": 512
+      },
+      "ms": 0.40605200000001673,
+      "settledPerSecond": 1260922,
+      "usPerJob": 0.7930703125000327
+    },
+    {
+      "policy": "free",
+      "store": "memory-async",
+      "batch": 128,
+      "workers": 1,
+      "rep": 2,
+      "jobs": 512,
+      "storeCalls": 8,
+      "jobsSent": 512,
+      "ok": 512,
+      "rejected": 0,
+      "outcomes": {
+        "ok": 512
+      },
+      "ms": 0.4185420000000022,
+      "settledPerSecond": 1223294,
+      "usPerJob": 0.8174648437500043
+    },
+    {
+      "policy": "free",
+      "store": "memory-async",
+      "batch": 128,
+      "workers": 4,
+      "rep": 0,
+      "jobs": 2048,
+      "storeCalls": 32,
+      "jobsSent": 2048,
+      "ok": 2048,
+      "rejected": 0,
+      "outcomes": {
+        "ok": 2048
+      },
+      "ms": 2.2537169999999946,
+      "settledPerSecond": 908721,
+      "usPerJob": 1.1004477539062474
+    },
+    {
+      "policy": "free",
+      "store": "memory-async",
+      "batch": 128,
+      "workers": 4,
+      "rep": 1,
+      "jobs": 2048,
+      "storeCalls": 32,
+      "jobsSent": 2048,
+      "ok": 2048,
+      "rejected": 0,
+      "outcomes": {
+        "ok": 2048
+      },
+      "ms": 1.6955669999999827,
+      "settledPerSecond": 1207856,
+      "usPerJob": 0.8279135742187416
+    },
+    {
+      "policy": "free",
+      "store": "memory-async",
+      "batch": 128,
+      "workers": 4,
+      "rep": 2,
+      "jobs": 2048,
+      "storeCalls": 32,
+      "jobsSent": 2048,
+      "ok": 2048,
+      "rejected": 0,
+      "outcomes": {
+        "ok": 2048
+      },
+      "ms": 1.6697550000000092,
+      "settledPerSecond": 1226527,
+      "usPerJob": 0.8153100585937545
+    },
+    {
+      "policy": "free",
+      "store": "redis",
+      "batch": 1,
+      "workers": 1,
+      "rep": 0,
+      "jobs": 512,
+      "storeCalls": 512,
+      "jobsSent": 512,
+      "ok": 512,
+      "rejected": 0,
+      "outcomes": {
+        "ok": 512
+      },
+      "ms": 43.63174399999997,
+      "settledPerSecond": 11735,
+      "usPerJob": 85.21824999999994
+    },
+    {
+      "policy": "free",
+      "store": "redis",
+      "batch": 1,
+      "workers": 1,
+      "rep": 1,
+      "jobs": 512,
+      "storeCalls": 512,
+      "jobsSent": 512,
+      "ok": 512,
+      "rejected": 0,
+      "outcomes": {
+        "ok": 512
+      },
+      "ms": 25.38074499999999,
+      "settledPerSecond": 20173,
+      "usPerJob": 49.571767578124984
+    },
+    {
+      "policy": "free",
+      "store": "redis",
+      "batch": 1,
+      "workers": 1,
+      "rep": 2,
+      "jobs": 512,
+      "storeCalls": 512,
+      "jobsSent": 512,
+      "ok": 512,
+      "rejected": 0,
+      "outcomes": {
+        "ok": 512
+      },
+      "ms": 21.68335000000002,
+      "settledPerSecond": 23613,
+      "usPerJob": 42.35029296875004
+    },
+    {
+      "policy": "free",
+      "store": "redis",
+      "batch": 1,
+      "workers": 4,
+      "rep": 0,
+      "jobs": 2048,
+      "storeCalls": 2048,
+      "jobsSent": 2048,
+      "ok": 2048,
+      "rejected": 0,
+      "outcomes": {
+        "ok": 2048
+      },
+      "ms": 59.285293999999965,
+      "settledPerSecond": 34545,
+      "usPerJob": 28.947897460937483
+    },
+    {
+      "policy": "free",
+      "store": "redis",
+      "batch": 1,
+      "workers": 4,
+      "rep": 1,
+      "jobs": 2048,
+      "storeCalls": 2048,
+      "jobsSent": 2048,
+      "ok": 2048,
+      "rejected": 0,
+      "outcomes": {
+        "ok": 2048
+      },
+      "ms": 71.58417200000002,
+      "settledPerSecond": 28610,
+      "usPerJob": 34.95320898437501
+    },
+    {
+      "policy": "free",
+      "store": "redis",
+      "batch": 1,
+      "workers": 4,
+      "rep": 2,
+      "jobs": 2048,
+      "storeCalls": 2048,
+      "jobsSent": 2048,
+      "ok": 2048,
+      "rejected": 0,
+      "outcomes": {
+        "ok": 2048
+      },
+      "ms": 65.93411399999997,
+      "settledPerSecond": 31061,
+      "usPerJob": 32.19439160156249
+    },
+    {
+      "policy": "free",
+      "store": "redis",
+      "batch": 32,
+      "workers": 1,
+      "rep": 0,
+      "jobs": 512,
+      "storeCalls": 16,
+      "jobsSent": 512,
+      "ok": 512,
+      "rejected": 0,
+      "outcomes": {
+        "ok": 512
+      },
+      "ms": 2.9440740000000005,
+      "settledPerSecond": 173909,
+      "usPerJob": 5.750144531250001
+    },
+    {
+      "policy": "free",
+      "store": "redis",
+      "batch": 32,
+      "workers": 1,
+      "rep": 1,
+      "jobs": 512,
+      "storeCalls": 16,
+      "jobsSent": 512,
+      "ok": 512,
+      "rejected": 0,
+      "outcomes": {
+        "ok": 512
+      },
+      "ms": 5.063024999999925,
+      "settledPerSecond": 101125,
+      "usPerJob": 9.888720703124854
+    },
+    {
+      "policy": "free",
+      "store": "redis",
+      "batch": 32,
+      "workers": 1,
+      "rep": 2,
+      "jobs": 512,
+      "storeCalls": 16,
+      "jobsSent": 512,
+      "ok": 512,
+      "rejected": 0,
+      "outcomes": {
+        "ok": 512
+      },
+      "ms": 4.416375000000016,
+      "settledPerSecond": 115932,
+      "usPerJob": 8.625732421875032
+    },
+    {
+      "policy": "free",
+      "store": "redis",
+      "batch": 32,
+      "workers": 4,
+      "rep": 0,
+      "jobs": 2048,
+      "storeCalls": 64,
+      "jobsSent": 2048,
+      "ok": 2048,
+      "rejected": 0,
+      "outcomes": {
+        "ok": 2048
+      },
+      "ms": 10.283607999999958,
+      "settledPerSecond": 199152,
+      "usPerJob": 5.02129296874998
+    },
+    {
+      "policy": "free",
+      "store": "redis",
+      "batch": 32,
+      "workers": 4,
+      "rep": 1,
+      "jobs": 2048,
+      "storeCalls": 64,
+      "jobsSent": 2048,
+      "ok": 2048,
+      "rejected": 0,
+      "outcomes": {
+        "ok": 2048
+      },
+      "ms": 6.030095999999958,
+      "settledPerSecond": 339630,
+      "usPerJob": 2.9443828124999794
+    },
+    {
+      "policy": "free",
+      "store": "redis",
+      "batch": 32,
+      "workers": 4,
+      "rep": 2,
+      "jobs": 2048,
+      "storeCalls": 64,
+      "jobsSent": 2048,
+      "ok": 2048,
+      "rejected": 0,
+      "outcomes": {
+        "ok": 2048
+      },
+      "ms": 7.051303000000075,
+      "settledPerSecond": 290443,
+      "usPerJob": 3.443019042968787
+    },
+    {
+      "policy": "free",
+      "store": "redis",
+      "batch": 128,
+      "workers": 1,
+      "rep": 0,
+      "jobs": 512,
+      "storeCalls": 8,
+      "jobsSent": 512,
+      "ok": 512,
+      "rejected": 0,
+      "outcomes": {
+        "ok": 512
+      },
+      "ms": 1.2076569999999265,
+      "settledPerSecond": 423961,
+      "usPerJob": 2.3587050781248564
+    },
+    {
+      "policy": "free",
+      "store": "redis",
+      "batch": 128,
+      "workers": 1,
+      "rep": 1,
+      "jobs": 512,
+      "storeCalls": 8,
+      "jobsSent": 512,
+      "ok": 512,
+      "rejected": 0,
+      "outcomes": {
+        "ok": 512
+      },
+      "ms": 2.273708000000056,
+      "settledPerSecond": 225183,
+      "usPerJob": 4.440835937500109
+    },
+    {
+      "policy": "free",
+      "store": "redis",
+      "batch": 128,
+      "workers": 1,
+      "rep": 2,
+      "jobs": 512,
+      "storeCalls": 8,
+      "jobsSent": 512,
+      "ok": 512,
+      "rejected": 0,
+      "outcomes": {
+        "ok": 512
+      },
+      "ms": 3.6086029999999027,
+      "settledPerSecond": 141883,
+      "usPerJob": 7.04805273437481
+    },
+    {
+      "policy": "free",
+      "store": "redis",
+      "batch": 128,
+      "workers": 4,
+      "rep": 0,
+      "jobs": 2048,
+      "storeCalls": 32,
+      "jobsSent": 2048,
+      "ok": 2048,
+      "rejected": 0,
+      "outcomes": {
+        "ok": 2048
+      },
+      "ms": 4.151384000000007,
+      "settledPerSecond": 493329,
+      "usPerJob": 2.0270429687500036
+    },
+    {
+      "policy": "free",
+      "store": "redis",
+      "batch": 128,
+      "workers": 4,
+      "rep": 1,
+      "jobs": 2048,
+      "storeCalls": 32,
+      "jobsSent": 2048,
+      "ok": 2048,
+      "rejected": 0,
+      "outcomes": {
+        "ok": 2048
+      },
+      "ms": 3.212913999999955,
+      "settledPerSecond": 637428,
+      "usPerJob": 1.5688056640624781
+    },
+    {
+      "policy": "free",
+      "store": "redis",
+      "batch": 128,
+      "workers": 4,
+      "rep": 2,
+      "jobs": 2048,
+      "storeCalls": 32,
+      "jobsSent": 2048,
+      "ok": 2048,
+      "rejected": 0,
+      "outcomes": {
+        "ok": 2048
+      },
+      "ms": 4.249508000000105,
+      "settledPerSecond": 481938,
+      "usPerJob": 2.0749550781250514
+    },
+    {
+      "policy": "free",
+      "store": "valkey",
+      "batch": 1,
+      "workers": 1,
+      "rep": 0,
+      "jobs": 512,
+      "storeCalls": 512,
+      "jobsSent": 512,
+      "ok": 512,
+      "rejected": 0,
+      "outcomes": {
+        "ok": 512
+      },
+      "ms": 34.62096500000007,
+      "settledPerSecond": 14789,
+      "usPerJob": 67.61907226562514
+    },
+    {
+      "policy": "free",
+      "store": "valkey",
+      "batch": 1,
+      "workers": 1,
+      "rep": 1,
+      "jobs": 512,
+      "storeCalls": 512,
+      "jobsSent": 512,
+      "ok": 512,
+      "rejected": 0,
+      "outcomes": {
+        "ok": 512
+      },
+      "ms": 18.63624200000004,
+      "settledPerSecond": 27473,
+      "usPerJob": 36.398910156250075
+    },
+    {
+      "policy": "free",
+      "store": "valkey",
+      "batch": 1,
+      "workers": 1,
+      "rep": 2,
+      "jobs": 512,
+      "storeCalls": 512,
+      "jobsSent": 512,
+      "ok": 512,
+      "rejected": 0,
+      "outcomes": {
+        "ok": 512
+      },
+      "ms": 21.120933000000036,
+      "settledPerSecond": 24241,
+      "usPerJob": 41.25182226562507
+    },
+    {
+      "policy": "free",
+      "store": "valkey",
+      "batch": 1,
+      "workers": 4,
+      "rep": 0,
+      "jobs": 2048,
+      "storeCalls": 2048,
+      "jobsSent": 2048,
+      "ok": 2048,
+      "rejected": 0,
+      "outcomes": {
+        "ok": 2048
+      },
+      "ms": 57.14279099999999,
+      "settledPerSecond": 35840,
+      "usPerJob": 27.901753417968745
+    },
+    {
+      "policy": "free",
+      "store": "valkey",
+      "batch": 1,
+      "workers": 4,
+      "rep": 1,
+      "jobs": 2048,
+      "storeCalls": 2048,
+      "jobsSent": 2048,
+      "ok": 2048,
+      "rejected": 0,
+      "outcomes": {
+        "ok": 2048
+      },
+      "ms": 57.064756999999986,
+      "settledPerSecond": 35889,
+      "usPerJob": 27.863650878906242
+    },
+    {
+      "policy": "free",
+      "store": "valkey",
+      "batch": 1,
+      "workers": 4,
+      "rep": 2,
+      "jobs": 2048,
+      "storeCalls": 2048,
+      "jobsSent": 2048,
+      "ok": 2048,
+      "rejected": 0,
+      "outcomes": {
+        "ok": 2048
+      },
+      "ms": 60.53928700000006,
+      "settledPerSecond": 33829,
+      "usPerJob": 29.560198730468777
+    },
+    {
+      "policy": "free",
+      "store": "valkey",
+      "batch": 32,
+      "workers": 1,
+      "rep": 0,
+      "jobs": 512,
+      "storeCalls": 16,
+      "jobsSent": 512,
+      "ok": 512,
+      "rejected": 0,
+      "outcomes": {
+        "ok": 512
+      },
+      "ms": 1.6096710000000485,
+      "settledPerSecond": 318077,
+      "usPerJob": 3.1438886718750947
+    },
+    {
+      "policy": "free",
+      "store": "valkey",
+      "batch": 32,
+      "workers": 1,
+      "rep": 1,
+      "jobs": 512,
+      "storeCalls": 16,
+      "jobsSent": 512,
+      "ok": 512,
+      "rejected": 0,
+      "outcomes": {
+        "ok": 512
+      },
+      "ms": 1.2313599999999951,
+      "settledPerSecond": 415800,
+      "usPerJob": 2.4049999999999905
+    },
+    {
+      "policy": "free",
+      "store": "valkey",
+      "batch": 32,
+      "workers": 1,
+      "rep": 2,
+      "jobs": 512,
+      "storeCalls": 16,
+      "jobsSent": 512,
+      "ok": 512,
+      "rejected": 0,
+      "outcomes": {
+        "ok": 512
+      },
+      "ms": 1.3078990000000204,
+      "settledPerSecond": 391468,
+      "usPerJob": 2.5544902343750397
+    },
+    {
+      "policy": "free",
+      "store": "valkey",
+      "batch": 32,
+      "workers": 4,
+      "rep": 0,
+      "jobs": 2048,
+      "storeCalls": 64,
+      "jobsSent": 2048,
+      "ok": 2048,
+      "rejected": 0,
+      "outcomes": {
+        "ok": 2048
+      },
+      "ms": 4.482817999999952,
+      "settledPerSecond": 456855,
+      "usPerJob": 2.1888759765624766
+    },
+    {
+      "policy": "free",
+      "store": "valkey",
+      "batch": 32,
+      "workers": 4,
+      "rep": 1,
+      "jobs": 2048,
+      "storeCalls": 64,
+      "jobsSent": 2048,
+      "ok": 2048,
+      "rejected": 0,
+      "outcomes": {
+        "ok": 2048
+      },
+      "ms": 5.788126000000034,
+      "settledPerSecond": 353828,
+      "usPerJob": 2.8262333984375165
+    },
+    {
+      "policy": "free",
+      "store": "valkey",
+      "batch": 32,
+      "workers": 4,
+      "rep": 2,
+      "jobs": 2048,
+      "storeCalls": 64,
+      "jobsSent": 2048,
+      "ok": 2048,
+      "rejected": 0,
+      "outcomes": {
+        "ok": 2048
+      },
+      "ms": 6.294114000000036,
+      "settledPerSecond": 325383,
+      "usPerJob": 3.0732978515625176
+    },
+    {
+      "policy": "free",
+      "store": "valkey",
+      "batch": 128,
+      "workers": 1,
+      "rep": 0,
+      "jobs": 512,
+      "storeCalls": 8,
+      "jobsSent": 512,
+      "ok": 512,
+      "rejected": 0,
+      "outcomes": {
+        "ok": 512
+      },
+      "ms": 2.3913479999999936,
+      "settledPerSecond": 214105,
+      "usPerJob": 4.6706015624999875
+    },
+    {
+      "policy": "free",
+      "store": "valkey",
+      "batch": 128,
+      "workers": 1,
+      "rep": 1,
+      "jobs": 512,
+      "storeCalls": 8,
+      "jobsSent": 512,
+      "ok": 512,
+      "rejected": 0,
+      "outcomes": {
+        "ok": 512
+      },
+      "ms": 2.1802940000000035,
+      "settledPerSecond": 234831,
+      "usPerJob": 4.258386718750007
+    },
+    {
+      "policy": "free",
+      "store": "valkey",
+      "batch": 128,
+      "workers": 1,
+      "rep": 2,
+      "jobs": 512,
+      "storeCalls": 8,
+      "jobsSent": 512,
+      "ok": 512,
+      "rejected": 0,
+      "outcomes": {
+        "ok": 512
+      },
+      "ms": 2.0627339999999776,
+      "settledPerSecond": 248214,
+      "usPerJob": 4.028777343749956
+    },
+    {
+      "policy": "free",
+      "store": "valkey",
+      "batch": 128,
+      "workers": 4,
+      "rep": 0,
+      "jobs": 2048,
+      "storeCalls": 32,
+      "jobsSent": 2048,
+      "ok": 2048,
+      "rejected": 0,
+      "outcomes": {
+        "ok": 2048
+      },
+      "ms": 5.410710999999992,
+      "settledPerSecond": 378508,
+      "usPerJob": 2.641948730468746
+    },
+    {
+      "policy": "free",
+      "store": "valkey",
+      "batch": 128,
+      "workers": 4,
+      "rep": 1,
+      "jobs": 2048,
+      "storeCalls": 32,
+      "jobsSent": 2048,
+      "ok": 2048,
+      "rejected": 0,
+      "outcomes": {
+        "ok": 2048
+      },
+      "ms": 3.175379000000021,
+      "settledPerSecond": 644962,
+      "usPerJob": 1.5504780273437602
+    },
+    {
+      "policy": "free",
+      "store": "valkey",
+      "batch": 128,
+      "workers": 4,
+      "rep": 2,
+      "jobs": 2048,
+      "storeCalls": 32,
+      "jobsSent": 2048,
+      "ok": 2048,
+      "rejected": 0,
+      "outcomes": {
+        "ok": 2048
+      },
+      "ms": 5.573231999999962,
+      "settledPerSecond": 367471,
+      "usPerJob": 2.7213046874999813
+    },
+    {
+      "policy": "limited",
+      "store": "memory",
+      "batch": 1,
+      "workers": 1,
+      "rep": 0,
+      "jobs": 512,
+      "storeCalls": 384,
+      "jobsSent": 384,
+      "ok": 256,
+      "rejected": 256,
+      "outcomes": {
+        "ok": 256,
+        "MAX_WAIT_EXCEEDED": 256
+      },
+      "ms": 4.172290000000089,
+      "settledPerSecond": 122714,
+      "usPerJob": 8.149003906250174
+    },
+    {
+      "policy": "limited",
+      "store": "memory",
+      "batch": 1,
+      "workers": 1,
+      "rep": 1,
+      "jobs": 512,
+      "storeCalls": 384,
+      "jobsSent": 384,
+      "ok": 256,
+      "rejected": 256,
+      "outcomes": {
+        "ok": 256,
+        "MAX_WAIT_EXCEEDED": 256
+      },
+      "ms": 3.383316000000036,
+      "settledPerSecond": 151331,
+      "usPerJob": 6.608039062500071
+    },
+    {
+      "policy": "limited",
+      "store": "memory",
+      "batch": 1,
+      "workers": 1,
+      "rep": 2,
+      "jobs": 512,
+      "storeCalls": 384,
+      "jobsSent": 384,
+      "ok": 256,
+      "rejected": 256,
+      "outcomes": {
+        "ok": 256,
+        "MAX_WAIT_EXCEEDED": 256
+      },
+      "ms": 3.4171739999999318,
+      "settledPerSecond": 149831,
+      "usPerJob": 6.674167968749867
+    },
+    {
+      "policy": "limited",
+      "store": "memory",
+      "batch": 1,
+      "workers": 4,
+      "rep": 0,
+      "jobs": 2048,
+      "storeCalls": 1152,
+      "jobsSent": 1152,
+      "ok": 256,
+      "rejected": 1792,
+      "outcomes": {
+        "ok": 256,
+        "MAX_WAIT_EXCEEDED": 1792
+      },
+      "ms": 13.518237999999997,
+      "settledPerSecond": 151499,
+      "usPerJob": 6.600702148437499
+    },
+    {
+      "policy": "limited",
+      "store": "memory",
+      "batch": 1,
+      "workers": 4,
+      "rep": 1,
+      "jobs": 2048,
+      "storeCalls": 1152,
+      "jobsSent": 1152,
+      "ok": 256,
+      "rejected": 1792,
+      "outcomes": {
+        "ok": 256,
+        "MAX_WAIT_EXCEEDED": 1792
+      },
+      "ms": 11.918690999999967,
+      "settledPerSecond": 171831,
+      "usPerJob": 5.8196733398437335
+    },
+    {
+      "policy": "limited",
+      "store": "memory",
+      "batch": 1,
+      "workers": 4,
+      "rep": 2,
+      "jobs": 2048,
+      "storeCalls": 1152,
+      "jobsSent": 1152,
+      "ok": 256,
+      "rejected": 1792,
+      "outcomes": {
+        "ok": 256,
+        "MAX_WAIT_EXCEEDED": 1792
+      },
+      "ms": 13.177534000000037,
+      "settledPerSecond": 155416,
+      "usPerJob": 6.434342773437518
+    },
+    {
+      "policy": "limited",
+      "store": "memory",
+      "batch": 32,
+      "workers": 1,
+      "rep": 0,
+      "jobs": 512,
+      "storeCalls": 16,
+      "jobsSent": 505,
+      "ok": 256,
+      "rejected": 256,
+      "outcomes": {
+        "ok": 256,
+        "MAX_WAIT_EXCEEDED": 256
+      },
+      "ms": 3.0544170000000577,
+      "settledPerSecond": 167626,
+      "usPerJob": 5.965658203125113
+    },
+    {
+      "policy": "limited",
+      "store": "memory",
+      "batch": 32,
+      "workers": 1,
+      "rep": 1,
+      "jobs": 512,
+      "storeCalls": 16,
+      "jobsSent": 505,
+      "ok": 256,
+      "rejected": 256,
+      "outcomes": {
+        "ok": 256,
+        "MAX_WAIT_EXCEEDED": 256
+      },
+      "ms": 2.9459840000000668,
+      "settledPerSecond": 173796,
+      "usPerJob": 5.75387500000013
+    },
+    {
+      "policy": "limited",
+      "store": "memory",
+      "batch": 32,
+      "workers": 1,
+      "rep": 2,
+      "jobs": 512,
+      "storeCalls": 16,
+      "jobsSent": 505,
+      "ok": 256,
+      "rejected": 256,
+      "outcomes": {
+        "ok": 256,
+        "MAX_WAIT_EXCEEDED": 256
+      },
+      "ms": 2.89516500000002,
+      "settledPerSecond": 176847,
+      "usPerJob": 5.654619140625039
+    },
+    {
+      "policy": "limited",
+      "store": "memory",
+      "batch": 32,
+      "workers": 4,
+      "rep": 0,
+      "jobs": 2048,
+      "storeCalls": 64,
+      "jobsSent": 1996,
+      "ok": 256,
+      "rejected": 1792,
+      "outcomes": {
+        "ok": 256,
+        "MAX_WAIT_EXCEEDED": 1792
+      },
+      "ms": 12.634386999999947,
+      "settledPerSecond": 162097,
+      "usPerJob": 6.1691342773437245
+    },
+    {
+      "policy": "limited",
+      "store": "memory",
+      "batch": 32,
+      "workers": 4,
+      "rep": 1,
+      "jobs": 2048,
+      "storeCalls": 64,
+      "jobsSent": 1996,
+      "ok": 256,
+      "rejected": 1792,
+      "outcomes": {
+        "ok": 256,
+        "MAX_WAIT_EXCEEDED": 1792
+      },
+      "ms": 12.59588000000008,
+      "settledPerSecond": 162593,
+      "usPerJob": 6.150332031250039
+    },
+    {
+      "policy": "limited",
+      "store": "memory",
+      "batch": 32,
+      "workers": 4,
+      "rep": 2,
+      "jobs": 2048,
+      "storeCalls": 64,
+      "jobsSent": 1996,
+      "ok": 256,
+      "rejected": 1792,
+      "outcomes": {
+        "ok": 256,
+        "MAX_WAIT_EXCEEDED": 1792
+      },
+      "ms": 12.776257999999984,
+      "settledPerSecond": 160297,
+      "usPerJob": 6.238407226562492
+    },
+    {
+      "policy": "limited",
+      "store": "memory",
+      "batch": 128,
+      "workers": 1,
+      "rep": 0,
+      "jobs": 512,
+      "storeCalls": 8,
+      "jobsSent": 509,
+      "ok": 256,
+      "rejected": 256,
+      "outcomes": {
+        "ok": 256,
+        "MAX_WAIT_EXCEEDED": 256
+      },
+      "ms": 2.9498289999999088,
+      "settledPerSecond": 173569,
+      "usPerJob": 5.761384765624822
+    },
+    {
+      "policy": "limited",
+      "store": "memory",
+      "batch": 128,
+      "workers": 1,
+      "rep": 1,
+      "jobs": 512,
+      "storeCalls": 8,
+      "jobsSent": 509,
+      "ok": 256,
+      "rejected": 256,
+      "outcomes": {
+        "ok": 256,
+        "MAX_WAIT_EXCEEDED": 256
+      },
+      "ms": 2.8735340000000633,
+      "settledPerSecond": 178178,
+      "usPerJob": 5.612371093750124
+    },
+    {
+      "policy": "limited",
+      "store": "memory",
+      "batch": 128,
+      "workers": 1,
+      "rep": 2,
+      "jobs": 512,
+      "storeCalls": 8,
+      "jobsSent": 509,
+      "ok": 256,
+      "rejected": 256,
+      "outcomes": {
+        "ok": 256,
+        "MAX_WAIT_EXCEEDED": 256
+      },
+      "ms": 2.8870470000000523,
+      "settledPerSecond": 177344,
+      "usPerJob": 5.638763671875102
+    },
+    {
+      "policy": "limited",
+      "store": "memory",
+      "batch": 128,
+      "workers": 4,
+      "rep": 0,
+      "jobs": 2048,
+      "storeCalls": 32,
+      "jobsSent": 2024,
+      "ok": 256,
+      "rejected": 1792,
+      "outcomes": {
+        "ok": 256,
+        "MAX_WAIT_EXCEEDED": 1792
+      },
+      "ms": 12.529579000000012,
+      "settledPerSecond": 163453,
+      "usPerJob": 6.117958496093756
+    },
+    {
+      "policy": "limited",
+      "store": "memory",
+      "batch": 128,
+      "workers": 4,
+      "rep": 1,
+      "jobs": 2048,
+      "storeCalls": 32,
+      "jobsSent": 2024,
+      "ok": 256,
+      "rejected": 1792,
+      "outcomes": {
+        "ok": 256,
+        "MAX_WAIT_EXCEEDED": 1792
+      },
+      "ms": 12.998618000000079,
+      "settledPerSecond": 157555,
+      "usPerJob": 6.346981445312538
+    },
+    {
+      "policy": "limited",
+      "store": "memory",
+      "batch": 128,
+      "workers": 4,
+      "rep": 2,
+      "jobs": 2048,
+      "storeCalls": 32,
+      "jobsSent": 2024,
+      "ok": 256,
+      "rejected": 1792,
+      "outcomes": {
+        "ok": 256,
+        "MAX_WAIT_EXCEEDED": 1792
+      },
+      "ms": 13.127566999999999,
+      "settledPerSecond": 156008,
+      "usPerJob": 6.40994482421875
+    },
+    {
+      "policy": "limited",
+      "store": "memory-async",
+      "batch": 1,
+      "workers": 1,
+      "rep": 0,
+      "jobs": 512,
+      "storeCalls": 384,
+      "jobsSent": 384,
+      "ok": 256,
+      "rejected": 256,
+      "outcomes": {
+        "ok": 256,
+        "MAX_WAIT_EXCEEDED": 256
+      },
+      "ms": 3.6505140000001575,
+      "settledPerSecond": 140254,
+      "usPerJob": 7.1299101562503076
+    },
+    {
+      "policy": "limited",
+      "store": "memory-async",
+      "batch": 1,
+      "workers": 1,
+      "rep": 1,
+      "jobs": 512,
+      "storeCalls": 384,
+      "jobsSent": 384,
+      "ok": 256,
+      "rejected": 256,
+      "outcomes": {
+        "ok": 256,
+        "MAX_WAIT_EXCEEDED": 256
+      },
+      "ms": 3.3166839999998956,
+      "settledPerSecond": 154371,
+      "usPerJob": 6.477898437499796
+    },
+    {
+      "policy": "limited",
+      "store": "memory-async",
+      "batch": 1,
+      "workers": 1,
+      "rep": 2,
+      "jobs": 512,
+      "storeCalls": 384,
+      "jobsSent": 384,
+      "ok": 256,
+      "rejected": 256,
+      "outcomes": {
+        "ok": 256,
+        "MAX_WAIT_EXCEEDED": 256
+      },
+      "ms": 1.9824980000000778,
+      "settledPerSecond": 258260,
+      "usPerJob": 3.872066406250152
+    },
+    {
+      "policy": "limited",
+      "store": "memory-async",
+      "batch": 1,
+      "workers": 4,
+      "rep": 0,
+      "jobs": 2048,
+      "storeCalls": 1152,
+      "jobsSent": 1152,
+      "ok": 256,
+      "rejected": 1792,
+      "outcomes": {
+        "ok": 256,
+        "MAX_WAIT_EXCEEDED": 1792
+      },
+      "ms": 11.555221000000074,
+      "settledPerSecond": 177236,
+      "usPerJob": 5.642197753906286
+    },
+    {
+      "policy": "limited",
+      "store": "memory-async",
+      "batch": 1,
+      "workers": 4,
+      "rep": 1,
+      "jobs": 2048,
+      "storeCalls": 1152,
+      "jobsSent": 1152,
+      "ok": 256,
+      "rejected": 1792,
+      "outcomes": {
+        "ok": 256,
+        "MAX_WAIT_EXCEEDED": 1792
+      },
+      "ms": 13.120791999999938,
+      "settledPerSecond": 156088,
+      "usPerJob": 6.4066367187499695
+    },
+    {
+      "policy": "limited",
+      "store": "memory-async",
+      "batch": 1,
+      "workers": 4,
+      "rep": 2,
+      "jobs": 2048,
+      "storeCalls": 1152,
+      "jobsSent": 1152,
+      "ok": 256,
+      "rejected": 1792,
+      "outcomes": {
+        "ok": 256,
+        "MAX_WAIT_EXCEEDED": 1792
+      },
+      "ms": 11.758880999999974,
+      "settledPerSecond": 174166,
+      "usPerJob": 5.741641113281237
+    },
+    {
+      "policy": "limited",
+      "store": "memory-async",
+      "batch": 32,
+      "workers": 1,
+      "rep": 0,
+      "jobs": 512,
+      "storeCalls": 16,
+      "jobsSent": 505,
+      "ok": 256,
+      "rejected": 256,
+      "outcomes": {
+        "ok": 256,
+        "MAX_WAIT_EXCEEDED": 256
+      },
+      "ms": 3.5085750000000644,
+      "settledPerSecond": 145928,
+      "usPerJob": 6.852685546875126
+    },
+    {
+      "policy": "limited",
+      "store": "memory-async",
+      "batch": 32,
+      "workers": 1,
+      "rep": 1,
+      "jobs": 512,
+      "storeCalls": 16,
+      "jobsSent": 505,
+      "ok": 256,
+      "rejected": 256,
+      "outcomes": {
+        "ok": 256,
+        "MAX_WAIT_EXCEEDED": 256
+      },
+      "ms": 2.928666000000021,
+      "settledPerSecond": 174824,
+      "usPerJob": 5.720050781250041
+    },
+    {
+      "policy": "limited",
+      "store": "memory-async",
+      "batch": 32,
+      "workers": 1,
+      "rep": 2,
+      "jobs": 512,
+      "storeCalls": 16,
+      "jobsSent": 505,
+      "ok": 256,
+      "rejected": 256,
+      "outcomes": {
+        "ok": 256,
+        "MAX_WAIT_EXCEEDED": 256
+      },
+      "ms": 2.957640999999967,
+      "settledPerSecond": 173111,
+      "usPerJob": 5.776642578124935
+    },
+    {
+      "policy": "limited",
+      "store": "memory-async",
+      "batch": 32,
+      "workers": 4,
+      "rep": 0,
+      "jobs": 2048,
+      "storeCalls": 64,
+      "jobsSent": 1996,
+      "ok": 256,
+      "rejected": 1792,
+      "outcomes": {
+        "ok": 256,
+        "MAX_WAIT_EXCEEDED": 1792
+      },
+      "ms": 12.081267000000025,
+      "settledPerSecond": 169519,
+      "usPerJob": 5.899056152343762
+    },
+    {
+      "policy": "limited",
+      "store": "memory-async",
+      "batch": 32,
+      "workers": 4,
+      "rep": 1,
+      "jobs": 2048,
+      "storeCalls": 64,
+      "jobsSent": 1996,
+      "ok": 256,
+      "rejected": 1792,
+      "outcomes": {
+        "ok": 256,
+        "MAX_WAIT_EXCEEDED": 1792
+      },
+      "ms": 12.146775999999818,
+      "settledPerSecond": 168604,
+      "usPerJob": 5.931042968749911
+    },
+    {
+      "policy": "limited",
+      "store": "memory-async",
+      "batch": 32,
+      "workers": 4,
+      "rep": 2,
+      "jobs": 2048,
+      "storeCalls": 64,
+      "jobsSent": 1996,
+      "ok": 256,
+      "rejected": 1792,
+      "outcomes": {
+        "ok": 256,
+        "MAX_WAIT_EXCEEDED": 1792
+      },
+      "ms": 12.459660999999869,
+      "settledPerSecond": 164370,
+      "usPerJob": 6.083818847656186
+    },
+    {
+      "policy": "limited",
+      "store": "memory-async",
+      "batch": 128,
+      "workers": 1,
+      "rep": 0,
+      "jobs": 512,
+      "storeCalls": 8,
+      "jobsSent": 509,
+      "ok": 256,
+      "rejected": 256,
+      "outcomes": {
+        "ok": 256,
+        "MAX_WAIT_EXCEEDED": 256
+      },
+      "ms": 2.8934690000000955,
+      "settledPerSecond": 176950,
+      "usPerJob": 5.651306640625187
+    },
+    {
+      "policy": "limited",
+      "store": "memory-async",
+      "batch": 128,
+      "workers": 1,
+      "rep": 1,
+      "jobs": 512,
+      "storeCalls": 8,
+      "jobsSent": 509,
+      "ok": 256,
+      "rejected": 256,
+      "outcomes": {
+        "ok": 256,
+        "MAX_WAIT_EXCEEDED": 256
+      },
+      "ms": 2.8867279999999482,
+      "settledPerSecond": 177363,
+      "usPerJob": 5.638140624999899
+    },
+    {
+      "policy": "limited",
+      "store": "memory-async",
+      "batch": 128,
+      "workers": 1,
+      "rep": 2,
+      "jobs": 512,
+      "storeCalls": 8,
+      "jobsSent": 509,
+      "ok": 256,
+      "rejected": 256,
+      "outcomes": {
+        "ok": 256,
+        "MAX_WAIT_EXCEEDED": 256
+      },
+      "ms": 1.6828660000001037,
+      "settledPerSecond": 304243,
+      "usPerJob": 3.2868476562502025
+    },
+    {
+      "policy": "limited",
+      "store": "memory-async",
+      "batch": 128,
+      "workers": 4,
+      "rep": 0,
+      "jobs": 2048,
+      "storeCalls": 32,
+      "jobsSent": 2024,
+      "ok": 256,
+      "rejected": 1792,
+      "outcomes": {
+        "ok": 256,
+        "MAX_WAIT_EXCEEDED": 1792
+      },
+      "ms": 11.646652000000131,
+      "settledPerSecond": 175845,
+      "usPerJob": 5.686841796875064
+    },
+    {
+      "policy": "limited",
+      "store": "memory-async",
+      "batch": 128,
+      "workers": 4,
+      "rep": 1,
+      "jobs": 2048,
+      "storeCalls": 32,
+      "jobsSent": 2024,
+      "ok": 256,
+      "rejected": 1792,
+      "outcomes": {
+        "ok": 256,
+        "MAX_WAIT_EXCEEDED": 1792
+      },
+      "ms": 12.783361000000014,
+      "settledPerSecond": 160208,
+      "usPerJob": 6.241875488281257
+    },
+    {
+      "policy": "limited",
+      "store": "memory-async",
+      "batch": 128,
+      "workers": 4,
+      "rep": 2,
+      "jobs": 2048,
+      "storeCalls": 32,
+      "jobsSent": 2024,
+      "ok": 256,
+      "rejected": 1792,
+      "outcomes": {
+        "ok": 256,
+        "MAX_WAIT_EXCEEDED": 1792
+      },
+      "ms": 12.413708000000042,
+      "settledPerSecond": 164979,
+      "usPerJob": 6.061380859375021
+    },
+    {
+      "policy": "limited",
+      "store": "redis",
+      "batch": 1,
+      "workers": 1,
+      "rep": 0,
+      "jobs": 512,
+      "storeCalls": 257,
+      "jobsSent": 257,
+      "ok": 256,
+      "rejected": 256,
+      "outcomes": {
+        "ok": 256,
+        "MAX_WAIT_EXCEEDED": 256
+      },
+      "ms": 13.843705999999884,
+      "settledPerSecond": 36984,
+      "usPerJob": 27.038488281249773
+    },
+    {
+      "policy": "limited",
+      "store": "redis",
+      "batch": 1,
+      "workers": 1,
+      "rep": 1,
+      "jobs": 512,
+      "storeCalls": 257,
+      "jobsSent": 257,
+      "ok": 256,
+      "rejected": 256,
+      "outcomes": {
+        "ok": 256,
+        "MAX_WAIT_EXCEEDED": 256
+      },
+      "ms": 15.771921999999904,
+      "settledPerSecond": 32463,
+      "usPerJob": 30.804535156249813
+    },
+    {
+      "policy": "limited",
+      "store": "redis",
+      "batch": 1,
+      "workers": 1,
+      "rep": 2,
+      "jobs": 512,
+      "storeCalls": 257,
+      "jobsSent": 257,
+      "ok": 256,
+      "rejected": 256,
+      "outcomes": {
+        "ok": 256,
+        "MAX_WAIT_EXCEEDED": 256
+      },
+      "ms": 14.529371000000083,
+      "settledPerSecond": 35239,
+      "usPerJob": 28.377677734375162
+    },
+    {
+      "policy": "limited",
+      "store": "redis",
+      "batch": 1,
+      "workers": 4,
+      "rep": 0,
+      "jobs": 2048,
+      "storeCalls": 260,
+      "jobsSent": 260,
+      "ok": 256,
+      "rejected": 1792,
+      "outcomes": {
+        "ok": 256,
+        "MAX_WAIT_EXCEEDED": 1792
+      },
+      "ms": 15.457928999999922,
+      "settledPerSecond": 132489,
+      "usPerJob": 7.547816894531212
+    },
+    {
+      "policy": "limited",
+      "store": "redis",
+      "batch": 1,
+      "workers": 4,
+      "rep": 1,
+      "jobs": 2048,
+      "storeCalls": 260,
+      "jobsSent": 260,
+      "ok": 256,
+      "rejected": 1792,
+      "outcomes": {
+        "ok": 256,
+        "MAX_WAIT_EXCEEDED": 1792
+      },
+      "ms": 15.83158000000003,
+      "settledPerSecond": 129362,
+      "usPerJob": 7.730263671875015
+    },
+    {
+      "policy": "limited",
+      "store": "redis",
+      "batch": 1,
+      "workers": 4,
+      "rep": 2,
+      "jobs": 2048,
+      "storeCalls": 260,
+      "jobsSent": 260,
+      "ok": 256,
+      "rejected": 1792,
+      "outcomes": {
+        "ok": 256,
+        "MAX_WAIT_EXCEEDED": 1792
+      },
+      "ms": 21.306846999999834,
+      "settledPerSecond": 96119,
+      "usPerJob": 10.403733886718669
+    },
+    {
+      "policy": "limited",
+      "store": "redis",
+      "batch": 32,
+      "workers": 1,
+      "rep": 0,
+      "jobs": 512,
+      "storeCalls": 10,
+      "jobsSent": 320,
+      "ok": 256,
+      "rejected": 256,
+      "outcomes": {
+        "ok": 256,
+        "MAX_WAIT_EXCEEDED": 256
+      },
+      "ms": 3.356939000000011,
+      "settledPerSecond": 152520,
+      "usPerJob": 6.556521484375022
+    },
+    {
+      "policy": "limited",
+      "store": "redis",
+      "batch": 32,
+      "workers": 1,
+      "rep": 1,
+      "jobs": 512,
+      "storeCalls": 9,
+      "jobsSent": 288,
+      "ok": 256,
+      "rejected": 256,
+      "outcomes": {
+        "ok": 256,
+        "MAX_WAIT_EXCEEDED": 256
+      },
+      "ms": 4.226012999999966,
+      "settledPerSecond": 121154,
+      "usPerJob": 8.253931640624934
+    },
+    {
+      "policy": "limited",
+      "store": "redis",
+      "batch": 32,
+      "workers": 1,
+      "rep": 2,
+      "jobs": 512,
+      "storeCalls": 10,
+      "jobsSent": 320,
+      "ok": 256,
+      "rejected": 256,
+      "outcomes": {
+        "ok": 256,
+        "MAX_WAIT_EXCEEDED": 256
+      },
+      "ms": 4.452751000000035,
+      "settledPerSecond": 114985,
+      "usPerJob": 8.696779296875068
+    },
+    {
+      "policy": "limited",
+      "store": "redis",
+      "batch": 32,
+      "workers": 4,
+      "rep": 0,
+      "jobs": 2048,
+      "storeCalls": 12,
+      "jobsSent": 384,
+      "ok": 256,
+      "rejected": 1792,
+      "outcomes": {
+        "ok": 256,
+        "MAX_WAIT_EXCEEDED": 1792
+      },
+      "ms": 10.702027000000044,
+      "settledPerSecond": 191366,
+      "usPerJob": 5.225599121093771
+    },
+    {
+      "policy": "limited",
+      "store": "redis",
+      "batch": 32,
+      "workers": 4,
+      "rep": 1,
+      "jobs": 2048,
+      "storeCalls": 12,
+      "jobsSent": 384,
+      "ok": 256,
+      "rejected": 1792,
+      "outcomes": {
+        "ok": 256,
+        "MAX_WAIT_EXCEEDED": 1792
+      },
+      "ms": 12.272697999999991,
+      "settledPerSecond": 166874,
+      "usPerJob": 5.992528320312496
+    },
+    {
+      "policy": "limited",
+      "store": "redis",
+      "batch": 32,
+      "workers": 4,
+      "rep": 2,
+      "jobs": 2048,
+      "storeCalls": 12,
+      "jobsSent": 384,
+      "ok": 256,
+      "rejected": 1792,
+      "outcomes": {
+        "ok": 256,
+        "MAX_WAIT_EXCEEDED": 1792
+      },
+      "ms": 10.259808000000021,
+      "settledPerSecond": 199614,
+      "usPerJob": 5.00967187500001
+    },
+    {
+      "policy": "limited",
+      "store": "redis",
+      "batch": 128,
+      "workers": 1,
+      "rep": 0,
+      "jobs": 512,
+      "storeCalls": 5,
+      "jobsSent": 320,
+      "ok": 256,
+      "rejected": 256,
+      "outcomes": {
+        "ok": 256,
+        "MAX_WAIT_EXCEEDED": 256
+      },
+      "ms": 3.4809409999998024,
+      "settledPerSecond": 147087,
+      "usPerJob": 6.798712890624614
+    },
+    {
+      "policy": "limited",
+      "store": "redis",
+      "batch": 128,
+      "workers": 1,
+      "rep": 1,
+      "jobs": 512,
+      "storeCalls": 5,
+      "jobsSent": 320,
+      "ok": 256,
+      "rejected": 256,
+      "outcomes": {
+        "ok": 256,
+        "MAX_WAIT_EXCEEDED": 256
+      },
+      "ms": 2.190405999999939,
+      "settledPerSecond": 233747,
+      "usPerJob": 4.278136718749881
+    },
+    {
+      "policy": "limited",
+      "store": "redis",
+      "batch": 128,
+      "workers": 1,
+      "rep": 2,
+      "jobs": 512,
+      "storeCalls": 6,
+      "jobsSent": 384,
+      "ok": 256,
+      "rejected": 256,
+      "outcomes": {
+        "ok": 256,
+        "MAX_WAIT_EXCEEDED": 256
+      },
+      "ms": 4.25278400000002,
+      "settledPerSecond": 120392,
+      "usPerJob": 8.306218750000038
+    },
+    {
+      "policy": "limited",
+      "store": "redis",
+      "batch": 128,
+      "workers": 4,
+      "rep": 0,
+      "jobs": 2048,
+      "storeCalls": 10,
+      "jobsSent": 640,
+      "ok": 256,
+      "rejected": 1792,
+      "outcomes": {
+        "ok": 256,
+        "MAX_WAIT_EXCEEDED": 1792
+      },
+      "ms": 9.568883000000142,
+      "settledPerSecond": 214027,
+      "usPerJob": 4.672306152343819
+    },
+    {
+      "policy": "limited",
+      "store": "redis",
+      "batch": 128,
+      "workers": 4,
+      "rep": 1,
+      "jobs": 2048,
+      "storeCalls": 8,
+      "jobsSent": 512,
+      "ok": 256,
+      "rejected": 1792,
+      "outcomes": {
+        "ok": 256,
+        "MAX_WAIT_EXCEEDED": 1792
+      },
+      "ms": 9.804018000000042,
+      "settledPerSecond": 208894,
+      "usPerJob": 4.78711816406252
+    },
+    {
+      "policy": "limited",
+      "store": "redis",
+      "batch": 128,
+      "workers": 4,
+      "rep": 2,
+      "jobs": 2048,
+      "storeCalls": 8,
+      "jobsSent": 512,
+      "ok": 256,
+      "rejected": 1792,
+      "outcomes": {
+        "ok": 256,
+        "MAX_WAIT_EXCEEDED": 1792
+      },
+      "ms": 9.68375600000013,
+      "settledPerSecond": 211488,
+      "usPerJob": 4.728396484375064
+    },
+    {
+      "policy": "limited",
+      "store": "valkey",
+      "batch": 1,
+      "workers": 1,
+      "rep": 0,
+      "jobs": 512,
+      "storeCalls": 257,
+      "jobsSent": 257,
+      "ok": 256,
+      "rejected": 256,
+      "outcomes": {
+        "ok": 256,
+        "MAX_WAIT_EXCEEDED": 256
+      },
+      "ms": 12.4057600000001,
+      "settledPerSecond": 41271,
+      "usPerJob": 24.230000000000196
+    },
+    {
+      "policy": "limited",
+      "store": "valkey",
+      "batch": 1,
+      "workers": 1,
+      "rep": 1,
+      "jobs": 512,
+      "storeCalls": 257,
+      "jobsSent": 257,
+      "ok": 256,
+      "rejected": 256,
+      "outcomes": {
+        "ok": 256,
+        "MAX_WAIT_EXCEEDED": 256
+      },
+      "ms": 10.750349000000142,
+      "settledPerSecond": 47626,
+      "usPerJob": 20.996775390625277
+    },
+    {
+      "policy": "limited",
+      "store": "valkey",
+      "batch": 1,
+      "workers": 1,
+      "rep": 2,
+      "jobs": 512,
+      "storeCalls": 257,
+      "jobsSent": 257,
+      "ok": 256,
+      "rejected": 256,
+      "outcomes": {
+        "ok": 256,
+        "MAX_WAIT_EXCEEDED": 256
+      },
+      "ms": 18.02900499999987,
+      "settledPerSecond": 28399,
+      "usPerJob": 35.212900390624746
+    },
+    {
+      "policy": "limited",
+      "store": "valkey",
+      "batch": 1,
+      "workers": 4,
+      "rep": 0,
+      "jobs": 2048,
+      "storeCalls": 260,
+      "jobsSent": 260,
+      "ok": 256,
+      "rejected": 1792,
+      "outcomes": {
+        "ok": 256,
+        "MAX_WAIT_EXCEEDED": 1792
+      },
+      "ms": 18.904902999999877,
+      "settledPerSecond": 108332,
+      "usPerJob": 9.230909667968689
+    },
+    {
+      "policy": "limited",
+      "store": "valkey",
+      "batch": 1,
+      "workers": 4,
+      "rep": 1,
+      "jobs": 2048,
+      "storeCalls": 260,
+      "jobsSent": 260,
+      "ok": 256,
+      "rejected": 1792,
+      "outcomes": {
+        "ok": 256,
+        "MAX_WAIT_EXCEEDED": 1792
+      },
+      "ms": 25.09666500000003,
+      "settledPerSecond": 81604,
+      "usPerJob": 12.254230957031265
+    },
+    {
+      "policy": "limited",
+      "store": "valkey",
+      "batch": 1,
+      "workers": 4,
+      "rep": 2,
+      "jobs": 2048,
+      "storeCalls": 260,
+      "jobsSent": 260,
+      "ok": 256,
+      "rejected": 1792,
+      "outcomes": {
+        "ok": 256,
+        "MAX_WAIT_EXCEEDED": 1792
+      },
+      "ms": 21.431360999999924,
+      "settledPerSecond": 95561,
+      "usPerJob": 10.464531738281213
+    },
+    {
+      "policy": "limited",
+      "store": "valkey",
+      "batch": 32,
+      "workers": 1,
+      "rep": 0,
+      "jobs": 512,
+      "storeCalls": 9,
+      "jobsSent": 288,
+      "ok": 256,
+      "rejected": 256,
+      "outcomes": {
+        "ok": 256,
+        "MAX_WAIT_EXCEEDED": 256
+      },
+      "ms": 3.8310500000000047,
+      "settledPerSecond": 133645,
+      "usPerJob": 7.482519531250009
+    },
+    {
+      "policy": "limited",
+      "store": "valkey",
+      "batch": 32,
+      "workers": 1,
+      "rep": 1,
+      "jobs": 512,
+      "storeCalls": 9,
+      "jobsSent": 288,
+      "ok": 256,
+      "rejected": 256,
+      "outcomes": {
+        "ok": 256,
+        "MAX_WAIT_EXCEEDED": 256
+      },
+      "ms": 5.195238000000018,
+      "settledPerSecond": 98552,
+      "usPerJob": 10.146949218750034
+    },
+    {
+      "policy": "limited",
+      "store": "valkey",
+      "batch": 32,
+      "workers": 1,
+      "rep": 2,
+      "jobs": 512,
+      "storeCalls": 9,
+      "jobsSent": 288,
+      "ok": 256,
+      "rejected": 256,
+      "outcomes": {
+        "ok": 256,
+        "MAX_WAIT_EXCEEDED": 256
+      },
+      "ms": 4.753169999999955,
+      "settledPerSecond": 107718,
+      "usPerJob": 9.283535156249911
+    },
+    {
+      "policy": "limited",
+      "store": "valkey",
+      "batch": 32,
+      "workers": 4,
+      "rep": 0,
+      "jobs": 2048,
+      "storeCalls": 12,
+      "jobsSent": 384,
+      "ok": 256,
+      "rejected": 1792,
+      "outcomes": {
+        "ok": 256,
+        "MAX_WAIT_EXCEEDED": 1792
+      },
+      "ms": 12.923667000000023,
+      "settledPerSecond": 158469,
+      "usPerJob": 6.310384277343761
+    },
+    {
+      "policy": "limited",
+      "store": "valkey",
+      "batch": 32,
+      "workers": 4,
+      "rep": 1,
+      "jobs": 2048,
+      "storeCalls": 12,
+      "jobsSent": 384,
+      "ok": 256,
+      "rejected": 1792,
+      "outcomes": {
+        "ok": 256,
+        "MAX_WAIT_EXCEEDED": 1792
+      },
+      "ms": 10.968347999999878,
+      "settledPerSecond": 186719,
+      "usPerJob": 5.3556386718749405
+    },
+    {
+      "policy": "limited",
+      "store": "valkey",
+      "batch": 32,
+      "workers": 4,
+      "rep": 2,
+      "jobs": 2048,
+      "storeCalls": 12,
+      "jobsSent": 384,
+      "ok": 256,
+      "rejected": 1792,
+      "outcomes": {
+        "ok": 256,
+        "MAX_WAIT_EXCEEDED": 1792
+      },
+      "ms": 10.811964999999873,
+      "settledPerSecond": 189420,
+      "usPerJob": 5.279279785156188
+    },
+    {
+      "policy": "limited",
+      "store": "valkey",
+      "batch": 128,
+      "workers": 1,
+      "rep": 0,
+      "jobs": 512,
+      "storeCalls": 5,
+      "jobsSent": 320,
+      "ok": 256,
+      "rejected": 256,
+      "outcomes": {
+        "ok": 256,
+        "MAX_WAIT_EXCEEDED": 256
+      },
+      "ms": 4.200887000000193,
+      "settledPerSecond": 121879,
+      "usPerJob": 8.204857421875378
+    },
+    {
+      "policy": "limited",
+      "store": "valkey",
+      "batch": 128,
+      "workers": 1,
+      "rep": 1,
+      "jobs": 512,
+      "storeCalls": 5,
+      "jobsSent": 320,
+      "ok": 256,
+      "rejected": 256,
+      "outcomes": {
+        "ok": 256,
+        "MAX_WAIT_EXCEEDED": 256
+      },
+      "ms": 4.323912999999948,
+      "settledPerSecond": 118411,
+      "usPerJob": 8.445142578124898
+    },
+    {
+      "policy": "limited",
+      "store": "valkey",
+      "batch": 128,
+      "workers": 1,
+      "rep": 2,
+      "jobs": 512,
+      "storeCalls": 5,
+      "jobsSent": 320,
+      "ok": 256,
+      "rejected": 256,
+      "outcomes": {
+        "ok": 256,
+        "MAX_WAIT_EXCEEDED": 256
+      },
+      "ms": 4.2761370000000625,
+      "settledPerSecond": 119734,
+      "usPerJob": 8.351830078125122
+    },
+    {
+      "policy": "limited",
+      "store": "valkey",
+      "batch": 128,
+      "workers": 4,
+      "rep": 0,
+      "jobs": 2048,
+      "storeCalls": 8,
+      "jobsSent": 512,
+      "ok": 256,
+      "rejected": 1792,
+      "outcomes": {
+        "ok": 256,
+        "MAX_WAIT_EXCEEDED": 1792
+      },
+      "ms": 11.723316999999952,
+      "settledPerSecond": 174695,
+      "usPerJob": 5.7242758789062265
+    },
+    {
+      "policy": "limited",
+      "store": "valkey",
+      "batch": 128,
+      "workers": 4,
+      "rep": 1,
+      "jobs": 2048,
+      "storeCalls": 8,
+      "jobsSent": 512,
+      "ok": 256,
+      "rejected": 1792,
+      "outcomes": {
+        "ok": 256,
+        "MAX_WAIT_EXCEEDED": 1792
+      },
+      "ms": 11.219992000000047,
+      "settledPerSecond": 182531,
+      "usPerJob": 5.478511718750023
+    },
+    {
+      "policy": "limited",
+      "store": "valkey",
+      "batch": 128,
+      "workers": 4,
+      "rep": 2,
+      "jobs": 2048,
+      "storeCalls": 8,
+      "jobsSent": 512,
+      "ok": 256,
+      "rejected": 1792,
+      "outcomes": {
+        "ok": 256,
+        "MAX_WAIT_EXCEEDED": 1792
+      },
+      "ms": 10.678413999999975,
+      "settledPerSecond": 191789,
+      "usPerJob": 5.214069335937488
+    },
+    {
+      "policy": "scoped",
+      "store": "memory",
+      "batch": 1,
+      "workers": 1,
+      "rep": 0,
+      "jobs": 512,
+      "storeCalls": 512,
+      "jobsSent": 512,
+      "ok": 257,
+      "rejected": 255,
+      "outcomes": {
+        "ok": 257,
+        "MAX_WAIT_EXCEEDED": 255
+      },
+      "ms": 8.622213999999985,
+      "settledPerSecond": 59381,
+      "usPerJob": 16.84026171874997
+    },
+    {
+      "policy": "scoped",
+      "store": "memory",
+      "batch": 1,
+      "workers": 1,
+      "rep": 1,
+      "jobs": 512,
+      "storeCalls": 512,
+      "jobsSent": 512,
+      "ok": 257,
+      "rejected": 255,
+      "outcomes": {
+        "ok": 257,
+        "MAX_WAIT_EXCEEDED": 255
+      },
+      "ms": 6.601621999999907,
+      "settledPerSecond": 77557,
+      "usPerJob": 12.893792968749818
+    },
+    {
+      "policy": "scoped",
+      "store": "memory",
+      "batch": 1,
+      "workers": 1,
+      "rep": 2,
+      "jobs": 512,
+      "storeCalls": 512,
+      "jobsSent": 512,
+      "ok": 257,
+      "rejected": 255,
+      "outcomes": {
+        "ok": 257,
+        "MAX_WAIT_EXCEEDED": 255
+      },
+      "ms": 7.072420999999849,
+      "settledPerSecond": 72394,
+      "usPerJob": 13.813322265624706
+    },
+    {
+      "policy": "scoped",
+      "store": "memory",
+      "batch": 1,
+      "workers": 4,
+      "rep": 0,
+      "jobs": 2048,
+      "storeCalls": 2048,
+      "jobsSent": 2048,
+      "ok": 257,
+      "rejected": 1791,
+      "outcomes": {
+        "MAX_WAIT_EXCEEDED": 1791,
+        "ok": 257
+      },
+      "ms": 23.509595999999874,
+      "settledPerSecond": 87113,
+      "usPerJob": 11.479294921874938
+    },
+    {
+      "policy": "scoped",
+      "store": "memory",
+      "batch": 1,
+      "workers": 4,
+      "rep": 1,
+      "jobs": 2048,
+      "storeCalls": 2048,
+      "jobsSent": 2048,
+      "ok": 257,
+      "rejected": 1791,
+      "outcomes": {
+        "MAX_WAIT_EXCEEDED": 1791,
+        "ok": 257
+      },
+      "ms": 22.677126000000044,
+      "settledPerSecond": 90311,
+      "usPerJob": 11.072815429687521
+    },
+    {
+      "policy": "scoped",
+      "store": "memory",
+      "batch": 1,
+      "workers": 4,
+      "rep": 2,
+      "jobs": 2048,
+      "storeCalls": 2048,
+      "jobsSent": 2048,
+      "ok": 257,
+      "rejected": 1791,
+      "outcomes": {
+        "MAX_WAIT_EXCEEDED": 1791,
+        "ok": 257
+      },
+      "ms": 23.099064999999882,
+      "settledPerSecond": 88662,
+      "usPerJob": 11.278840332031193
+    },
+    {
+      "policy": "scoped",
+      "store": "memory",
+      "batch": 32,
+      "workers": 1,
+      "rep": 0,
+      "jobs": 512,
+      "storeCalls": 16,
+      "jobsSent": 512,
+      "ok": 257,
+      "rejected": 255,
+      "outcomes": {
+        "MAX_WAIT_EXCEEDED": 255,
+        "ok": 257
+      },
+      "ms": 3.1181790000000547,
+      "settledPerSecond": 164198,
+      "usPerJob": 6.090193359375107
+    },
+    {
+      "policy": "scoped",
+      "store": "memory",
+      "batch": 32,
+      "workers": 1,
+      "rep": 1,
+      "jobs": 512,
+      "storeCalls": 16,
+      "jobsSent": 512,
+      "ok": 257,
+      "rejected": 255,
+      "outcomes": {
+        "MAX_WAIT_EXCEEDED": 255,
+        "ok": 257
+      },
+      "ms": 3.101607000000058,
+      "settledPerSecond": 165076,
+      "usPerJob": 6.057826171875114
+    },
+    {
+      "policy": "scoped",
+      "store": "memory",
+      "batch": 32,
+      "workers": 1,
+      "rep": 2,
+      "jobs": 512,
+      "storeCalls": 16,
+      "jobsSent": 512,
+      "ok": 257,
+      "rejected": 255,
+      "outcomes": {
+        "MAX_WAIT_EXCEEDED": 255,
+        "ok": 257
+      },
+      "ms": 2.6856279999999515,
+      "settledPerSecond": 190644,
+      "usPerJob": 5.245367187499905
+    },
+    {
+      "policy": "scoped",
+      "store": "memory",
+      "batch": 32,
+      "workers": 4,
+      "rep": 0,
+      "jobs": 2048,
+      "storeCalls": 64,
+      "jobsSent": 2048,
+      "ok": 257,
+      "rejected": 1791,
+      "outcomes": {
+        "MAX_WAIT_EXCEEDED": 1791,
+        "ok": 257
+      },
+      "ms": 13.93440899999996,
+      "settledPerSecond": 146974,
+      "usPerJob": 6.80391064453123
+    },
+    {
+      "policy": "scoped",
+      "store": "memory",
+      "batch": 32,
+      "workers": 4,
+      "rep": 1,
+      "jobs": 2048,
+      "storeCalls": 64,
+      "jobsSent": 2048,
+      "ok": 257,
+      "rejected": 1791,
+      "outcomes": {
+        "MAX_WAIT_EXCEEDED": 1791,
+        "ok": 257
+      },
+      "ms": 13.914209999999912,
+      "settledPerSecond": 147188,
+      "usPerJob": 6.794047851562457
+    },
+    {
+      "policy": "scoped",
+      "store": "memory",
+      "batch": 32,
+      "workers": 4,
+      "rep": 2,
+      "jobs": 2048,
+      "storeCalls": 64,
+      "jobsSent": 2048,
+      "ok": 257,
+      "rejected": 1791,
+      "outcomes": {
+        "MAX_WAIT_EXCEEDED": 1791,
+        "ok": 257
+      },
+      "ms": 14.921029999999973,
+      "settledPerSecond": 137256,
+      "usPerJob": 7.285659179687487
+    },
+    {
+      "policy": "scoped",
+      "store": "memory",
+      "batch": 128,
+      "workers": 1,
+      "rep": 0,
+      "jobs": 512,
+      "storeCalls": 12,
+      "jobsSent": 512,
+      "ok": 257,
+      "rejected": 255,
+      "outcomes": {
+        "MAX_WAIT_EXCEEDED": 255,
+        "ok": 257
+      },
+      "ms": 2.661982999999964,
+      "settledPerSecond": 192338,
+      "usPerJob": 5.199185546874929
+    },
+    {
+      "policy": "scoped",
+      "store": "memory",
+      "batch": 128,
+      "workers": 1,
+      "rep": 1,
+      "jobs": 512,
+      "storeCalls": 12,
+      "jobsSent": 512,
+      "ok": 257,
+      "rejected": 255,
+      "outcomes": {
+        "MAX_WAIT_EXCEEDED": 255,
+        "ok": 257
+      },
+      "ms": 2.5732510000000275,
+      "settledPerSecond": 198970,
+      "usPerJob": 5.025880859375054
+    },
+    {
+      "policy": "scoped",
+      "store": "memory",
+      "batch": 128,
+      "workers": 1,
+      "rep": 2,
+      "jobs": 512,
+      "storeCalls": 12,
+      "jobsSent": 512,
+      "ok": 257,
+      "rejected": 255,
+      "outcomes": {
+        "MAX_WAIT_EXCEEDED": 255,
+        "ok": 257
+      },
+      "ms": 2.776789000000008,
+      "settledPerSecond": 184386,
+      "usPerJob": 5.4234160156250155
+    },
+    {
+      "policy": "scoped",
+      "store": "memory",
+      "batch": 128,
+      "workers": 4,
+      "rep": 0,
+      "jobs": 2048,
+      "storeCalls": 37,
+      "jobsSent": 2048,
+      "ok": 257,
+      "rejected": 1791,
+      "outcomes": {
+        "MAX_WAIT_EXCEEDED": 1791,
+        "ok": 257
+      },
+      "ms": 14.103699000000006,
+      "settledPerSecond": 145210,
+      "usPerJob": 6.886571777343753
+    },
+    {
+      "policy": "scoped",
+      "store": "memory",
+      "batch": 128,
+      "workers": 4,
+      "rep": 1,
+      "jobs": 2048,
+      "storeCalls": 37,
+      "jobsSent": 2048,
+      "ok": 257,
+      "rejected": 1791,
+      "outcomes": {
+        "MAX_WAIT_EXCEEDED": 1791,
+        "ok": 257
+      },
+      "ms": 14.298761999999897,
+      "settledPerSecond": 143229,
+      "usPerJob": 6.98181738281245
+    },
+    {
+      "policy": "scoped",
+      "store": "memory",
+      "batch": 128,
+      "workers": 4,
+      "rep": 2,
+      "jobs": 2048,
+      "storeCalls": 37,
+      "jobsSent": 2048,
+      "ok": 257,
+      "rejected": 1791,
+      "outcomes": {
+        "MAX_WAIT_EXCEEDED": 1791,
+        "ok": 257
+      },
+      "ms": 13.84383200000002,
+      "settledPerSecond": 147936,
+      "usPerJob": 6.75968359375001
+    },
+    {
+      "policy": "scoped",
+      "store": "memory-async",
+      "batch": 1,
+      "workers": 1,
+      "rep": 0,
+      "jobs": 512,
+      "storeCalls": 512,
+      "jobsSent": 512,
+      "ok": 257,
+      "rejected": 255,
+      "outcomes": {
+        "ok": 257,
+        "MAX_WAIT_EXCEEDED": 255
+      },
+      "ms": 4.804453000000194,
+      "settledPerSecond": 106568,
+      "usPerJob": 9.38369726562538
+    },
+    {
+      "policy": "scoped",
+      "store": "memory-async",
+      "batch": 1,
+      "workers": 1,
+      "rep": 1,
+      "jobs": 512,
+      "storeCalls": 512,
+      "jobsSent": 512,
+      "ok": 257,
+      "rejected": 255,
+      "outcomes": {
+        "ok": 257,
+        "MAX_WAIT_EXCEEDED": 255
+      },
+      "ms": 4.991459000000077,
+      "settledPerSecond": 102575,
+      "usPerJob": 9.74894335937515
+    },
+    {
+      "policy": "scoped",
+      "store": "memory-async",
+      "batch": 1,
+      "workers": 1,
+      "rep": 2,
+      "jobs": 512,
+      "storeCalls": 512,
+      "jobsSent": 512,
+      "ok": 257,
+      "rejected": 255,
+      "outcomes": {
+        "ok": 257,
+        "MAX_WAIT_EXCEEDED": 255
+      },
+      "ms": 4.603666999999859,
+      "settledPerSecond": 111216,
+      "usPerJob": 8.991537109374725
+    },
+    {
+      "policy": "scoped",
+      "store": "memory-async",
+      "batch": 1,
+      "workers": 4,
+      "rep": 0,
+      "jobs": 2048,
+      "storeCalls": 2048,
+      "jobsSent": 2048,
+      "ok": 257,
+      "rejected": 1791,
+      "outcomes": {
+        "MAX_WAIT_EXCEEDED": 1791,
+        "ok": 257
+      },
+      "ms": 20.605591000000004,
+      "settledPerSecond": 99391,
+      "usPerJob": 10.061323730468752
+    },
+    {
+      "policy": "scoped",
+      "store": "memory-async",
+      "batch": 1,
+      "workers": 4,
+      "rep": 1,
+      "jobs": 2048,
+      "storeCalls": 2048,
+      "jobsSent": 2048,
+      "ok": 257,
+      "rejected": 1791,
+      "outcomes": {
+        "MAX_WAIT_EXCEEDED": 1791,
+        "ok": 257
+      },
+      "ms": 20.158055999999988,
+      "settledPerSecond": 101597,
+      "usPerJob": 9.842800781249995
+    },
+    {
+      "policy": "scoped",
+      "store": "memory-async",
+      "batch": 1,
+      "workers": 4,
+      "rep": 2,
+      "jobs": 2048,
+      "storeCalls": 2048,
+      "jobsSent": 2048,
+      "ok": 257,
+      "rejected": 1791,
+      "outcomes": {
+        "MAX_WAIT_EXCEEDED": 1791,
+        "ok": 257
+      },
+      "ms": 19.925297999999884,
+      "settledPerSecond": 102784,
+      "usPerJob": 9.729149414062444
+    },
+    {
+      "policy": "scoped",
+      "store": "memory-async",
+      "batch": 32,
+      "workers": 1,
+      "rep": 0,
+      "jobs": 512,
+      "storeCalls": 16,
+      "jobsSent": 512,
+      "ok": 257,
+      "rejected": 255,
+      "outcomes": {
+        "MAX_WAIT_EXCEEDED": 255,
+        "ok": 257
+      },
+      "ms": 2.5803930000001856,
+      "settledPerSecond": 198419,
+      "usPerJob": 5.039830078125362
+    },
+    {
+      "policy": "scoped",
+      "store": "memory-async",
+      "batch": 32,
+      "workers": 1,
+      "rep": 1,
+      "jobs": 512,
+      "storeCalls": 16,
+      "jobsSent": 512,
+      "ok": 257,
+      "rejected": 255,
+      "outcomes": {
+        "MAX_WAIT_EXCEEDED": 255,
+        "ok": 257
+      },
+      "ms": 2.4470269999999346,
+      "settledPerSecond": 209233,
+      "usPerJob": 4.779349609374872
+    },
+    {
+      "policy": "scoped",
+      "store": "memory-async",
+      "batch": 32,
+      "workers": 1,
+      "rep": 2,
+      "jobs": 512,
+      "storeCalls": 16,
+      "jobsSent": 512,
+      "ok": 257,
+      "rejected": 255,
+      "outcomes": {
+        "MAX_WAIT_EXCEEDED": 255,
+        "ok": 257
+      },
+      "ms": 2.5409069999998337,
+      "settledPerSecond": 201503,
+      "usPerJob": 4.962708984374675
+    },
+    {
+      "policy": "scoped",
+      "store": "memory-async",
+      "batch": 32,
+      "workers": 4,
+      "rep": 0,
+      "jobs": 2048,
+      "storeCalls": 64,
+      "jobsSent": 2048,
+      "ok": 257,
+      "rejected": 1791,
+      "outcomes": {
+        "MAX_WAIT_EXCEEDED": 1791,
+        "ok": 257
+      },
+      "ms": 13.582707000000028,
+      "settledPerSecond": 150780,
+      "usPerJob": 6.6321811523437635
+    },
+    {
+      "policy": "scoped",
+      "store": "memory-async",
+      "batch": 32,
+      "workers": 4,
+      "rep": 1,
+      "jobs": 2048,
+      "storeCalls": 64,
+      "jobsSent": 2048,
+      "ok": 257,
+      "rejected": 1791,
+      "outcomes": {
+        "MAX_WAIT_EXCEEDED": 1791,
+        "ok": 257
+      },
+      "ms": 12.55036199999995,
+      "settledPerSecond": 163183,
+      "usPerJob": 6.128106445312476
+    },
+    {
+      "policy": "scoped",
+      "store": "memory-async",
+      "batch": 32,
+      "workers": 4,
+      "rep": 2,
+      "jobs": 2048,
+      "storeCalls": 64,
+      "jobsSent": 2048,
+      "ok": 257,
+      "rejected": 1791,
+      "outcomes": {
+        "MAX_WAIT_EXCEEDED": 1791,
+        "ok": 257
+      },
+      "ms": 12.545215999999982,
+      "settledPerSecond": 163249,
+      "usPerJob": 6.125593749999991
+    },
+    {
+      "policy": "scoped",
+      "store": "memory-async",
+      "batch": 128,
+      "workers": 1,
+      "rep": 0,
+      "jobs": 512,
+      "storeCalls": 12,
+      "jobsSent": 512,
+      "ok": 257,
+      "rejected": 255,
+      "outcomes": {
+        "MAX_WAIT_EXCEEDED": 255,
+        "ok": 257
+      },
+      "ms": 2.694167000000107,
+      "settledPerSecond": 190040,
+      "usPerJob": 5.262044921875209
+    },
+    {
+      "policy": "scoped",
+      "store": "memory-async",
+      "batch": 128,
+      "workers": 1,
+      "rep": 1,
+      "jobs": 512,
+      "storeCalls": 12,
+      "jobsSent": 512,
+      "ok": 257,
+      "rejected": 255,
+      "outcomes": {
+        "MAX_WAIT_EXCEEDED": 255,
+        "ok": 257
+      },
+      "ms": 2.3454800000001796,
+      "settledPerSecond": 218292,
+      "usPerJob": 4.581015625000351
+    },
+    {
+      "policy": "scoped",
+      "store": "memory-async",
+      "batch": 128,
+      "workers": 1,
+      "rep": 2,
+      "jobs": 512,
+      "storeCalls": 12,
+      "jobsSent": 512,
+      "ok": 257,
+      "rejected": 255,
+      "outcomes": {
+        "MAX_WAIT_EXCEEDED": 255,
+        "ok": 257
+      },
+      "ms": 2.275726000000077,
+      "settledPerSecond": 224983,
+      "usPerJob": 4.44477734375015
+    },
+    {
+      "policy": "scoped",
+      "store": "memory-async",
+      "batch": 128,
+      "workers": 4,
+      "rep": 0,
+      "jobs": 2048,
+      "storeCalls": 37,
+      "jobsSent": 2048,
+      "ok": 257,
+      "rejected": 1791,
+      "outcomes": {
+        "MAX_WAIT_EXCEEDED": 1791,
+        "ok": 257
+      },
+      "ms": 12.40607799999998,
+      "settledPerSecond": 165080,
+      "usPerJob": 6.05765527343749
+    },
+    {
+      "policy": "scoped",
+      "store": "memory-async",
+      "batch": 128,
+      "workers": 4,
+      "rep": 1,
+      "jobs": 2048,
+      "storeCalls": 37,
+      "jobsSent": 2048,
+      "ok": 257,
+      "rejected": 1791,
+      "outcomes": {
+        "MAX_WAIT_EXCEEDED": 1791,
+        "ok": 257
+      },
+      "ms": 12.549621000000116,
+      "settledPerSecond": 163192,
+      "usPerJob": 6.1277446289063064
+    },
+    {
+      "policy": "scoped",
+      "store": "memory-async",
+      "batch": 128,
+      "workers": 4,
+      "rep": 2,
+      "jobs": 2048,
+      "storeCalls": 37,
+      "jobsSent": 2048,
+      "ok": 257,
+      "rejected": 1791,
+      "outcomes": {
+        "MAX_WAIT_EXCEEDED": 1791,
+        "ok": 257
+      },
+      "ms": 12.998577999999952,
+      "settledPerSecond": 157556,
+      "usPerJob": 6.346961914062477
+    },
+    {
+      "policy": "scoped",
+      "store": "redis",
+      "batch": 1,
+      "workers": 1,
+      "rep": 0,
+      "jobs": 512,
+      "storeCalls": 512,
+      "jobsSent": 512,
+      "ok": 257,
+      "rejected": 255,
+      "outcomes": {
+        "ok": 257,
+        "MAX_WAIT_EXCEEDED": 255
+      },
+      "ms": 72.57925399999999,
+      "settledPerSecond": 7054,
+      "usPerJob": 141.75635546874997
+    },
+    {
+      "policy": "scoped",
+      "store": "redis",
+      "batch": 1,
+      "workers": 1,
+      "rep": 1,
+      "jobs": 512,
+      "storeCalls": 512,
+      "jobsSent": 512,
+      "ok": 257,
+      "rejected": 255,
+      "outcomes": {
+        "ok": 257,
+        "MAX_WAIT_EXCEEDED": 255
+      },
+      "ms": 37.68644099999983,
+      "settledPerSecond": 13586,
+      "usPerJob": 73.60633007812467
+    },
+    {
+      "policy": "scoped",
+      "store": "redis",
+      "batch": 1,
+      "workers": 1,
+      "rep": 2,
+      "jobs": 512,
+      "storeCalls": 512,
+      "jobsSent": 512,
+      "ok": 257,
+      "rejected": 255,
+      "outcomes": {
+        "ok": 257,
+        "MAX_WAIT_EXCEEDED": 255
+      },
+      "ms": 29.85820600000011,
+      "settledPerSecond": 17148,
+      "usPerJob": 58.31680859375021
+    },
+    {
+      "policy": "scoped",
+      "store": "redis",
+      "batch": 1,
+      "workers": 4,
+      "rep": 0,
+      "jobs": 2048,
+      "storeCalls": 2048,
+      "jobsSent": 2048,
+      "ok": 257,
+      "rejected": 1791,
+      "outcomes": {
+        "MAX_WAIT_EXCEEDED": 1791,
+        "ok": 257
+      },
+      "ms": 98.93172300000015,
+      "settledPerSecond": 20701,
+      "usPerJob": 48.30650537109382
+    },
+    {
+      "policy": "scoped",
+      "store": "redis",
+      "batch": 1,
+      "workers": 4,
+      "rep": 1,
+      "jobs": 2048,
+      "storeCalls": 2048,
+      "jobsSent": 2048,
+      "ok": 257,
+      "rejected": 1791,
+      "outcomes": {
+        "MAX_WAIT_EXCEEDED": 1791,
+        "ok": 257
+      },
+      "ms": 80.00160800000003,
+      "settledPerSecond": 25599,
+      "usPerJob": 39.06328515625002
+    },
+    {
+      "policy": "scoped",
+      "store": "redis",
+      "batch": 1,
+      "workers": 4,
+      "rep": 2,
+      "jobs": 2048,
+      "storeCalls": 2048,
+      "jobsSent": 2048,
+      "ok": 257,
+      "rejected": 1791,
+      "outcomes": {
+        "MAX_WAIT_EXCEEDED": 1791,
+        "ok": 257
+      },
+      "ms": 91.26907999999958,
+      "settledPerSecond": 22439,
+      "usPerJob": 44.564980468749795
+    },
+    {
+      "policy": "scoped",
+      "store": "redis",
+      "batch": 32,
+      "workers": 1,
+      "rep": 0,
+      "jobs": 512,
+      "storeCalls": 16,
+      "jobsSent": 512,
+      "ok": 257,
+      "rejected": 255,
+      "outcomes": {
+        "MAX_WAIT_EXCEEDED": 255,
+        "ok": 257
+      },
+      "ms": 5.919608999999582,
+      "settledPerSecond": 86492,
+      "usPerJob": 11.561736328124184
+    },
+    {
+      "policy": "scoped",
+      "store": "redis",
+      "batch": 32,
+      "workers": 1,
+      "rep": 1,
+      "jobs": 512,
+      "storeCalls": 16,
+      "jobsSent": 512,
+      "ok": 257,
+      "rejected": 255,
+      "outcomes": {
+        "MAX_WAIT_EXCEEDED": 255,
+        "ok": 257
+      },
+      "ms": 5.604225000000042,
+      "settledPerSecond": 91360,
+      "usPerJob": 10.945751953125082
+    },
+    {
+      "policy": "scoped",
+      "store": "redis",
+      "batch": 32,
+      "workers": 1,
+      "rep": 2,
+      "jobs": 512,
+      "storeCalls": 16,
+      "jobsSent": 512,
+      "ok": 257,
+      "rejected": 255,
+      "outcomes": {
+        "MAX_WAIT_EXCEEDED": 255,
+        "ok": 257
+      },
+      "ms": 6.006655000000137,
+      "settledPerSecond": 85239,
+      "usPerJob": 11.731748046875268
+    },
+    {
+      "policy": "scoped",
+      "store": "redis",
+      "batch": 32,
+      "workers": 4,
+      "rep": 0,
+      "jobs": 2048,
+      "storeCalls": 64,
+      "jobsSent": 2048,
+      "ok": 257,
+      "rejected": 1791,
+      "outcomes": {
+        "MAX_WAIT_EXCEEDED": 1791,
+        "ok": 257
+      },
+      "ms": 20.87371600000006,
+      "settledPerSecond": 98114,
+      "usPerJob": 10.192244140625029
+    },
+    {
+      "policy": "scoped",
+      "store": "redis",
+      "batch": 32,
+      "workers": 4,
+      "rep": 1,
+      "jobs": 2048,
+      "storeCalls": 64,
+      "jobsSent": 2048,
+      "ok": 257,
+      "rejected": 1791,
+      "outcomes": {
+        "MAX_WAIT_EXCEEDED": 1791,
+        "ok": 257
+      },
+      "ms": 39.60232700000006,
+      "settledPerSecond": 51714,
+      "usPerJob": 19.33707373046878
+    },
+    {
+      "policy": "scoped",
+      "store": "redis",
+      "batch": 32,
+      "workers": 4,
+      "rep": 2,
+      "jobs": 2048,
+      "storeCalls": 64,
+      "jobsSent": 2048,
+      "ok": 257,
+      "rejected": 1791,
+      "outcomes": {
+        "MAX_WAIT_EXCEEDED": 1791,
+        "ok": 257
+      },
+      "ms": 32.03600000000006,
+      "settledPerSecond": 63928,
+      "usPerJob": 15.642578125000028
+    },
+    {
+      "policy": "scoped",
+      "store": "redis",
+      "batch": 128,
+      "workers": 1,
+      "rep": 0,
+      "jobs": 512,
+      "storeCalls": 12,
+      "jobsSent": 512,
+      "ok": 257,
+      "rejected": 255,
+      "outcomes": {
+        "MAX_WAIT_EXCEEDED": 255,
+        "ok": 257
+      },
+      "ms": 10.937513999999737,
+      "settledPerSecond": 46811,
+      "usPerJob": 21.362332031249487
+    },
+    {
+      "policy": "scoped",
+      "store": "redis",
+      "batch": 128,
+      "workers": 1,
+      "rep": 1,
+      "jobs": 512,
+      "storeCalls": 12,
+      "jobsSent": 512,
+      "ok": 257,
+      "rejected": 255,
+      "outcomes": {
+        "MAX_WAIT_EXCEEDED": 255,
+        "ok": 257
+      },
+      "ms": 8.867747999999665,
+      "settledPerSecond": 57737,
+      "usPerJob": 17.319820312499346
+    },
+    {
+      "policy": "scoped",
+      "store": "redis",
+      "batch": 128,
+      "workers": 1,
+      "rep": 2,
+      "jobs": 512,
+      "storeCalls": 12,
+      "jobsSent": 512,
+      "ok": 257,
+      "rejected": 255,
+      "outcomes": {
+        "MAX_WAIT_EXCEEDED": 255,
+        "ok": 257
+      },
+      "ms": 15.88868500000035,
+      "settledPerSecond": 32224,
+      "usPerJob": 31.032587890625685
+    },
+    {
+      "policy": "scoped",
+      "store": "redis",
+      "batch": 128,
+      "workers": 4,
+      "rep": 0,
+      "jobs": 2048,
+      "storeCalls": 37,
+      "jobsSent": 2048,
+      "ok": 257,
+      "rejected": 1791,
+      "outcomes": {
+        "MAX_WAIT_EXCEEDED": 1791,
+        "ok": 257
+      },
+      "ms": 27.856631000000107,
+      "settledPerSecond": 73519,
+      "usPerJob": 13.601870605468802
+    },
+    {
+      "policy": "scoped",
+      "store": "redis",
+      "batch": 128,
+      "workers": 4,
+      "rep": 1,
+      "jobs": 2048,
+      "storeCalls": 37,
+      "jobsSent": 2048,
+      "ok": 257,
+      "rejected": 1791,
+      "outcomes": {
+        "MAX_WAIT_EXCEEDED": 1791,
+        "ok": 257
+      },
+      "ms": 23.13338799999974,
+      "settledPerSecond": 88530,
+      "usPerJob": 11.295599609374873
+    },
+    {
+      "policy": "scoped",
+      "store": "redis",
+      "batch": 128,
+      "workers": 4,
+      "rep": 2,
+      "jobs": 2048,
+      "storeCalls": 37,
+      "jobsSent": 2048,
+      "ok": 257,
+      "rejected": 1791,
+      "outcomes": {
+        "MAX_WAIT_EXCEEDED": 1791,
+        "ok": 257
+      },
+      "ms": 19.030538999999862,
+      "settledPerSecond": 107616,
+      "usPerJob": 9.292255371093683
+    },
+    {
+      "policy": "scoped",
+      "store": "valkey",
+      "batch": 1,
+      "workers": 1,
+      "rep": 0,
+      "jobs": 512,
+      "storeCalls": 512,
+      "jobsSent": 512,
+      "ok": 257,
+      "rejected": 255,
+      "outcomes": {
+        "ok": 257,
+        "MAX_WAIT_EXCEEDED": 255
+      },
+      "ms": 33.616563999999926,
+      "settledPerSecond": 15231,
+      "usPerJob": 65.65735156249985
+    },
+    {
+      "policy": "scoped",
+      "store": "valkey",
+      "batch": 1,
+      "workers": 1,
+      "rep": 1,
+      "jobs": 512,
+      "storeCalls": 512,
+      "jobsSent": 512,
+      "ok": 257,
+      "rejected": 255,
+      "outcomes": {
+        "ok": 257,
+        "MAX_WAIT_EXCEEDED": 255
+      },
+      "ms": 33.76939200000015,
+      "settledPerSecond": 15162,
+      "usPerJob": 65.9558437500003
+    },
+    {
+      "policy": "scoped",
+      "store": "valkey",
+      "batch": 1,
+      "workers": 1,
+      "rep": 2,
+      "jobs": 512,
+      "storeCalls": 512,
+      "jobsSent": 512,
+      "ok": 257,
+      "rejected": 255,
+      "outcomes": {
+        "ok": 257,
+        "MAX_WAIT_EXCEEDED": 255
+      },
+      "ms": 25.654405000000224,
+      "settledPerSecond": 19958,
+      "usPerJob": 50.10625976562544
+    },
+    {
+      "policy": "scoped",
+      "store": "valkey",
+      "batch": 1,
+      "workers": 4,
+      "rep": 0,
+      "jobs": 2048,
+      "storeCalls": 2048,
+      "jobsSent": 2048,
+      "ok": 257,
+      "rejected": 1791,
+      "outcomes": {
+        "MAX_WAIT_EXCEEDED": 1791,
+        "ok": 257
+      },
+      "ms": 88.97463999999991,
+      "settledPerSecond": 23018,
+      "usPerJob": 43.44464843749996
+    },
+    {
+      "policy": "scoped",
+      "store": "valkey",
+      "batch": 1,
+      "workers": 4,
+      "rep": 1,
+      "jobs": 2048,
+      "storeCalls": 2048,
+      "jobsSent": 2048,
+      "ok": 257,
+      "rejected": 1791,
+      "outcomes": {
+        "MAX_WAIT_EXCEEDED": 1791,
+        "ok": 257
+      },
+      "ms": 86.29817600000024,
+      "settledPerSecond": 23732,
+      "usPerJob": 42.13778125000012
+    },
+    {
+      "policy": "scoped",
+      "store": "valkey",
+      "batch": 1,
+      "workers": 4,
+      "rep": 2,
+      "jobs": 2048,
+      "storeCalls": 2048,
+      "jobsSent": 2048,
+      "ok": 257,
+      "rejected": 1791,
+      "outcomes": {
+        "MAX_WAIT_EXCEEDED": 1791,
+        "ok": 257
+      },
+      "ms": 101.59448499999962,
+      "settledPerSecond": 20159,
+      "usPerJob": 49.606682128906066
+    },
+    {
+      "policy": "scoped",
+      "store": "valkey",
+      "batch": 32,
+      "workers": 1,
+      "rep": 0,
+      "jobs": 512,
+      "storeCalls": 16,
+      "jobsSent": 512,
+      "ok": 257,
+      "rejected": 255,
+      "outcomes": {
+        "MAX_WAIT_EXCEEDED": 255,
+        "ok": 257
+      },
+      "ms": 6.284440999999788,
+      "settledPerSecond": 81471,
+      "usPerJob": 12.274298828124586
+    },
+    {
+      "policy": "scoped",
+      "store": "valkey",
+      "batch": 32,
+      "workers": 1,
+      "rep": 1,
+      "jobs": 512,
+      "storeCalls": 16,
+      "jobsSent": 512,
+      "ok": 257,
+      "rejected": 255,
+      "outcomes": {
+        "MAX_WAIT_EXCEEDED": 255,
+        "ok": 257
+      },
+      "ms": 6.062333000000308,
+      "settledPerSecond": 84456,
+      "usPerJob": 11.840494140625601
+    },
+    {
+      "policy": "scoped",
+      "store": "valkey",
+      "batch": 32,
+      "workers": 1,
+      "rep": 2,
+      "jobs": 512,
+      "storeCalls": 16,
+      "jobsSent": 512,
+      "ok": 257,
+      "rejected": 255,
+      "outcomes": {
+        "MAX_WAIT_EXCEEDED": 255,
+        "ok": 257
+      },
+      "ms": 6.065517,
+      "settledPerSecond": 84412,
+      "usPerJob": 11.846712890625
+    },
+    {
+      "policy": "scoped",
+      "store": "valkey",
+      "batch": 32,
+      "workers": 4,
+      "rep": 0,
+      "jobs": 2048,
+      "storeCalls": 64,
+      "jobsSent": 2048,
+      "ok": 257,
+      "rejected": 1791,
+      "outcomes": {
+        "MAX_WAIT_EXCEEDED": 1791,
+        "ok": 257
+      },
+      "ms": 17.44499900000028,
+      "settledPerSecond": 117398,
+      "usPerJob": 8.518065917968887
+    },
+    {
+      "policy": "scoped",
+      "store": "valkey",
+      "batch": 32,
+      "workers": 4,
+      "rep": 1,
+      "jobs": 2048,
+      "storeCalls": 64,
+      "jobsSent": 2048,
+      "ok": 257,
+      "rejected": 1791,
+      "outcomes": {
+        "MAX_WAIT_EXCEEDED": 1791,
+        "ok": 257
+      },
+      "ms": 29.565706999999747,
+      "settledPerSecond": 69269,
+      "usPerJob": 14.436380371093627
+    },
+    {
+      "policy": "scoped",
+      "store": "valkey",
+      "batch": 32,
+      "workers": 4,
+      "rep": 2,
+      "jobs": 2048,
+      "storeCalls": 64,
+      "jobsSent": 2048,
+      "ok": 257,
+      "rejected": 1791,
+      "outcomes": {
+        "MAX_WAIT_EXCEEDED": 1791,
+        "ok": 257
+      },
+      "ms": 30.69925000000012,
+      "settledPerSecond": 66712,
+      "usPerJob": 14.989868164062559
+    },
+    {
+      "policy": "scoped",
+      "store": "valkey",
+      "batch": 128,
+      "workers": 1,
+      "rep": 0,
+      "jobs": 512,
+      "storeCalls": 12,
+      "jobsSent": 512,
+      "ok": 257,
+      "rejected": 255,
+      "outcomes": {
+        "MAX_WAIT_EXCEEDED": 255,
+        "ok": 257
+      },
+      "ms": 9.198539999999866,
+      "settledPerSecond": 55661,
+      "usPerJob": 17.96589843749974
+    },
+    {
+      "policy": "scoped",
+      "store": "valkey",
+      "batch": 128,
+      "workers": 1,
+      "rep": 1,
+      "jobs": 512,
+      "storeCalls": 12,
+      "jobsSent": 512,
+      "ok": 257,
+      "rejected": 255,
+      "outcomes": {
+        "MAX_WAIT_EXCEEDED": 255,
+        "ok": 257
+      },
+      "ms": 7.931623999999829,
+      "settledPerSecond": 64552,
+      "usPerJob": 15.491453124999666
+    },
+    {
+      "policy": "scoped",
+      "store": "valkey",
+      "batch": 128,
+      "workers": 1,
+      "rep": 2,
+      "jobs": 512,
+      "storeCalls": 12,
+      "jobsSent": 512,
+      "ok": 257,
+      "rejected": 255,
+      "outcomes": {
+        "MAX_WAIT_EXCEEDED": 255,
+        "ok": 257
+      },
+      "ms": 5.716494999999668,
+      "settledPerSecond": 89565,
+      "usPerJob": 11.165029296874351
+    },
+    {
+      "policy": "scoped",
+      "store": "valkey",
+      "batch": 128,
+      "workers": 4,
+      "rep": 0,
+      "jobs": 2048,
+      "storeCalls": 37,
+      "jobsSent": 2048,
+      "ok": 257,
+      "rejected": 1791,
+      "outcomes": {
+        "MAX_WAIT_EXCEEDED": 1791,
+        "ok": 257
+      },
+      "ms": 16.43457699999999,
+      "settledPerSecond": 124615,
+      "usPerJob": 8.024695800781245
+    },
+    {
+      "policy": "scoped",
+      "store": "valkey",
+      "batch": 128,
+      "workers": 4,
+      "rep": 1,
+      "jobs": 2048,
+      "storeCalls": 37,
+      "jobsSent": 2048,
+      "ok": 257,
+      "rejected": 1791,
+      "outcomes": {
+        "MAX_WAIT_EXCEEDED": 1791,
+        "ok": 257
+      },
+      "ms": 18.77038500000026,
+      "settledPerSecond": 109108,
+      "usPerJob": 9.165227050781377
+    },
+    {
+      "policy": "scoped",
+      "store": "valkey",
+      "batch": 128,
+      "workers": 4,
+      "rep": 2,
+      "jobs": 2048,
+      "storeCalls": 37,
+      "jobsSent": 2048,
+      "ok": 257,
+      "rejected": 1791,
+      "outcomes": {
+        "MAX_WAIT_EXCEEDED": 1791,
+        "ok": 257
+      },
+      "ms": 16.365690000000086,
+      "settledPerSecond": 125140,
+      "usPerJob": 7.991059570312542
+    }
+  ]
+}
