@@ -175,6 +175,52 @@ describe('scoped scheduler and wrappers', () => {
     await api.close();
     expect(vi.getTimerCount()).toBe(0);
   });
+  it('gives zero maxWait scoped jobs behind a slow admission their own attempt', async () => {
+    vi.useFakeTimers();
+    const memory = memoryStore();
+    const acquireScoped = vi.fn(
+      (request: ScopedAcquireRequest) =>
+        new Promise<ReturnType<NonNullable<Store['acquireScopedSync']>>>(
+          (resolve) =>
+            setTimeout(() => resolve(memory.acquireScopedSync!(request)), 5),
+        ),
+    );
+    const store: Store = {
+      kind: 'custom',
+      acquire: memory.acquire,
+      acquireScoped,
+      pause: memory.pause,
+      resume: memory.resume,
+      close: memory.close,
+    };
+    const api = createValve({
+      id: 'zero-slow',
+      rate: [{ name: 'r', scope: 'recipient', limit: 1, interval: '24h' }],
+      concurrency: 64,
+      batch: 16,
+      store,
+    });
+    const outcomes = Array.from({ length: 64 }, (_, i) =>
+      api
+        .run(() => undefined, {
+          maxWait: 0,
+          scopes: { recipient: i % 2 ? `c${i}` : 'hot' },
+        })
+        .then(
+          () => 'ok',
+          (error: { code: string }) => error.code,
+        ),
+    );
+    await vi.advanceTimersByTimeAsync(20);
+    const results = await Promise.all(outcomes);
+    expect(acquireScoped).toHaveBeenCalledTimes(4);
+    expect(acquireScoped.mock.calls.flatMap(([r]) => r.jobs)).toHaveLength(64);
+    expect(results.filter((r) => r === 'ok')).toHaveLength(33);
+    expect(results.filter((r) => r === 'MAX_WAIT_EXCEEDED')).toHaveLength(31);
+    expect(api.stats().queued).toBe(0);
+    await api.close();
+    expect(vi.getTimerCount()).toBe(0);
+  });
   it('lets B and C pass A2, then wakes A2 with one eligibility timer', async () => {
     vi.useFakeTimers();
     const api = createValve({ id: 'sparse', rate: rate.slice(1) });

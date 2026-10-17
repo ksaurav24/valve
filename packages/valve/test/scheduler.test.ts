@@ -473,6 +473,166 @@ describe('cancellation and lifecycle', () => {
     expect(fn).not.toHaveBeenCalled();
     expect(vi.getTimerCount()).toBe(0);
   });
+  it('gives zero maxWait jobs queued behind a slow admission their own attempt', async () => {
+    // A synchronous memory store sends every batch before any timer runs.
+    const outcomes = async (store: Store) => {
+      const valve = make({
+        id: 'x',
+        rate: { limit: 40, interval: 60000, algorithm: 'fixed-window' },
+        concurrency: 64,
+        batch: 16,
+        store,
+      });
+      const runs = Array.from({ length: 64 }, () =>
+        valve
+          .run(() => undefined, { maxWait: 0 })
+          .then(
+            () => 'ok',
+            (error: { code: string }) => error.code,
+          ),
+      );
+      await vi.advanceTimersByTimeAsync(20);
+      const results = await Promise.all(runs);
+      expect(valve.stats().queued).toBe(0);
+      return results;
+    };
+    const expected = await outcomes(memoryStore());
+    const slow = memoryStore();
+    const acquire = vi.fn(
+      (request: Parameters<Store['acquire']>[0]) =>
+        new Promise<AcquireResult>((resolve) =>
+          setTimeout(() => resolve(slow.acquireSync!(request)), 5),
+        ),
+    );
+    expect(await outcomes(failing(acquire))).toEqual(expected);
+    expect(expected.filter((r) => r === 'ok')).toHaveLength(40);
+    // After the partial denial the valve waits for the rate hint, so the last
+    // batch is rejected without an attempt it could not win.
+    expect(acquire).toHaveBeenCalledTimes(3);
+    expect(acquire.mock.calls.flatMap(([r]) => r.costs)).toHaveLength(48);
+    expect(vi.getTimerCount()).toBe(0);
+  });
+  it('rejects zero maxWait jobs left without local capacity after a slow admission', async () => {
+    const acquire = vi.fn(
+      (request: Parameters<Store['acquire']>[0]) =>
+        new Promise<AcquireResult>((resolve) =>
+          setTimeout(
+            () =>
+              resolve({
+                granted: request.costs.length,
+                retryAfterMs: 0,
+                pausedMs: 0,
+              }),
+            5,
+          ),
+        ),
+    );
+    const valve = make({
+      id: 'x',
+      concurrency: 2,
+      store: failing(acquire),
+    });
+    const releases: (() => void)[] = [];
+    const runs = Array.from({ length: 5 }, () =>
+      valve
+        .run(() => new Promise<void>((r) => releases.push(r)), { maxWait: 0 })
+        .then(
+          () => 'ok',
+          (error: { code: string }) => error.code,
+        ),
+    );
+    await vi.advanceTimersByTimeAsync(5);
+    expect(releases).toHaveLength(2);
+    // Held jobs get one timer turn after the reply, like the original expiry.
+    expect(valve.stats().queued).toBe(3);
+    await vi.advanceTimersByTimeAsync(1);
+    expect(valve.stats().queued).toBe(0);
+    for (const release of releases) release();
+    expect(await Promise.all(runs)).toEqual([
+      'ok',
+      'ok',
+      'MAX_WAIT_EXCEEDED',
+      'MAX_WAIT_EXCEEDED',
+      'MAX_WAIT_EXCEEDED',
+    ]);
+    expect(acquire).toHaveBeenCalledTimes(1);
+    expect(vi.getTimerCount()).toBe(0);
+  });
+  it('rejects a held zero maxWait job that newer higher-priority work overtakes', async () => {
+    const acquire = vi.fn(
+      (request: Parameters<Store['acquire']>[0]) =>
+        new Promise<AcquireResult>((resolve) =>
+          setTimeout(
+            () =>
+              resolve({
+                granted: request.costs.length,
+                retryAfterMs: 0,
+                pausedMs: 0,
+              }),
+            5,
+          ),
+        ),
+    );
+    const valve = make({
+      id: 'x',
+      concurrency: 8,
+      batch: 1,
+      store: failing(acquire),
+    });
+    const first = valve.run(() => 'first');
+    const zero = valve.run(() => 'zero', { maxWait: 0 });
+    const check = expect(zero).rejects.toMatchObject({
+      code: 'MAX_WAIT_EXCEEDED',
+    });
+    await vi.advanceTimersByTimeAsync(2);
+    // Each newer urgent job would otherwise keep the held job waiting.
+    const urgent = [valve.run(() => 'urgent', { priority: 10 })];
+    await vi.advanceTimersByTimeAsync(4);
+    await check;
+    urgent.push(valve.run(() => 'urgent', { priority: 10 }));
+    await vi.advanceTimersByTimeAsync(20);
+    expect(await first).toBe('first');
+    expect(await Promise.all(urgent)).toEqual(['urgent', 'urgent']);
+    expect(acquire).toHaveBeenCalledTimes(3);
+    expect(vi.getTimerCount()).toBe(0);
+  });
+  it('aborts and closes zero maxWait jobs held behind a slow admission', async () => {
+    let resolveAcquire!: (result: AcquireResult) => void;
+    const acquire = vi.fn(
+      () =>
+        new Promise<AcquireResult>((resolve) => {
+          resolveAcquire = resolve;
+        }),
+    );
+    const valve = make({
+      id: 'x',
+      concurrency: 2,
+      batch: 1,
+      store: failing(acquire),
+    });
+    const controller = new AbortController();
+    const first = valve.run(() => 1, { maxWait: 0 });
+    const aborted = valve.run(() => 2, {
+      maxWait: 0,
+      signal: controller.signal,
+    });
+    const closed = valve.run(() => 3, { maxWait: 0 });
+    const checks = [
+      expect(first).rejects.toMatchObject({ code: 'CLOSED' }),
+      expect(aborted).rejects.toMatchObject({ code: 'ABORTED' }),
+      expect(closed).rejects.toMatchObject({ code: 'CLOSED' }),
+    ];
+    await vi.advanceTimersByTimeAsync(10);
+    expect(valve.stats().queued).toBe(3);
+    controller.abort();
+    const closing = valve.close();
+    resolveAcquire({ granted: 1, retryAfterMs: 0, pausedMs: 0 });
+    await tick();
+    await Promise.all(checks);
+    await closing;
+    expect(acquire).toHaveBeenCalledTimes(1);
+    expect(vi.getTimerCount()).toBe(0);
+  });
   it('rejects a zero maxWait job during a store outage', async () => {
     const valve = make({
       id: 'x',
