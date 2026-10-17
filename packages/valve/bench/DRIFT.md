@@ -1,5 +1,9 @@
 # Paced scheduling drift
 
+Raw results are not kept in the repository. Links to them point to commit
+[`1979020`](https://github.com/ksaurav24/valve/tree/197902098769e5abf396d16582a42d1b7a123ded/packages/valve/bench), the last revision
+that contained them; rerun the commands below to regenerate them.
+
 Issue #11 builds on merged PR #10, commit
 `360621096a5b9a05b2886a17748d539cd6436cf5`. The original 5ms p99
 ideal-sequence target remains open. This work does not change the rate algorithms,
@@ -140,8 +144,8 @@ increases about 15.6% at zero injected RTT and 14.4% at 5ms. Earlier rate checks
 can increase contention even when throughput does not improve. Coordination
 and traffic reduction remain owned by #12.
 
-The [baseline](./drift-results/paced-baseline.json) and
-[current](./drift-results/paced-current.json) files retain every case, CPU,
+The [baseline](https://github.com/ksaurav24/valve/blob/197902098769e5abf396d16582a42d1b7a123ded/packages/valve/bench/drift-results/paced-baseline.json) and
+[current](https://github.com/ksaurav24/valve/blob/197902098769e5abf396d16582a42d1b7a123ded/packages/valve/bench/drift-results/paced-current.json) files retain every case, CPU,
 queue wait, denials, callback gaps, and each valve's last callback time. These
 finite workloads complete every job, but do not establish cross-worker fairness.
 
@@ -150,8 +154,8 @@ finite workloads complete every job, but do not establish cross-worker fairness.
 Both implementations ran all 42 comparison cases, including every Bottleneck
 case, with five measured rounds and the existing warmup. Node 24.21.0, Redis
 7.4.7, Valkey 8.0.4, ioredis 5.11.1, and node-redis 5.12.1 were used. Complete
-[baseline](./drift-results/comparison-baseline.json) and
-[current](./drift-results/comparison-current.json) samples are retained.
+[baseline](https://github.com/ksaurav24/valve/blob/197902098769e5abf396d16582a42d1b7a123ded/packages/valve/bench/drift-results/comparison-baseline.json) and
+[current](https://github.com/ksaurav24/valve/blob/197902098769e5abf396d16582a42d1b7a123ded/packages/valve/bench/drift-results/comparison-current.json) samples are retained.
 These full programs ran current then baseline; causal claims above use the
 separate alternating paired drift protocol.
 
@@ -184,7 +188,7 @@ repetitions each**, retaining all 45 samples per implementation. Median
 elapsed times are 217.15 to 222.29ms, 215.26 to 220.76ms, and 222.57 to
 229.68ms. This is a repeatable **2.3-3.1% throughput cost** in those program
 pairs. Its mechanism is not isolated here; it remains a review tradeoff, not
-a claimed improvement. [All controls](./drift-results/controls.json), including
+a claimed improvement. [All controls](https://github.com/ksaurav24/valve/blob/197902098769e5abf396d16582a42d1b7a123ded/packages/valve/bench/drift-results/controls.json), including
 the initially aborted control's completed rows, are retained. No CI ceiling
 was raised.
 
@@ -201,7 +205,7 @@ also passes the Redis 6.2/7.4/8 and Valkey 7.2/8 correctness matrix.
 The initial single-run CI throughput comparison measured current 360.07ms
 versus baseline 222.76ms and failed its existing 15% ceiling. On the identical
 source commit, its rerun measured 162.12ms versus 186.05ms and passed. Both
-outcomes are recorded in [validation.json](./drift-results/validation.json);
+outcomes are recorded in [validation.json](https://github.com/ksaurav24/valve/blob/197902098769e5abf396d16582a42d1b7a123ded/packages/valve/bench/drift-results/validation.json);
 the single-run check is not evidence of a stable throughput improvement.
 An artifact-only commit subsequently measured current 263.42ms versus baseline
 223.78ms and failed the same gate again, with unchanged runtime source. CI now
@@ -226,13 +230,13 @@ all existing ceilings pass and zero runtime dependencies remain.
 
 ## Raw evidence
 
-[summary.json](./drift-results/summary.json) retains all 84 traced and untraced
+[summary.json](https://github.com/ksaurav24/valve/blob/197902098769e5abf396d16582a42d1b7a123ded/packages/valve/bench/drift-results/summary.json) retains all 84 traced and untraced
 per-round metric samples, source and harness hashes, host/runtime metadata,
 and archive checksums. Full eligibility/wakeup/admission/dispatch traces are
-in [Node 20](./drift-results/node20.json.gz),
-[Node 22](./drift-results/node22.json.gz), and
-[Node 24](./drift-results/node24.json.gz). The complete
-[untraced sensitivity run](./drift-results/untraced-node24.json.gz) is retained too.
+in [Node 20](https://github.com/ksaurav24/valve/blob/197902098769e5abf396d16582a42d1b7a123ded/packages/valve/bench/drift-results/node20.json.gz),
+[Node 22](https://github.com/ksaurav24/valve/blob/197902098769e5abf396d16582a42d1b7a123ded/packages/valve/bench/drift-results/node22.json.gz), and
+[Node 24](https://github.com/ksaurav24/valve/blob/197902098769e5abf396d16582a42d1b7a123ded/packages/valve/bench/drift-results/node24.json.gz). The complete
+[untraced sensitivity run](https://github.com/ksaurav24/valve/blob/197902098769e5abf396d16582a42d1b7a123ded/packages/valve/bench/drift-results/untraced-node24.json.gz) is retained too.
 All 79,200 traced grants satisfy the 10ms store-clock spacing assertion.
 
 ```sh

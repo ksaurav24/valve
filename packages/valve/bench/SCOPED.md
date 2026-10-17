@@ -1,5 +1,9 @@
 # Scoped admission: correctness and performance
 
+Raw results are not kept in the repository. Links to them point to commit
+[`1979020`](https://github.com/ksaurav24/valve/tree/197902098769e5abf396d16582a42d1b7a123ded/packages/valve/bench), the last revision
+that contained them; rerun the commands below to regenerate them.
+
 This report covers issue #52's v0.4.0 scoped admission implementation. Static
 configurations retain prefix admission and the existing Lua script. Scoped
 configurations use indexed grants, a delayed eligibility heap, and one bounded
@@ -17,7 +21,7 @@ throughput sample, and 2,000 paced jobs per timing sample. Every sample is
 retained. No tests or builds ran alongside the final measurements. These are
 local Node.js v26.8.1 measurements, not estimates of production HTTP throughput.
 
-`scoped-results/static-baseline.json` and `static-current.json` contain the
+[`scoped-results/static-baseline.json`](https://github.com/ksaurav24/valve/blob/197902098769e5abf396d16582a42d1b7a123ded/packages/valve/bench/scoped-results/static-baseline.json) and `static-current.json` contain the
 final raw samples and medians. The separate `pilot-static-*.json` files preserve
 a shorter development run with 300 paced jobs; they are not combined with the
 final run.
@@ -35,7 +39,7 @@ execution and request construction. It covers:
   during measurement to exercise cardinality.
 - One, four and eight concurrent Redis clients sharing one Valve ID and slot.
 
-`scoped-results/matrix.json` records evaluated jobs, actual grants, distinct
+[`scoped-results/matrix.json`](https://github.com/ksaurav24/valve/blob/197902098769e5abf396d16582a42d1b7a123ded/packages/valve/bench/scoped-results/matrix.json) records evaluated jobs, actual grants, distinct
 keys per call, median and p99 call duration, and evaluations per second. A
 high rate of denied evaluations is not successful request throughput. The
 contention cases use multiple connections from one Node.js process; they do
@@ -91,7 +95,7 @@ minification and gzip) measured:
 - Redis: **3,494 → 6,043 bytes**, an increase of **2,549 bytes**.
 - Headers: **1,184 → 1,184 bytes**, unchanged.
 
-`scoped-results/size.json` records those measurements and the CPU model
+[`scoped-results/size.json`](https://github.com/ksaurav24/valve/blob/197902098769e5abf396d16582a42d1b7a123ded/packages/valve/bench/scoped-results/size.json) records those measurements and the CPU model
 (Intel Core i5-12450H). Identity validation, the delayed heap, scoped memory
 admission and the second Lua script increase the footprint. The old core and
 Redis CI ceilings (8,960 and 4,096 bytes) cannot contain this feature. They are
