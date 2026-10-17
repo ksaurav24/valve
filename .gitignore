@@ -21,3 +21,7 @@ apps/web/next-env.d.ts
 
 apps/web/content/changelog/
 apps/web/content/contributing/
+
+.taste-skill/
+/.agent/
+/.agents/

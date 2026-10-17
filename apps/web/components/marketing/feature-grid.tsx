@@ -1,12 +1,11 @@
+import Link from 'next/link';
+import { ArrowUpRight } from 'lucide-react';
 import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardEyebrow,
-  CardGroup,
-  CardHeader,
-  CardTitle,
-} from '@/components/ui/card';
+  AccordionGroup,
+  AccordionItem,
+  AccordionTrigger,
+  AccordionContent,
+} from '@/components/ui/accordion';
 
 const features = [
   {
@@ -75,48 +74,40 @@ const features = [
   },
 ];
 
-export function FeatureGrid() {
-  return (
-    <CardGroup columns={2} border="outlined" className="max-sm:hidden">
-      {features.map((feature, index) => (
-        <FeatureCard key={feature.href} index={index} {...feature} />
-      ))}
-    </CardGroup>
-  );
-}
-
-/** Phones get a single column; the two-column group keeps 2-D fluid hover. */
 export function FeatureList() {
   return (
-    <CardGroup columns={1} border="outlined" className="sm:hidden">
+    <AccordionGroup
+      type="multiple"
+      defaultValue={[features[0].href]}
+      className="capability-list w-full"
+    >
       {features.map((feature, index) => (
-        <FeatureCard key={feature.href} index={index} {...feature} />
+        <AccordionItem
+          key={feature.href}
+          value={feature.href}
+          index={index}
+          className="capability"
+        >
+          <AccordionTrigger className="capability-summary">
+            {feature.title.replace(/\.$/, '')}
+          </AccordionTrigger>
+          <AccordionContent className="capability-panel">
+            <div className="capability-body">
+              <p>{feature.description}</p>
+              <pre data-ui className="capability-code">
+                <code>{feature.snippet}</code>
+              </pre>
+              <Link
+                href={feature.href}
+                className="inline-flex min-h-11 items-center gap-2 text-sm font-medium hover:text-live-foreground"
+              >
+                Read the guide{' '}
+                <ArrowUpRight aria-hidden="true" className="size-4" />
+              </Link>
+            </div>
+          </AccordionContent>
+        </AccordionItem>
       ))}
-    </CardGroup>
-  );
-}
-
-function FeatureCard({
-  index,
-  title,
-  description,
-  snippet,
-  href,
-}: (typeof features)[number] & { index: number }) {
-  return (
-    <Card href={href} label={title} index={index}>
-      <CardHeader>
-        <CardEyebrow className="font-mono">
-          {String(index + 1).padStart(2, '0')}
-        </CardEyebrow>
-        <CardTitle>{title}</CardTitle>
-        <CardDescription>{description}</CardDescription>
-      </CardHeader>
-      <CardContent>
-        <code className="block truncate rounded-md border border-border bg-background px-2.5 py-1.5 font-mono text-[11.5px] text-muted-foreground">
-          {snippet}
-        </code>
-      </CardContent>
-    </Card>
+    </AccordionGroup>
   );
 }

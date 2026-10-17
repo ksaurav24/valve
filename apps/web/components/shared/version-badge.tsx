@@ -26,7 +26,7 @@ export function VersionBadge({
         state === 'dev' || state === 'historical' ? '/changelog' : '/releases'
       }
       className={cn(
-        'inline-flex h-7 items-center gap-2 rounded-full border border-border bg-card px-3 font-mono text-xs text-muted-foreground hover:border-ring hover:text-foreground',
+        'inline-flex h-7 items-center gap-2 rounded-md bg-muted px-2.5 text-[13px] text-muted-foreground hover:border-ring hover:text-foreground',
         className,
       )}
       title={

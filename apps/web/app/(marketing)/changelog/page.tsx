@@ -1,15 +1,18 @@
 import type { Metadata } from 'next';
+import Link from 'next/link';
 import { PageHeader } from '@/components/marketing/page-header';
 import { VersionBadge } from '@/components/shared/version-badge';
 import { changelogSource } from '@/lib/source';
 import { getMDXComponents } from '@/mdx-components';
 import { site } from '@/lib/site';
+import { pageMetadata } from '@/lib/metadata';
 
-export const metadata: Metadata = {
+export const metadata: Metadata = pageMetadata({
   title: 'Changelog',
   description:
     'Version history and package changes for valve, generated from the package changelog.',
-};
+  path: '/changelog',
+});
 
 export default function ChangelogPage() {
   const page = changelogSource.getPage([]);
@@ -36,8 +39,23 @@ export default function ChangelogPage() {
           changelog.
         </p>
       </PageHeader>
-      <div className="mx-auto max-w-5xl px-4 py-12 sm:px-6">
-        <div className="prose changelog-body max-w-3xl">
+      <div className="page-gutter grid items-start gap-10 py-14 lg:grid-cols-[minmax(0,1fr)_minmax(0,2fr)] lg:gap-16">
+        <aside className="max-w-sm space-y-5 lg:sticky lg:top-24">
+          <h2 className="text-2xl font-medium tracking-tight">
+            Release history
+          </h2>
+          <p className="text-base leading-relaxed text-muted-foreground">
+            The package changelog is the source of truth. Published versions and
+            development notes keep their original order.
+          </p>
+          <Link
+            href="/releases"
+            className="inline-flex min-h-11 items-center text-sm font-medium hover:text-live-foreground"
+          >
+            View published releases
+          </Link>
+        </aside>
+        <div className="prose changelog-body min-w-0 max-w-[75ch]">
           <Content components={getMDXComponents()} />
         </div>
       </div>

@@ -90,10 +90,10 @@ test('home page leads with install, usage, and documentation', async ({
 }) => {
   await page.goto('/');
   await expect(page.getByRole('heading', { level: 1 })).toHaveText(
-    'Shared rate limits for outbound API calls.',
+    'Many workers. One rate limit.',
   );
   await expect(
-    page.getByRole('link', { name: 'Get started', exact: true }),
+    page.getByRole('link', { name: 'Read quickstart', exact: true }),
   ).toHaveAttribute('href', '/docs/quickstart/');
   await expect(
     page.getByRole('link', { name: 'valve home' }).locator('svg, img'),
@@ -102,8 +102,24 @@ test('home page leads with install, usage, and documentation', async ({
     page.getByRole('link', { name: /^v\d+\.\d+\.\d+/ }).first(),
   ).toContainText(release.version);
   await expect(
-    page.locator('#changelog > ol > li > div > span:first-child'),
+    page.locator('#changelog').getByRole('link', { name: /^v\d/ }),
   ).toHaveText(changelog.slice(0, 3).map((entry) => `v${entry.version}`));
+  expect(
+    await page
+      .locator('#readme')
+      .evaluate(
+        (element) => element.getBoundingClientRect().top + window.scrollY,
+      ),
+  ).toBeGreaterThanOrEqual(page.viewportSize()!.height - 1);
+  await expect(
+    page.getByRole('button', { name: 'Pause animation', exact: true }),
+  ).toBeVisible();
+  await page
+    .getByRole('button', { name: 'Pause animation', exact: true })
+    .click();
+  await expect(
+    page.getByRole('button', { name: 'Play animation', exact: true }),
+  ).toBeVisible();
   const published = Object.hasOwn(metadata.npm.versions, release.version);
   await expect(
     page.getByRole('tab', { name: published ? 'pnpm' : 'source', exact: true }),
@@ -126,8 +142,37 @@ test('home page leads with install, usage, and documentation', async ({
   await expect(page.getByRole('tabpanel', { name: 'scoped.ts' })).toContainText(
     "scopes: { recipient: 'contact-A' }",
   );
+  const rulesTrigger = page.getByRole('button', {
+    name: 'Shared rate rules',
+    exact: true,
+  });
+  const scopedFeature = page.locator('#features .capability').filter({
+    has: page.getByRole('button', {
+      name: 'Shared and scoped budgets',
+      exact: true,
+    }),
+  });
+  const scopedTrigger = scopedFeature.getByRole('button', {
+    name: 'Shared and scoped budgets',
+    exact: true,
+  });
+  await rulesTrigger.focus();
+  await page.keyboard.press('ArrowDown');
+  await expect(scopedTrigger).toBeFocused();
+  await page.keyboard.press('Enter');
+  await expect(scopedTrigger).toHaveAttribute('aria-expanded', 'true');
+  await expect(scopedFeature.getByRole('region')).toBeVisible();
+  await page.keyboard.press('Space');
+  await expect(scopedTrigger).toHaveAttribute('aria-expanded', 'false');
+  await expect(scopedFeature.getByRole('region')).toBeHidden();
+  await scopedTrigger.click();
   await expect(
-    page.getByRole('link', { name: 'Shared and scoped budgets.' }),
+    scopedFeature.getByText(
+      "api.run(send, { scopes: { recipient: 'contact-42' } })",
+    ),
+  ).toBeVisible();
+  await expect(
+    scopedFeature.getByRole('link', { name: 'Read the guide' }),
   ).toHaveAttribute('href', /^\/docs\/guides\/scoped-rate-limits\/?$/);
   expect(
     await page.evaluate(

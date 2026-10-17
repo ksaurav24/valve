@@ -8,6 +8,7 @@ import {
 } from 'fumadocs-ui/page';
 import { getMDXComponents } from '@/mdx-components';
 import { source } from '@/lib/source';
+import { pageMetadata } from '@/lib/metadata';
 
 type PageProps = { params: Promise<{ slug?: string[] }> };
 
@@ -36,5 +37,9 @@ export async function generateMetadata({
 }: PageProps): Promise<Metadata> {
   const page = source.getPage((await params).slug);
   if (!page) notFound();
-  return { title: page.data.title, description: page.data.description };
+  return pageMetadata({
+    title: page.data.title,
+    description: page.data.description,
+    path: page.url,
+  });
 }

@@ -10,15 +10,15 @@ export function ChangelogSections({
   limit?: number;
 }) {
   return (
-    <div className="space-y-4">
+    <div className="max-w-[72ch] space-y-4">
       {sections.map((section, index) => (
         <section key={index}>
           {section.title && (
-            <h4 className="mb-2 font-mono text-[11px] uppercase tracking-wider text-muted-foreground">
+            <h4 className="mb-3 text-sm font-medium text-foreground">
               {section.title}
             </h4>
           )}
-          <ul className="space-y-2 text-sm leading-relaxed text-muted-foreground">
+          <ul className="space-y-3 text-base leading-relaxed">
             {section.items.slice(0, limit).map((item, i) => (
               <li key={i} className="relative pl-4">
                 <span

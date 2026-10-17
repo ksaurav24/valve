@@ -4,9 +4,12 @@ const packageName = 'valvejs';
 
 export const site = {
   name: 'valve',
-  url: 'https://valvejs.vercel.app',
+  // Use the production origin for metadata, including on preview deployments.
+  url: new URL(process.env.NEXT_PUBLIC_SITE_URL || 'https://valvejs.vercel.app')
+    .origin,
+  title: 'valve: Shared rate limits for outbound API calls',
   description:
-    'A shared rate limit for outbound API calls across every worker, with provider-aware backoff.',
+    'A TypeScript library for outbound API rate limits, atomic shared and scoped budgets, and provider backoff. Memory, Redis, and Valkey stores with zero runtime dependencies.',
   /** From packages/valve/package.json, copied by scripts/sync-content.mjs. */
   version: release.version,
   packageName,

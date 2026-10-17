@@ -2,19 +2,20 @@
 
 import Link from 'next/link';
 import { ArrowRight } from 'lucide-react';
-import { GitHubIcon } from '@/components/shared/icons';
-import { Button } from '@/components/ui/button';
 import { site } from '@/lib/site';
 
 export function HeroActions() {
   return (
     <div className="flex flex-wrap items-center gap-2">
-      <Button asChild variant="primary" trailingIcon={ArrowRight}>
-        <Link href="/docs/quickstart">Get started</Link>
-      </Button>
-      <Button asChild variant="secondary" leadingIcon={GitHubIcon}>
-        <a href={site.repository}>Source</a>
-      </Button>
+      <Link href="/docs/quickstart" className="primary-doc-link">
+        Read quickstart <ArrowRight aria-hidden="true" className="size-4" />
+      </Link>
+      <a
+        href={site.repository}
+        className="inline-flex min-h-11 items-center px-3 text-sm text-muted-foreground hover:text-foreground"
+      >
+        View source
+      </a>
     </div>
   );
 }

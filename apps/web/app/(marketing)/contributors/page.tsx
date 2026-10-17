@@ -6,11 +6,13 @@ import { contributors } from '@/lib/github';
 import { site } from '@/lib/site';
 import { contributingSource } from '@/lib/source';
 import { getMDXComponents } from '@/mdx-components';
+import { pageMetadata } from '@/lib/metadata';
 
-export const metadata: Metadata = {
+export const metadata: Metadata = pageMetadata({
   title: 'Contributors',
   description: 'The people building valve, and how to contribute.',
-};
+  path: '/contributors',
+});
 
 const starters = [
   {
@@ -46,34 +48,28 @@ export default function ContributorsPage() {
           to valve. Fixes, docs, benchmarks, and reviews all count.
         </p>
       </PageHeader>
-      <div className="mx-auto max-w-5xl space-y-16 px-4 py-12 sm:px-6">
+      <div className="page-gutter space-y-20 py-16">
         <section aria-labelledby="people">
-          <h2
-            id="people"
-            className="mb-5 font-mono text-xs uppercase tracking-[0.18em] text-muted-foreground"
-          >
+          <h2 id="people" className="mb-8 text-2xl font-medium tracking-tight">
             contributors
           </h2>
           <ContributorGrid contributors={contributors} />
         </section>
 
         <section aria-labelledby="start">
-          <h2
-            id="start"
-            className="mb-5 font-mono text-xs uppercase tracking-[0.18em] text-muted-foreground"
-          >
+          <h2 id="start" className="mb-8 text-2xl font-medium tracking-tight">
             start here
           </h2>
-          <div className="grid gap-3 sm:grid-cols-3">
+          <div className="grid gap-6 lg:grid-cols-3">
             {starters.map(({ icon: Icon, title, description, href }) => (
               <a
                 key={title}
                 href={href}
-                className="group rounded-xl border border-border bg-card p-4 hover:border-ring hover:bg-accent"
+                className="group flex flex-col items-start rounded-md bg-card p-6 hover:bg-muted"
               >
                 <Icon className="size-4 text-muted-foreground transition-colors duration-150 group-hover:text-foreground" />
-                <span className="mt-3 block text-sm font-medium">{title}</span>
-                <span className="mt-1 block text-xs leading-relaxed text-muted-foreground">
+                <span className="mt-5 block text-lg font-medium">{title}</span>
+                <span className="mt-2 block text-base leading-relaxed text-muted-foreground">
                   {description}
                 </span>
               </a>
@@ -89,18 +85,18 @@ export default function ContributorsPage() {
           <div className="mb-6 flex flex-wrap items-baseline justify-between gap-3">
             <h2
               id="guide-title"
-              className="font-mono text-xs uppercase tracking-[0.18em] text-muted-foreground"
+              className="text-2xl font-medium tracking-tight"
             >
               contribution guide
             </h2>
             <a
               href={`${site.source}/CONTRIBUTING.md`}
-              className="font-mono text-xs text-muted-foreground hover:text-foreground"
+              className="font-mono text-sm text-muted-foreground hover:text-foreground"
             >
               CONTRIBUTING.md
             </a>
           </div>
-          <div className="prose max-w-3xl">
+          <div className="prose max-w-[75ch] lg:ml-[calc(100%/3)]">
             <Guide components={getMDXComponents()} />
           </div>
         </section>

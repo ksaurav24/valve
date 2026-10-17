@@ -14,3 +14,7 @@ playwright-report/
 out/
 apps/web/next-env.d.ts
 .codegraph/
+
+.agent/
+.agents/
+.taste-skill/

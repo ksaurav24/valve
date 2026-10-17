@@ -5,12 +5,14 @@ import { PageHeader } from '@/components/marketing/page-header';
 import { ChangelogSections } from '@/components/marketing/changelog-entry';
 import { GitHubIcon } from '@/components/shared/icons';
 import { VersionBadge } from '@/components/shared/version-badge';
-import { current, latestPublished, releases } from '@/lib/releases';
+import { current, releases } from '@/lib/releases';
+import { pageMetadata } from '@/lib/metadata';
 
-export const metadata: Metadata = {
+export const metadata: Metadata = pageMetadata({
   title: 'Releases',
   description: 'Published valve versions on npm, with their release notes.',
-};
+  path: '/releases',
+});
 
 const date = new Intl.DateTimeFormat('en', { dateStyle: 'medium' });
 
@@ -30,9 +32,9 @@ export default function ReleasesPage() {
           .
         </p>
       </PageHeader>
-      <div className="mx-auto max-w-5xl px-4 py-12 sm:px-6">
+      <div className="page-gutter py-16">
         {releases.length === 0 ? (
-          <div className="bg-dots rounded-2xl border border-dashed border-border px-6 py-16 text-center">
+          <div className="rounded-md bg-card px-6 py-16 text-center">
             <Package className="mx-auto size-6 text-muted-foreground" />
             <h2 className="mt-4 text-lg font-medium">
               No plain-version releases yet
@@ -53,37 +55,29 @@ export default function ReleasesPage() {
             </Link>
           </div>
         ) : (
-          <ol className="relative space-y-10 border-l border-border pl-6 sm:pl-10">
+          <ol className="space-y-12">
             {releases.map((release) => (
               <li key={release.version} className="relative">
-                <span
-                  aria-hidden="true"
-                  className={`absolute -left-[29px] top-2 size-2.5 rounded-full border-2 border-background sm:-left-[45px] ${
-                    release.version === latestPublished
-                      ? 'bg-live'
-                      : 'bg-muted-foreground/50'
-                  }`}
-                />
                 <article
                   id={`v${release.version}`}
-                  className="scroll-mt-20 rounded-xl border border-border bg-card"
+                  className="grid scroll-mt-24 gap-8 lg:grid-cols-[minmax(0,1fr)_minmax(0,2fr)] lg:gap-16"
                 >
-                  <header className="flex flex-wrap items-center justify-between gap-3 border-b border-border px-5 py-4">
+                  <header className="flex flex-col items-start gap-5">
                     <div className="flex flex-wrap items-center gap-3">
-                      <h2 className="font-mono text-lg font-semibold">
+                      <h2 className="font-mono text-2xl font-medium">
                         v{release.version}
                       </h2>
                       <VersionBadge version={release.version} />
                       {release.publishedAt && (
                         <time
                           dateTime={release.publishedAt}
-                          className="text-xs text-muted-foreground"
+                          className="text-sm text-muted-foreground"
                         >
                           {date.format(new Date(release.publishedAt))}
                         </time>
                       )}
                     </div>
-                    <div className="flex items-center gap-1 font-mono text-xs">
+                    <div className="flex items-center gap-2 text-sm">
                       <ExternalLink href={release.npmUrl}>npm</ExternalLink>
                       {release.githubUrl && (
                         <ExternalLink href={release.githubUrl} github>
@@ -92,7 +86,7 @@ export default function ReleasesPage() {
                       )}
                     </div>
                   </header>
-                  <div className="px-5 py-5">
+                  <div className="min-w-0 rounded-md bg-card p-6 sm:p-8">
                     <ChangelogSections sections={release.sections} />
                   </div>
                 </article>
@@ -117,7 +111,7 @@ function ExternalLink({
   return (
     <a
       href={href}
-      className="group inline-flex h-7 items-center gap-1 rounded-md px-2 text-muted-foreground hover:bg-hover hover:text-foreground"
+      className="group inline-flex min-h-11 items-center gap-1 rounded-md px-2 text-muted-foreground hover:bg-hover hover:text-foreground"
     >
       {github && <GitHubIcon className="size-3" />}
       {children}

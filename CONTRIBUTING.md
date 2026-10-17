@@ -135,6 +135,17 @@ search index into `apps/web/out/`. After `pnpm docs:build`, run
 `pnpm --filter @valve/web test:browser` for browser checks. Install Chromium
 with `pnpm --filter @valve/web exec playwright install chromium` first.
 
+The website's canonical origin comes from `NEXT_PUBLIC_SITE_URL` at build time.
+Copy `apps/web/.env.example` to `apps/web/.env.local` for local overrides, or set
+the variable in the deployment environment. It defaults to
+`https://valvejs.vercel.app`; previews use that production origin for canonical
+URLs, social metadata, robots, and the sitemap. Rebuild after changing it.
+
+The social card and manifest icons are committed static PNGs generated from the
+valve SVG identity and local Geist fonts. After installing Chromium, run
+`pnpm --filter @valve/web social:images` to regenerate them. Image generation
+does not run during installation or deployment builds.
+
 See `packages/valve/bench/COMPARISON.md` for measured targets that remain open.
 
 ## Performance
