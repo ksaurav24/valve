@@ -1,13 +1,14 @@
 {
   "npm": {
-    "latest": "0.4.1",
+    "latest": "0.5.0",
     "versions": {
       "0.0.0-stage": "2026-10-15T16:16:33.272Z",
       "0.3.0-beta.0": "2026-10-15T16:17:30.302Z",
       "0.3.0-beta.1": "2026-10-15T17:23:13.929Z",
       "0.4.0-beta.0": "2026-10-15T21:33:58.657Z",
       "0.4.0": "2026-10-15T22:19:50.461Z",
-      "0.4.1": "2026-10-16T06:38:55.156Z"
+      "0.4.1": "2026-10-16T06:38:55.156Z",
+      "0.5.0": "2026-10-17T04:19:12.204Z"
     }
   },
   "downloads": null,
@@ -20,10 +21,17 @@
       "login": "ksaurav24",
       "avatar": "https://avatars.githubusercontent.com/u/138647854?v=4",
       "url": "https://github.com/ksaurav24",
-      "contributions": 36
+      "contributions": 40
     }
   ],
   "releases": [
+    {
+      "tag": "valvejs@0.5.0",
+      "name": "valvejs@0.5.0",
+      "url": "https://github.com/ksaurav24/valve/releases/tag/valvejs%400.5.0",
+      "publishedAt": "2026-10-17T04:17:06Z",
+      "prerelease": false
+    },
     {
       "tag": "valvejs@0.4.1",
       "name": "valvejs@0.4.1",
