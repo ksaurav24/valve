@@ -502,32 +502,52 @@ describe('global concurrency', () => {
         await valve.close();
       },
     );
-    it('polls lease waits every 50ms only without a subscriber', async () => {
-      vi.useFakeTimers();
-      for (const subscribe of [false, true]) {
-        const { store, calls } = counted(memoryStore(), subscribe);
-        const options = {
-          id: 'lease-wait',
-          concurrency: { limit: 1, scope: 'global' as const, leaseTtl: 10000 },
-          store,
-        };
-        const holder = createValve(options);
-        const valve = createValve(options);
-        let release!: () => void;
-        const held = holder.run(() => new Promise<void>((r) => (release = r)));
-        await vi.advanceTimersByTimeAsync(0);
-        calls.count = 0;
-        const waiting = valve.run(() => 2);
-        await vi.advanceTimersByTimeAsync(1000);
-        if (subscribe) expect(calls.count).toBeLessThanOrEqual(2);
-        else expect(calls.count).toBeGreaterThanOrEqual(15);
-        release();
-        await held;
-        await vi.advanceTimersByTimeAsync(60);
-        expect(await waiting).toBe(2);
-        await Promise.all([holder.close(), valve.close()]);
-      }
-    });
+    it.each([
+      { subscribe: false, random: 0, expectedCalls: 21 },
+      // A 71ms interval puts the next poll 65ms after release at t=1000.
+      { subscribe: false, random: 0.84, expectedCalls: 15 },
+      { subscribe: false, random: 1 - Number.EPSILON, expectedCalls: 14 },
+      { subscribe: true, random: 0, expectedCalls: 2 },
+      { subscribe: true, random: 1 - Number.EPSILON, expectedCalls: 1 },
+    ])(
+      'bounds lease polling and wakes after release (subscriber=$subscribe, random=$random)',
+      async ({ subscribe, random, expectedCalls }) => {
+        vi.useFakeTimers();
+        const jitter = vi.spyOn(Math, 'random').mockReturnValue(random);
+        try {
+          const { store, calls } = counted(memoryStore(), subscribe);
+          const options = {
+            id: 'lease-wait',
+            concurrency: {
+              limit: 1,
+              scope: 'global' as const,
+              leaseTtl: 10000,
+            },
+            store,
+          };
+          const holder = createValve(options);
+          const valve = createValve(options);
+          let release!: () => void;
+          const held = holder.run(
+            () => new Promise<void>((r) => (release = r)),
+          );
+          await vi.advanceTimersByTimeAsync(0);
+          calls.count = 0;
+          const waiting = valve.run(() => 2);
+          await vi.advanceTimersByTimeAsync(1000);
+          expect(calls.count).toBe(expectedCalls);
+          release();
+          await held;
+          // Fallback polling adds up to 25ms of jitter to its 50ms delay.
+          await vi.advanceTimersByTimeAsync(75);
+          expect(valve.stats().totals.started).toBe(1);
+          expect(await waiting).toBe(2);
+          await Promise.all([holder.close(), valve.close()]);
+        } finally {
+          jitter.mockRestore();
+        }
+      },
+    );
     it('keeps release fan-out well below one admission per waiting valve', async () => {
       vi.useFakeTimers();
       const { store, calls } = counted(memoryStore());
