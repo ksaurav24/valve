@@ -1,7 +1,7 @@
 // Real Redis/Valkey parity, structural clients, shared pauses, and process bounds.
 import { fork } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
-import { afterAll, beforeAll, describe, expect, it } from 'vitest';
+import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest';
 import fc from 'fast-check';
 import { Redis } from 'ioredis5';
 import { createClient as createV4 } from 'redis4';
@@ -30,6 +30,63 @@ suite('real Redis/Valkey', () => {
     await v4.quit();
     await v5.quit();
   });
+  it.each(['local', 'global'] as const)(
+    'rejects a granted callback at its deadline and frees %s concurrency',
+    async (scope) => {
+      const store = redisStore({ client: io, prefix });
+      const acquire = vi.spyOn(store, 'acquire');
+      const release = vi.spyOn(store, 'release');
+      const api = createValve({
+        id: `invocation-${scope}-${crypto.randomUUID()}`,
+        store,
+        concurrency:
+          scope === 'global' ? { limit: 2, scope, leaseTtl: 10000 } : 2,
+      });
+      const fn = vi.fn();
+      let clock: ReturnType<typeof vi.spyOn> | undefined;
+      try {
+        const submittedAt = Date.now();
+        clock = vi.spyOn(Date, 'now').mockReturnValue(submittedAt);
+        const first = api.run(() => {
+          // Model a synchronous event-loop stall without timing-sensitive sleeps.
+          clock!.mockReturnValue(submittedAt + 1000);
+        });
+        const second = api.run(fn, { maxWait: 1000 });
+        const outcomes = await Promise.allSettled([first, second]);
+        expect(acquire.mock.calls[0]![0].costs).toHaveLength(2);
+        expect((await acquire.mock.results[0]!.value).granted).toBe(2);
+        expect(outcomes[0]!.status).toBe('fulfilled');
+        expect(outcomes[1]).toMatchObject({
+          status: 'rejected',
+          reason: { code: 'MAX_WAIT_EXCEEDED' },
+        });
+        expect(fn).not.toHaveBeenCalled();
+        expect(api.stats()).toMatchObject({
+          queued: 0,
+          running: 0,
+          totals: { started: 1, succeeded: 1, failed: 0, rejected: 1 },
+        });
+        clock?.mockRestore();
+        const replacements = await Promise.all([
+          api.run(() => 1),
+          api.run(() => 2),
+        ]);
+        expect(replacements).toEqual([1, 2]);
+        await api.close();
+        if (scope === 'global') {
+          const tokens = release.mock.calls.flatMap(([, leases]) => [
+            ...leases,
+          ]);
+          expect(tokens).toHaveLength(4);
+          expect(new Set(tokens).size).toBe(4);
+        }
+      } finally {
+        clock?.mockRestore();
+        await api.close();
+        await store.close();
+      }
+    },
+  );
   it.each(['ioredis', 'node-redis-v4', 'node-redis-v5'] as const)(
     'grants, pauses, resumes and recovers NOSCRIPT with %s',
     async (kind) => {
