@@ -22,6 +22,9 @@ interface Store {
 
 interface HeadersModule {
   defaultFeedback(response: { status: number; headers: Headers }): unknown;
+  retryAfter(): (response: { status: number; headers: Headers }) => unknown;
+  ietfRateLimit(): (response: { status: number; headers: Headers }) => unknown;
+  xRateLimit(): (response: { status: number; headers: Headers }) => unknown;
 }
 
 const noop = () => undefined;
@@ -48,7 +51,8 @@ export async function microSuites(opts: {
   const headersUrl = pathToFileURL(
     join(dirname(fileURLToPath(opts.valveModuleUrl)), 'headers', 'index.js'),
   ).href;
-  const { defaultFeedback } = (await import(headersUrl)) as HeadersModule;
+  const { defaultFeedback, retryAfter, ietfRateLimit, xRateLimit } =
+    (await import(headersUrl)) as HeadersModule;
   const options = {
     iterations: 1,
     retainSamples: true,
@@ -144,6 +148,22 @@ export async function microSuites(opts: {
   headers.add('defaultFeedback/typical', () =>
     defaultFeedback({ headers: feedbackHeaders, status: 429 }),
   );
+  const headerResponse = {
+    status: 429,
+    headers: new Headers({
+      'retry-after': '2',
+      ratelimit: '"default";r=0;t=2',
+      'x-ratelimit-remaining': '0',
+      'x-ratelimit-reset': '2',
+    }),
+  };
+  for (const [name, reader] of [
+    ['retryAfter', retryAfter()],
+    ['ietfRateLimit', ietfRateLimit()],
+    ['xRateLimit', xRateLimit()],
+    ['defaultFeedback', defaultFeedback],
+  ] as const)
+    headers.add(`${name}/429`, () => reader(headerResponse));
 
   const timers = make('node.timers');
   timers.add(

@@ -26,6 +26,9 @@ pnpm perf infra down redis74
 pnpm perf infra down valkey8
 ```
 
+All active benchmark code, dependencies, size budgets, and probes live in this package.
+See [OWNERSHIP.md](./docs/OWNERSHIP.md) for the migration and CI coverage map.
+
 See [REPRODUCING.md](./REPRODUCING.md) for comparisons, run archives, and exact reproduction.
 [IMPLEMENTATION.md](./IMPLEMENTATION.md) records executed checks, retained run IDs, and limits.
 
@@ -115,6 +118,10 @@ pnpm perf calibrate
 pnpm perf infra up|down|status|adopt|images
 pnpm perf build [--ref <git-ref>] [--patch <file>]
 pnpm perf micro | model | quick
+pnpm perf footprint [--check] [--base <ref>]
+pnpm perf startup [--base <ref>] [--reps 3]
+pnpm perf scoped [--stores memory,redis74] [--iterations 100] [--base <ref>]
+pnpm perf drift [--base <ref>] [--jobs 200] [--response-ms 0] [--reps 3]
 pnpm perf smoke [--stores redis74,valkey8] [--suite <name>]
 pnpm perf plan --profile targeted|nightly|decision [--suite <name>] [--budget 40m]
 pnpm perf matrix --profile <profile> --base <ref> [--head <ref>|--current] [--yes]

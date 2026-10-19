@@ -105,7 +105,7 @@ Those historical measurements predate scoped admission. The scoped extension
 uses source-entry CI ceilings of 12,000 bytes for core, 6,200 for Redis, and
 2,048 for headers. It adds identity validation, a delayed queue, and a second
 Lua script; it does not meet the original core or Redis size targets. See the
-[scoped benchmark report](https://github.com/ksaurav24/valve/blob/master/packages/valve/bench/SCOPED.md)
+[scoped benchmark report](https://github.com/ksaurav24/valve/blob/master/packages/perf/docs/history/SCOPED.md)
 for current sizes and measured growth. Consumer sizes depend on which exports
 remain reachable after bundling; the full headers entry is larger than a
 consumer importing only `retryAfter()`.

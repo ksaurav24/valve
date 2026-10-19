@@ -28,6 +28,7 @@ import { SYLVIE_POLICY } from './supervisor/resources.ts';
 import { runSylvie } from './tiers/sylvie.ts';
 import { c1, calibrate, doctor, micro, model } from './tiers/local.ts';
 import { c1Safety, type C1Result } from './tiers/c1.ts';
+import { measure } from './measure/run.ts';
 import {
   preparePlan,
   printPlan,
@@ -42,6 +43,9 @@ Usage: pnpm perf <command> [options]
   infra up|down|status|images [SERVER,...] [--cpuset CPUS] [--recreate]
   infra adopt URL --empty-only [--name NAME]
   micro [--quick] [--filter TEXT] | model | quick
+  footprint [--check] [--base REF] | startup [--base REF] [--reps 3]
+  scoped [--stores memory,redis74] [--iterations 100] [--base REF]
+  drift [--base REF] [--jobs 200] [--response-ms 0] [--reps 3]
   plan --profile smoke|targeted|sylvie|nightly|decision [--suite NAME,...] [--budget 40m]
   smoke | matrix --base REF [--head REF|--current] [--profile targeted]
   libs [--category L1,L2,D1] | soak [--duration 4h] | chaos [--faults TYPE,...]
@@ -90,6 +94,9 @@ const strings = [
   'name',
   'filter',
   'archive',
+  'jobs',
+  'response-ms',
+  'iterations',
 ];
 const booleans = [
   'help',
@@ -105,6 +112,7 @@ const booleans = [
   'empty-only',
   'recreate',
   'build',
+  'check',
 ];
 const commonRun = [
   'profile',
@@ -148,6 +156,10 @@ const allowed: Record<string, string[]> = {
   micro: ['quick', 'filter', 'rebuild'],
   model: [],
   quick: ['filter', 'rebuild'],
+  footprint: ['check', 'base', 'head', 'current'],
+  startup: ['base', 'head', 'current', 'reps'],
+  scoped: ['base', 'head', 'current', 'reps', 'iterations', 'stores'],
+  drift: ['base', 'head', 'current', 'reps', 'jobs', 'response-ms'],
   plan: commonRun,
   smoke: commonRun,
   matrix: commonRun,
@@ -271,6 +283,9 @@ export function parseCli(argv: string[]) {
   if (durations.length > 1)
     fail('use only one of --duration, --window, --window-ms');
   const windowSec = duration(text('duration') ?? text('window'), 'window');
+  numberOption(text('jobs'), 'jobs', 2, 5000);
+  numberOption(text('response-ms'), 'response-ms', 0, 100);
+  numberOption(text('iterations'), 'iterations', 1, 1000);
   const options: TierOptions = {
     tier: (command === 'plan'
       ? text('profile') === 'smoke'
@@ -445,6 +460,30 @@ export async function main(
           quick: v.quick === true,
           filter: text('filter'),
           rebuild: true,
+        },
+        log,
+      );
+    case 'footprint':
+    case 'startup':
+    case 'scoped':
+    case 'drift':
+      return measure(
+        command,
+        {
+          base: options!.base,
+          head: options!.head,
+          check: v.check === true,
+          reps: options!.reps,
+          stores: options!.stores,
+          jobs: text('jobs') === undefined ? undefined : Number(text('jobs')),
+          responseMs:
+            text('response-ms') === undefined
+              ? undefined
+              : Number(text('response-ms')),
+          iterations:
+            text('iterations') === undefined
+              ? undefined
+              : Number(text('iterations')),
         },
         log,
       );

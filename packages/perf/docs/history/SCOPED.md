@@ -1,5 +1,10 @@
 # Scoped admission: correctness and performance
 
+> Historical report, moved from `packages/valve/bench`. Measurements and claims
+> below describe the recorded revisions. Old reproduction commands require the
+> [pre-migration checkout](https://github.com/ksaurav24/valve/tree/16dac5920a90623285346e9f06355b242b738d9b).
+> Use [the perf ownership guide](../OWNERSHIP.md) for current commands.
+
 Raw results are not kept in the repository. Links to them point to commit
 [`1979020`](https://github.com/ksaurav24/valve/tree/197902098769e5abf396d16582a42d1b7a123ded/packages/valve/bench), the last revision
 that contained them; rerun the commands below to regenerate them.

@@ -79,26 +79,19 @@
     "test:integration": "pnpm build && vitest run --config vitest.integration.config.ts",
     "test:types": "vitest run --typecheck.only",
     "check:package": "publint && node ../../scripts/check-package.mjs",
-    "check:size": "node ../../scripts/check-size.mjs",
     "docs:api": "typedoc --options typedoc.json"
   },
   "devDependencies": {
     "@arethetypeswrong/cli": "0.18.5",
     "@vitest/coverage-v8": "5.0.3",
-    "bottleneck": "2.19.5",
-    "esbuild": "0.28.2",
     "fast-check": "4.10.2",
     "ioredis": "6.0.0",
     "ioredis5": "npm:ioredis@^5.11.1",
-    "mitata": "1.0.34",
-    "p-limit": "7.3.3",
-    "p-queue": "9.3.3",
     "publint": "0.3.25",
     "redis": "6.3.0",
     "redis4": "npm:redis@^4.7.1",
     "redis5": "npm:redis@^5.12.1",
     "tsdown": "0.23.0",
-    "tsx": "4.23.15",
     "typedoc": "0.28.20",
     "vitest": "5.0.3"
   }

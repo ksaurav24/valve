@@ -32,11 +32,24 @@ import { runTrial } from '../supervisor/trial.ts';
 const median = (xs: number[]) =>
   [...xs].sort((a, b) => a - b)[Math.floor(xs.length / 2)]!;
 
-function localManifest(
-  tier: 'micro' | 'model' | 'calibrate' | 'c1',
+export function localManifest(
+  tier: RunManifest['tier'],
   build: BuildIdentity,
+  options: {
+    builds?: Record<string, BuildIdentity>;
+    reps?: number;
+    runtime?: Record<string, unknown>;
+    servers?: RunManifest['servers'];
+  } = {},
 ): RunManifest {
-  const fingerprint = captureFingerprint();
+  const fingerprint = captureFingerprint(
+    Object.fromEntries(
+      Object.entries(options.servers ?? {}).map(([name, server]) => [
+        name,
+        server.image,
+      ]),
+    ),
+  );
   const m: RunManifest = {
     version: 1,
     runId: `${tier}-${Date.now()}-${randomUUID().slice(0, 8)}`,
@@ -49,14 +62,15 @@ function localManifest(
     fingerprintId: fingerprintId(fingerprint),
     authoritative: false,
     authoritativeReasons: ['portable local tier'],
-    builds: { current: build },
+    builds: options.builds ?? { current: build },
     arms: [],
     cells: [],
-    reps: 1,
+    reps: options.reps ?? 1,
     baseSeed: 42,
     planHash: '',
     estimateSec: 0,
-    servers: {},
+    servers: options.servers ?? {},
+    ...(options.runtime ? { runtime: options.runtime } : {}),
   };
   m.planHash = planHash(m);
   writeManifest(m);

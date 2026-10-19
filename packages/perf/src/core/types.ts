@@ -205,11 +205,14 @@ export interface BuildIdentity {
   dirty: boolean;
   diffSha256?: string;
   patchSha256?: string;
-  /** Absolute path of the valve package directory holding `dist/` and `src/redis/scripts.ts`. */
+  /** Absolute path of the frozen Valve package, including dist and matching source. */
   packageDir: string;
   /** SHA-256 over sorted `dist/` file hashes. */
   distSha256: string;
   files: Record<string, string>;
+  /** Optional only for manifests written before source footprint measurements existed. */
+  sourceFiles?: Record<string, string>;
+  sourceSha256?: string;
   lockSha256: string;
   luaSha1: Record<string, string>;
   builtAt: string;

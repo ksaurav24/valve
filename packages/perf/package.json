@@ -21,6 +21,7 @@
     "@stdlib/stats-base-dists-t-quantile": "0.2.3",
     "@types/node": "^24.19.1",
     "bottleneck": "2.19.5",
+    "esbuild": "0.28.2",
     "fast-check": "4.10.2",
     "ioredis": "5.11.1",
     "p-limit": "7.3.3",

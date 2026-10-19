@@ -85,12 +85,20 @@ Every row except "No eviction" shows silent loss. See
 
 ## Benchmarks
 
+All benchmark tooling belongs to the private `packages/perf` workspace.
+
 ```sh
-pnpm bench          # Local scheduler workloads
-pnpm bench:compare  # Repeated comparisons. Add REDIS_URL and VALKEY_URL for distributed runs.
+pnpm perf quick                    # Portable models and microbenchmarks
+pnpm perf footprint --check         # Existing source-entry size budgets
+pnpm perf startup --base master     # Cold import and initialization samples
+pnpm perf:sylvie                    # Quiet-laptop comparison preset
 ```
 
-Recorded results and methodology live in `packages/valve/bench/COMPARISON.md`.
+Use `pnpm perf libs` for library comparisons after provisioning dedicated
+harness-owned stores. See the [harness guide](https://github.com/ksaurav24/valve/tree/master/packages/perf)
+for setup, statistical rules, scoped admission, and drift probes. Measurements
+and manifests are written under `.perf/`. Historical reports live in
+`packages/perf/docs/history/` and retain their original revision references.
 
 ## Work on the docs
 

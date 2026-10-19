@@ -19,6 +19,10 @@ export interface RunManifest {
     | 'soak'
     | 'chaos'
     | 'c1'
+    | 'footprint'
+    | 'startup'
+    | 'scoped'
+    | 'drift'
     | 'calibrate';
   profile: string;
   createdAt: string;
@@ -54,6 +58,7 @@ export function planHash(
         k,
         {
           dist: b.distSha256,
+          source: b.sourceSha256,
           patch: b.patchSha256,
           lock: b.lockSha256,
           lua: b.luaSha1,

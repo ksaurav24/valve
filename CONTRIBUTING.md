@@ -146,11 +146,17 @@ valve SVG identity and local Geist fonts. After installing Chromium, run
 `pnpm --filter @valve/web social:images` to regenerate them. Image generation
 does not run during installation or deployment builds.
 
-See `packages/valve/bench/COMPARISON.md` for measured targets that remain open.
+See `packages/perf/docs/history/COMPARISON.md` for historical measurements and open targets.
 
 ## Performance
 
-Run `pnpm bench:compare` for repeated comparisons with Bottleneck, p-limit and
-p-queue. Set `REDIS_URL` and `VALKEY_URL` to include shared-store cases. Raw
-results and workload limitations live in `packages/valve/bench/COMPARISON.md`.
-Run benchmarks without builds or tests competing for CPU.
+All benchmark code, dependencies, budgets, reports, and infrastructure belong to
+`packages/perf`. The library owns its runtime, build, unit tests, integration
+tests, and package checks. Do not add benchmark helpers or dependencies to
+`packages/valve`.
+
+Start with `pnpm perf quick` and `pnpm perf footprint --check` (also available
+through `pnpm check:size`). Use `pnpm perf:sylvie` for Sylvie, or the matrix and
+library commands for other comparisons. Read [the harness guide](packages/perf/README.md)
+and [the migration map](packages/perf/docs/OWNERSHIP.md) for store setup and coverage.
+Run measurements without builds or tests competing for CPU.

@@ -40,6 +40,11 @@ describe('CLI validation and bounded planning', () => {
     ['smoke', '--run-id', '../escape'],
     ['smoke', '--endpoint', 'http://localhost'],
     ['not-a-command'],
+    ['footprint', '--reps', '3'],
+    ['startup', '--check'],
+    ['scoped', '--iterations', '0'],
+    ['drift', '--jobs', '1'],
+    ['drift', '--response-ms', '-1'],
   ])('refuses invalid arguments %j', (...args) => {
     expect(() => parseCli(args)).toThrow(UsageError);
   });

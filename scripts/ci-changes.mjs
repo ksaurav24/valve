@@ -47,6 +47,12 @@ export function classifyChanges(paths, versionOnly = false) {
     ) {
       checks.package = checks.website = true;
     } else if (
+      path.startsWith('packages/perf/') ||
+      /^\.github\/workflows\/perf-.*\.yml$/.test(path)
+    ) {
+      if (!path.endsWith('.md')) checks.benchmarks = true;
+    } else if (
+      // Recognize old paths only so deletions during the migration stay tooling changes.
       path.startsWith('packages/valve/bench/') ||
       /^scripts\/.*(bench|footprint)/.test(path)
     ) {
@@ -65,7 +71,7 @@ export function classifyChanges(paths, versionOnly = false) {
     ) {
       checks.website = true;
     } else if (
-      /^\.github\/workflows\/(test|runtime|bench|changes)\.yml$/.test(path) ||
+      /^\.github\/workflows\/(test|runtime|changes)\.yml$/.test(path) ||
       path.startsWith('scripts/ci-changes')
     ) {
       Object.assign(checks, all);

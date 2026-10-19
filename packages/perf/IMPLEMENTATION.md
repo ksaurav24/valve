@@ -20,6 +20,55 @@ production source changes or package release.
 - The nightly workflow is manual-only, defaulting to hosted smoke. Enable its schedule only
   after provisioning the `valve-perf` runner and disjoint server/worker CPU variables.
 
+## Complete benchmark ownership migration
+
+All active benchmarks now belong to `packages/perf`, including size budgets,
+bundle/source attribution, cold startup, public-store drift, and scoped admission.
+The old library bench directory and six root benchmark scripts are removed. The
+four reports moved to `docs/history/` with their original measurements and evidence
+links retained. See [the coverage map](./docs/OWNERSHIP.md).
+
+Valve's production source, exports, and runtime dependencies are unchanged. Its
+benchmark-only development dependencies and size script were removed. A patch
+changeset records that package metadata cleanup; no version was published.
+The website changelog was synchronized, rebuilt, and checked at `/changelog`,
+`/releases`, and the homepage. Published 0.5.2 remains visible, and the changelog
+retains newest-first ordering.
+
+`perf-pr.yml` now owns portable, real-store, and footprint checks on relevant PRs
+and master pushes; `bench.yml` is retired. The deterministic size budgets are
+unchanged. Hosted timing probes remain descriptive; the old 15% pooled-median
+gate is replaced by the controlled-host harness decision protocol, not by a
+hosted timing threshold. Nightly and decision execution remain manual.
+
+Verification on Node 24.21.0 and pnpm 11.28.4:
+
+- Full `pnpm check` passed: lint/format, workspace types, 389 production tests with
+  coverage, type tests, all builds, source conventions, package validation, and size.
+- Final perf typecheck and all 167 tests passed. Real-timer unit tests now run
+  sequentially: one Bottleneck spacing assertion failed when the new cold-process
+  probes ran concurrently. The existing 3 ms tolerance was not changed.
+- All 48 Redis/Valkey integration tests, 21 CI/release script tests, 22 website
+  tests, and 32 desktop/mobile browser checks passed. Actionlint 1.7.7 passed.
+- `footprint-1792395600967-c4775117`: both artifacts' 16 footprint rows exactly match the
+  pre-migration tool. Source sizes remain 12,749 / 6,235 / 1,263 gzip bytes against
+  ceilings of 12,750 / 6,300 / 2,048.
+- `startup-1792395604559-8ed31b00` retained 180 cold-process samples; `drift-1792395612691-22a4e049` retained
+  six paired drift samples. Both measure master and current with one implementation.
+- `model-1792395621920-739ca0d7` and `micro-1792395623591-869e0385` completed the quick tier: 77 model/oracle
+  checks and 13 micro tasks, including the individual header readers.
+- `scoped-1792395638310-6a3a3b1f` passed 162 scoped scenarios and 12 contention scenarios
+  across both artifacts and memory/Redis 7.4/Valkey 8, at the original 100 iterations.
+  Policies are immutable, matching `createValve`, without importing private helpers.
+- `c1-1792395634531-8e4e7410` passed memory/Redis/Valkey deadline rejection. `perf-ownership-final-node24` completed
+  all 34 selected smoke cells with safety PASS and exit 0.
+
+These final command manifests record harness SHA-256
+`9bc991b9431d29a01a993630ebd5fb6dcd074fe81bb45a01b0178d3f252bb394`. Run metadata is retained in `.perf/verify-ownership-20261019/`.
+Both temporary stores were removed, and all eight pre-existing containers retain
+their original running state. These diagnostics do not resolve the earlier Sylvie
+A/A uncertainty or establish new performance improvements.
+
 ## Sylvie preset
 
 The preset is named after Sylvie, the i5-12450H laptop used for calibration. It was originally

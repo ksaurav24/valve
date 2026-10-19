@@ -179,6 +179,7 @@ can outlive its lease; external fencing is needed for strict partition safety.
 Close the valves, then `store.close()`, then your own subscriber and command
 clients. For node-redis, connect the duplicated subscriber before use.
 
-Run `pnpm bench:compare` for repeated comparisons. Add `REDIS_URL` and
-`VALKEY_URL` to include distributed workloads. Raw samples and methodology
-are recorded in `packages/valve/bench/COMPARISON.md`.
+Benchmark tooling lives in the private [performance workspace](packages/perf/README.md).
+Run `pnpm perf quick` for portable checks or `pnpm perf:sylvie` for the laptop
+comparison preset. Shared-store comparisons use dedicated harness-owned stores;
+see the harness documentation for setup, evidence, and workload limitations.

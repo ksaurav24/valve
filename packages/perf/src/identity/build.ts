@@ -53,6 +53,12 @@ export function identify(
     throw new Error(`No build at ${dist}; build valvejs first.`);
   const files: Record<string, string> = {};
   for (const f of walk(dist)) files[relative(packageDir, f)] = fileSha256(f);
+  const sourceFiles = Object.fromEntries(
+    walk(join(packageDir, 'src')).map((f) => [
+      relative(packageDir, f),
+      fileSha256(f),
+    ]),
+  );
   const root = resolve(packageDir, '../..');
   const scripts = loadScripts(packageDir);
   return {
@@ -66,6 +72,8 @@ export function identify(
         .join('\n'),
     ),
     files,
+    sourceFiles,
+    sourceSha256: sha256(JSON.stringify(sourceFiles)),
     lockSha256: fileSha256(join(root, 'pnpm-lock.yaml')),
     luaSha1: Object.fromEntries(
       Object.values(scripts).map((s) => [s.name, s.sha]),
@@ -113,6 +121,7 @@ function freezeBuild(identity: BuildIdentity): BuildIdentity {
   const parent = ensureDir(join(buildsDir, 'artifacts'));
   const key = sha256(
     identity.distSha256 +
+      identity.sourceSha256 +
       identity.lockSha256 +
       JSON.stringify(identity.luaSha1),
   );
@@ -128,16 +137,17 @@ function freezeBuild(identity: BuildIdentity): BuildIdentity {
       join(identity.packageDir, 'package.json'),
       join(target, 'package.json'),
     );
-    ensureDir(join(target, 'src/redis'));
-    cpSync(
-      join(identity.packageDir, 'src/redis/scripts.ts'),
-      join(target, 'src/redis/scripts.ts'),
-    );
+    cpSync(join(identity.packageDir, 'src'), join(target, 'src'), {
+      recursive: true,
+    });
     cpSync(
       resolve(identity.packageDir, '../../pnpm-lock.yaml'),
       join(temporary, 'pnpm-lock.yaml'),
     );
-    for (const [file, hash] of Object.entries(identity.files))
+    for (const [file, hash] of Object.entries({
+      ...identity.files,
+      ...identity.sourceFiles,
+    }))
       if (fileSha256(join(target, file)) !== hash)
         throw new Error(
           'Build changed while snapshotting; retry after the build completes',
@@ -148,7 +158,10 @@ function freezeBuild(identity: BuildIdentity): BuildIdentity {
       if (!existsSync(root)) throw error;
     }
   }
-  for (const [file, hash] of Object.entries(identity.files))
+  for (const [file, hash] of Object.entries({
+    ...identity.files,
+    ...identity.sourceFiles,
+  }))
     if (fileSha256(join(packageDir, file)) !== hash)
       throw new Error(`Frozen artifact is corrupted: ${file}`);
   return { ...identity, packageDir };
@@ -177,6 +190,7 @@ export function refBuild(
     });
     if (
       again.distSha256 === id.distSha256 &&
+      again.sourceSha256 === id.sourceSha256 &&
       again.lockSha256 === id.lockSha256 &&
       JSON.stringify(again.luaSha1) === JSON.stringify(id.luaSha1)
     )

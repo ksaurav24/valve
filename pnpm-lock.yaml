@@ -210,6 +210,9 @@ importers:
       bottleneck:
         specifier: 2.19.5
         version: 2.19.5
+      esbuild:
+        specifier: 0.28.2
+        version: 0.28.2
       fast-check:
         specifier: 4.10.2
         version: 4.10.2
@@ -246,12 +249,6 @@ importers:
       '@vitest/coverage-v8':
         specifier: 5.0.3
         version: 5.0.3(vitest@5.0.3)
-      bottleneck:
-        specifier: 2.19.5
-        version: 2.19.5
-      esbuild:
-        specifier: 0.28.2
-        version: 0.28.2
       fast-check:
         specifier: 4.10.2
         version: 4.10.2
@@ -261,15 +258,6 @@ importers:
       ioredis5:
         specifier: npm:ioredis@^5.11.1
         version: ioredis@5.11.1(supports-color@7.2.0)
-      mitata:
-        specifier: 1.0.34
-        version: 1.0.34
-      p-limit:
-        specifier: 7.3.3
-        version: 7.3.3
-      p-queue:
-        specifier: 9.3.3
-        version: 9.3.3
       publint:
         specifier: 0.3.25
         version: 0.3.25
@@ -285,9 +273,6 @@ importers:
       tsdown:
         specifier: 0.23.0
         version: 0.23.0(@arethetypeswrong/core@0.18.5)(@volar/typescript@2.4.28(typescript@6.0.3))(publint@0.3.25)(tsx@4.23.15)(typescript@6.0.3)
-      tsx:
-        specifier: 4.23.15
-        version: 4.23.15
       typedoc:
         specifier: 0.28.20
         version: 0.28.20(typescript@6.0.3)
@@ -4673,9 +4658,6 @@ packages:
   minimatch@10.2.6:
     resolution: {integrity: sha512-vpLQEs+VLCr1nU0BXS07maYoFwlDAH0gngQuuttxIwutDFEMHq2blX+8vpgxDdK3J1PwjCJiep77OitTZ4Ll1A==}
     engines: {node: 18 || 20 || >=22}
-
-  mitata@1.0.34:
-    resolution: {integrity: sha512-Mc3zrtNBKIMeHSCQ0XqRLo1vbdIx1wvFV9c8NJAiyho6AjNfMY8bVhbS12bwciUdd1t4rj8099CH3N3NFahaUA==}
 
   motion-dom@14.0.0:
     resolution: {integrity: sha512-aU3ApXo1yTpeUi3JU+jbDk2TELjxPE3MbBMUP7nZHlARb6RweJK+ojmLjpuB0YsY6zhbBl1YWGo8LMsI1/Llqw==}
@@ -10352,8 +10334,6 @@ snapshots:
   minimatch@10.2.6:
     dependencies:
       brace-expansion: 5.0.12
-
-  mitata@1.0.34: {}
 
   motion-dom@14.0.0:
     dependencies:

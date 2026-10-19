@@ -4,13 +4,8 @@ on:
   pull_request:
     branches: [master]
     types: [opened, synchronize, reopened, ready_for_review]
-    paths:
-      - '.github/workflows/perf-*.yml'
-      - 'package.json'
-      - 'pnpm-lock.yaml'
-      - 'pnpm-workspace.yaml'
-      - 'packages/perf/**'
-      - 'packages/valve/**'
+  push:
+    branches: [master]
   workflow_dispatch:
 
 permissions:
@@ -21,11 +16,19 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
+  changes:
+    uses: ./.github/workflows/changes.yml
+
   portable:
+    needs: changes
+    if: always() && (needs.changes.result != 'success' || needs.changes.outputs.benchmarks == 'true')
     name: Unit, typecheck, and quick
     runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:
+      - name: Require successful change detection
+        if: needs.changes.result != 'success'
+        run: exit 1
       - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
         with:
           fetch-depth: 0
@@ -43,6 +46,8 @@ jobs:
         run: pnpm --filter @valve/perf typecheck
       - name: Portable quick tier
         run: pnpm perf quick
+      - name: Public drift diagnostic
+        run: pnpm perf drift --jobs 20 --response-ms 5 --reps 1
       - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         if: always()
         with:
@@ -52,10 +57,15 @@ jobs:
           retention-days: 14
 
   smoke:
+    needs: changes
+    if: always() && (needs.changes.result != 'success' || needs.changes.outputs.benchmarks == 'true')
     name: Redis 7.4 and Valkey 8 smoke
     runs-on: ubuntu-latest
     timeout-minutes: 15
     steps:
+      - name: Require successful change detection
+        if: needs.changes.result != 'success'
+        run: exit 1
       - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
         with:
           fetch-depth: 0
@@ -76,6 +86,8 @@ jobs:
         run: |
           PERF_INTEGRATION=1 pnpm --filter @valve/perf test:integration
           pnpm perf c1 --stores memory,redis74,valkey8
+      - name: Scoped admission cardinality and contention probe
+        run: pnpm perf scoped --stores memory,redis74,valkey8 --iterations 2
       - name: Run the smoke profile
         run: pnpm perf smoke --stores memory,redis74,valkey8
       - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
@@ -90,3 +102,40 @@ jobs:
         run: |
           pnpm perf infra down redis74
           pnpm perf infra down valkey8
+
+  footprint:
+    name: Bundle budgets and cold startup
+    needs: changes
+    if: always() && (needs.changes.result != 'success' || needs.changes.outputs.benchmarks == 'true')
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Require successful change detection
+        if: needs.changes.result != 'success'
+        run: exit 1
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - uses: pnpm/action-setup@0977fd99725f1db4007ccb2928dbb4e90d06cc86 # v6
+      - uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6
+        with:
+          node-version-file: .node-version
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - name: Measure both builds with the current harness
+        env:
+          PERF_BASE_REF: ${{ github.event.pull_request.base.sha }}
+        shell: bash
+        run: |
+          args=()
+          if [[ -n "$PERF_BASE_REF" ]]; then args+=(--base "$PERF_BASE_REF"); fi
+          pnpm perf footprint --check "${args[@]}"
+          pnpm perf startup "${args[@]}"
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        if: always()
+        with:
+          name: perf-pr-footprint-${{ github.run_attempt }}
+          path: .perf/runs/
+          if-no-files-found: warn
+          retention-days: 14
