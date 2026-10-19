@@ -291,29 +291,29 @@ export function createValve(options: ValveOptions): Valve {
     // A released lease wakes the valve once the store has the slot back.
     if (!job.lease) schedule();
   }
-  /** Start a grant unless cancelled or past a positive queue-wait deadline. */
+  /** Reserve capacity, then check eligibility immediately before invoking a grant. */
   function start(job: Job) {
-    if (job.state !== 'queued') {
-      if (job.lease) leases!.release(job.lease);
-      return;
-    }
-    if (job.waitMs && job.deadline <= Date.now()) {
-      rejectJob(
-        job,
-        'MAX_WAIT_EXCEEDED',
-        `job waited longer than maxWait ${job.waitMs}ms.`,
-      );
-      if (job.lease) leases!.release(job.lease);
-      return;
-    }
-    waiting.delete(job);
-    cleanup(job);
-    job.state = 'running';
-    job.location = null;
     running++;
-    totals.started++;
+    job.location = null;
     // Jobs always execute in a microtask, including the memory fast path.
     queueMicrotask(() => {
+      if (job.state === 'queued' && job.waitMs && job.deadline <= Date.now())
+        rejectJob(
+          job,
+          'MAX_WAIT_EXCEEDED',
+          `job waited longer than maxWait ${job.waitMs}ms.`,
+        );
+      if (job.state !== 'queued') {
+        running--;
+        if (job.lease) leases!.release(job.lease);
+        else schedule();
+        finishIdle();
+        return;
+      }
+      waiting.delete(job);
+      cleanup(job);
+      job.state = 'running';
+      totals.started++;
       const leaseError = job.lease ? leases!.error(job.lease) : undefined;
       if (leaseError) {
         settle(job, false, leaseError);
