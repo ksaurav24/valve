@@ -1,7 +1,7 @@
 // Shared planning and execution for real-time tiers. Dry runs never build or start servers.
 import { randomUUID } from 'node:crypto';
 import { join } from 'node:path';
-import { DEFAULT_POLICY } from '../supervisor/resources.ts';
+import { DEFAULT_POLICY, SYLVIE_POLICY } from '../supervisor/resources.ts';
 import { captureFingerprint, fingerprintId } from '../core/fingerprint.ts';
 import {
   cellHash,
@@ -124,6 +124,14 @@ export function preparePlan(opts: TierOptions): TierPlan {
   const profile =
     opts.profile ?? (opts.tier === 'smoke' ? 'smoke' : 'targeted');
   const def = PROFILES[profile];
+  if (profile === 'sylvie') {
+    opts = { ...opts, isolate: true };
+    if (opts.tier !== 'matrix') throw new Error('sylvie is a matrix profile');
+    if (opts.workers !== undefined && opts.workers > 2)
+      throw new Error(
+        'sylvie supports at most two workers; use targeted for larger fleets',
+      );
+  }
   const known = new Set([
     ...Object.keys(CATALOG),
     ...Object.keys(CATALOG).map((x) => `${x}-netem`),
@@ -232,11 +240,16 @@ export function preparePlan(opts: TierOptions): TierPlan {
       : single
         ? ['base']
         : ['base', 'aa', 'head'];
-  const audit = !single && def.audit;
+  const libraryAudit = (cell: CellSpec) =>
+    cell.library === 'valve' && cell.store.kind === 'redis';
+  const audit =
+    (!single && def.audit) ||
+    (opts.tier === 'libs' && cells.some(libraryAudit));
   const count = looks.at(-1)! * armNames.length + (audit ? 1 : 0);
   const countFor = (cell: CellSpec) =>
     opts.tier === 'libs'
-      ? looks.at(-1)! * (cell.library === 'valve' ? 2 : 1)
+      ? looks.at(-1)! * (cell.library === 'valve' ? 2 : 1) +
+        (libraryAudit(cell) ? 1 : 0)
       : count;
   const cal = loadCalibration();
   const budget =
@@ -301,6 +314,10 @@ export async function runTier(
   opts: TierOptions,
   log: (line: string) => void = console.log,
 ): Promise<number> {
+  if (opts.profile === 'sylvie')
+    opts = { ...opts, isolate: true, requireAuthoritative: true };
+  const resourcePolicy =
+    opts.profile === 'sylvie' ? SYLVIE_POLICY : DEFAULT_POLICY;
   const plan = preparePlan(opts);
   printPlan(plan, log);
   if (!plan.cells.length)
@@ -334,6 +351,7 @@ export async function runTier(
     servers,
     !!opts.isolate,
     opts.workerCpus,
+    resourcePolicy,
   );
   if (opts.endpoint) {
     isolation.authoritative = false;
@@ -371,7 +389,7 @@ export async function runTier(
   const runtime = {
     workerCpus: isolation.workerCpus ?? null,
     serverCpus: isolation.serverCpus ?? {},
-    resourcePolicy: DEFAULT_POLICY,
+    resourcePolicy,
     recordBudgetBytesPerStream: 64 * 1024 ** 2,
   };
   const manifest: RunManifest & { runtime: typeof runtime } = {
@@ -424,6 +442,7 @@ export async function runTier(
     metricsFor,
     trial: {
       authoritative: isolation.authoritative,
+      policy: runtime.resourcePolicy,
       ...(isolation.workerCpus ? { workerCpus: isolation.workerCpus } : {}),
       ...(opts.endpoint ? { endpointFor: () => opts.endpoint! } : {}),
       keepRaw: opts.keepRaw ?? false,
@@ -435,7 +454,10 @@ export async function runTier(
     ...(opts.tier === 'libs'
       ? {
           includeTrial: (trial: PlannedTrial) =>
-            trial.arm.name === 'base' || trial.cell.library === 'valve',
+            trial.arm.name === 'audit'
+              ? trial.cell.library === 'valve' &&
+                trial.cell.store.kind === 'redis'
+              : trial.arm.name === 'base' || trial.cell.library === 'valve',
         }
       : {}),
     log,

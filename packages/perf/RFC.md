@@ -229,6 +229,9 @@ by `lifelines` (`AalenJohansenFitter`, `KaplanMeierFitter`), produced once by
 
 **A/A.**
 
+Jain fairness is not a decision metric for single-worker cells; applicability is fixed during
+planning. An inapplicable metric must not leave an otherwise valid A/A control unresolved.
+
 - Every paired matrix cell includes an A/A arm, the same artifact in separate processes.
   Library categories include Valve A/A; one-arm smoke, soak, and chaos do not make A/B claims.
 - If the A/A interval at the final look does not contain 0, or extends beyond ±m, the cell is
@@ -308,11 +311,18 @@ Runs whose estimate exceeds 60 minutes require `--yes`.
 | `quick`         | micro (reduced iterations) + model + oracle self-tests                                                       | under 90 s on a laptop              | local and PR                |
 | `smoke`         | About 22 cells, 1 rep, base arm only, 1.5 s windows, Redis 7.4 + Valkey 8, plus memory cells                 | measured in CI (section 12)         | PR, path-filtered           |
 | `targeted`      | Risk cells of one suite, 3 arms, 5 reps                                                                      | estimate printed; usually 15-30 min | developer on demand         |
+| `sylvie`        | Two workers; rate and lease cells; 3 arms, 10 fixed pairs, 15 s windows, separate correctness audits         | about 21 min on i5-12450H           | quiet local laptop          |
 | `nightly`       | Budget-bounded (`--budget`, default 40 min): risk cells by priority until the budget is used, 3 arms, 5 reps | ≤ budget                            | nightly on a dedicated host |
 | `decision`      | All suites' risk and covering cells, staged looks 5/10/20                                                    | multi-hour, printed                 | manual or release candidate |
 | `soak`, `chaos` | 1-12 h and fault scripts                                                                                     | printed                             | manual or weekly            |
 
 Speed choices:
+
+- `sylvie` keeps the existing margins and A/A rules, selects separate fast physical cores,
+  and requires a protected 3 GiB process scope with no swap. It provisions one pinned store
+  when needed and removes only what it created. The resource guard requires 4 GiB available
+  before trials, 2 GiB during trials, and no more than 2 GiB process memory. This is focused
+  rate/lease coverage; the broader profiles remain available for other mechanisms and fleets.
 
 - Workers stay warm inside a trial but are never reused across trials.
 - Rate-decision windows use at least 40 eligibility slots and at least 1.5 s. Local L1/L1-noop

@@ -24,6 +24,8 @@ import { parseDuration } from './plan/budget.ts';
 import { PROFILES, type ProfileName } from './plan/profiles.ts';
 import { writeReports } from './report/index.ts';
 import { reexecIsolated } from './supervisor/isolate.ts';
+import { SYLVIE_POLICY } from './supervisor/resources.ts';
+import { runSylvie } from './tiers/sylvie.ts';
 import { c1, calibrate, doctor, micro, model } from './tiers/local.ts';
 import { c1Safety, type C1Result } from './tiers/c1.ts';
 import {
@@ -40,7 +42,7 @@ Usage: pnpm perf <command> [options]
   infra up|down|status|images [SERVER,...] [--cpuset CPUS] [--recreate]
   infra adopt URL --empty-only [--name NAME]
   micro [--quick] [--filter TEXT] | model | quick
-  plan --profile smoke|targeted|nightly|decision [--suite NAME,...] [--budget 40m]
+  plan --profile smoke|targeted|sylvie|nightly|decision [--suite NAME,...] [--budget 40m]
   smoke | matrix --base REF [--head REF|--current] [--profile targeted]
   libs [--category L1,L2,D1] | soak [--duration 4h] | chaos [--faults TYPE,...]
   c1 [--stores memory,redis74] | report RUN_ID [--html]
@@ -52,6 +54,8 @@ Real-time options:
   --dry-run  --budget 40m  --yes  --isolate  --worker-cpus CPUS
   --require-authoritative (dedicated CI; fail if isolation requirements are unmet)
   --endpoint URL  --run-id ID  --html  --keep-raw
+Sylvie: matrix --profile sylvie defaults to HEAD vs current; 2 workers, 10 pairs,
+  15s windows, automatic CPU placement, owned store setup/cleanup, 3 GiB scope, no swap.
 Dry runs print estimates without builds or trial execution. Estimates >60 min require --yes.
 Exit: 0 completed; 1 safety/regression/execution failure; 2 invalid arguments or setup.
 C1: 0 verified deadline rejection; 1 late callback; 2 inconclusive verification.`;
@@ -258,6 +262,9 @@ export function parseCli(argv: string[]) {
   for (const s of stores ?? []) if (!known.has(s)) fail(`unknown store ${s}`);
   if (text('profile') && !(text('profile')! in PROFILES))
     fail(`unknown profile ${text('profile')}`);
+  const sylvie = text('profile') === 'sylvie';
+  if (sylvie && !['matrix', 'plan'].includes(command))
+    fail('sylvie is supported by matrix and plan');
   const durations = ['duration', 'window', 'window-ms'].filter(
     (key) => v[key] !== undefined,
   );
@@ -297,8 +304,8 @@ export function parseCli(argv: string[]) {
     budgetSec: duration(text('budget'), 'budget'),
     dryRun: command === 'plan' || v['dry-run'] === true,
     yes: v.yes === true,
-    isolate: v.isolate === true,
-    requireAuthoritative: v['require-authoritative'] === true,
+    isolate: sylvie || v.isolate === true,
+    requireAuthoritative: sylvie || v['require-authoritative'] === true,
     workerCpus: cpus(text('worker-cpus')),
     endpoint: text('endpoint'),
     runId: text('run-id') ? safeId(text('run-id')!, 'run ID') : undefined,
@@ -331,7 +338,10 @@ export async function main(
     return 0;
   }
   if (options!.isolate && !options!.dryRun) {
-    const code = reexecIsolated([process.argv[1]!, ...argv]);
+    const code = reexecIsolated(
+      [process.argv[1]!, ...argv],
+      options!.profile === 'sylvie' ? SYLVIE_POLICY.maxGroupGiB + 1 : undefined,
+    );
     if (code !== null) return code;
   }
   switch (command) {
@@ -444,6 +454,7 @@ export async function main(
       await model(log);
       return micro({ quick: true, filter: text('filter'), rebuild: true }, log);
     case 'plan': {
+      if (options!.profile === 'sylvie') return runSylvie(options!, log);
       const plan = preparePlan(options!);
       printPlan(plan, log);
       if (!plan.cells.length)
@@ -455,7 +466,9 @@ export async function main(
     case 'libs':
     case 'soak':
     case 'chaos':
-      return runTier(options!, log);
+      return options!.profile === 'sylvie'
+        ? runSylvie(options!, log)
+        : runTier(options!, log);
     case 'c1':
       return c1({ stores: options!.stores, endpoint: options!.endpoint }, log);
     case 'report': {

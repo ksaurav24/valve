@@ -46,6 +46,52 @@ pnpm perf infra adopt redis://127.0.0.1:6379 --empty-only
 
 Adoption refuses a non-empty database. Never adopt a production or shared endpoint.
 
+## Run the Sylvie preset
+
+Close other heavy workloads, stay plugged in, and use Node 24. Inspect the plan, then run:
+
+```sh
+pnpm perf plan --profile sylvie
+pnpm perf:sylvie
+```
+
+The default baseline is the exact `HEAD` commit and the candidate is the current checkout.
+To select another baseline, pass `--base <ref>`; use `--head HEAD` to compare identical builds
+when checking measurement repeatability. The wrapper uses the existing build snapshots,
+manifests, raw records, safety oracles, and statistics.
+
+The default plan has two workloads: GCRA 500/s burst 1 and global leases with concurrency 8
+and mean 20 ms async jobs. Both use two worker processes. It runs ten fixed paired repetitions
+with separate base/A-A/head trials, 15-second measurement windows, two-second warmups,
+500 ms drains, and one correctness audit per workload: 62 trials, about 21 minutes on the
+calibrated i5-12450H. For a shorter focused study, `pnpm perf:sylvie --suite gcra` retains the
+same repetitions and window length while running only the rate workload.
+
+CPU placement selects one logical thread from each of three physical cores in the fastest
+core class. On this laptop it uses workers 2/4 and server 6, avoiding SMT siblings and efficiency
+cores. Linux CPU topology, cgroup controls, and Docker are required; missing controls fail
+before measurements. The process scope has a 3 GiB memory cap and no swap. Its resource guard
+limits measured process memory to 2 GiB, requires 4 GiB available before each trial and 2 GiB
+during execution, and retains the existing CPU, swap, and memory-pressure rejection rules.
+
+Redis 7.4 is provisioned automatically if not registered, with the chosen CPU pinning, and
+removed in cleanup. A matching registered store is reused and left registered. Existing stores
+with different CPU placement, active endpoint locks, and containers outside this checkout's
+registry are refused. `--stores valkey8` selects a single Valkey store instead. Other existing
+containers and host power settings are not changed.
+
+HTML and machine-readable reports are retained in the normal run directory. Statistical
+margins are unchanged, and unstable A/A still withholds candidate conclusions. This preset
+covers focused rate and lease comparisons; run smoke for broader correctness coverage and
+targeted/decision profiles for larger fleets. Explicit timing or replication overrides create
+a different plan and can reduce evidential strength.
+
+The first full laptop validation completed all 62 trials without resource retries, but rate
+utilization and lease fairness still failed the A/A precision gate. To plan a larger fixed study,
+use `pnpm perf:sylvie --reps 20 --dry-run` (about 42 minutes on this calibration), then start a
+new run with the chosen replication count. More data can improve precision; it does not
+guarantee equivalent A/A. Never widen margins or discard valid trials to force a verdict.
+
 ## Reproduce a paired comparison
 
 First inspect the host and print the exact plan:
@@ -131,6 +177,37 @@ Other categories use longer windows. One-rep library runs verify wiring and cont
 performance differences. Exact competitor reservation clocks remain `UNVERIFIED`; callback
 envelopes, actual concurrency, and queued cancellation are checked separately. L5 cancels only
 jobs that are still queued, so differences in running-job cancellation do not enter that category.
+
+Distributed Valve library cells also run one instrumented correctness trial, reported as
+`valve-audit`. Those audit timings never enter library or A/A comparisons. A passing audit
+establishes safety for that separate trial; uninstrumented performance rows retain their own
+UNVERIFIED rate/window status. Proving exact competitor reservation semantics requires their
+internal decision traces; increasing callback timing tolerances cannot supply that evidence.
+
+For planned restart correctness trials, the harness atomically snapshots the Lua log and pauses
+writes, saves the snapshot outside the container, then restarts without persistence. Reports
+check each store generation separately. A failed checkpoint or expired pause cannot justify
+PASS. This covers a planned restart with an audit barrier, not an unannounced crash. Use a
+longer window to observe recovery:
+
+```sh
+pnpm perf chaos --faults redis-restart --stores valkey8 --workers 2 --window 10s --warmup-ms 0 --drain-ms 500 --html
+```
+
+If A/A remains unstable, choose a new run directory and preregister longer windows and more
+replications before execution. Keep the margins unchanged. Pin the server and workers to
+separate physical cores, protect the process scope, and avoid concurrent workloads. For
+example, after verifying this machine's topology, CPUs 6 and 4 can be assigned separately:
+
+```sh
+pnpm perf infra up redis74 --cpuset 6
+pnpm perf matrix --profile targeted --suite gcra --cell sat-1w-100-b1 --base HEAD --head HEAD --reps 10 --window 10s --warmup-ms 500 --drain-ms 200 --stores redis74 --worker-cpus 4 --isolate --require-authoritative --html
+```
+
+`infra up` reuses existing containers; use a newly created container or explicitly recreate a
+harness-owned one if its CPU assignment differs. Identical base/head refs test repeatability,
+not an optimization. Single-worker cells exclude the inapplicable Jain fairness metric before
+execution. Isolation and more data can improve precision, but do not guarantee equivalent A/A.
 
 Server locks live in `.perf/locks/` and record their owner's PID and run ID. An interrupted
 supervisor can leave a stale lock. Inspect the PID and retained evidence before removing that

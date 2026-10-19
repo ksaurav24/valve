@@ -36,6 +36,15 @@ export const DEFAULT_POLICY: ResourcePolicy = {
   maxQuietWaitMs: 120000,
 };
 
+/** Two workers need little memory; keep headroom for Sylvie's 16 GiB desktop. */
+export const SYLVIE_POLICY: ResourcePolicy = {
+  ...DEFAULT_POLICY,
+  version: 'v5-ts1-sylvie',
+  minStartAvailableGiB: 4,
+  minRunningAvailableGiB: 2,
+  maxGroupGiB: 2,
+};
+
 const GiB = 1024 ** 3;
 const linux = process.platform === 'linux' && existsSync('/proc/meminfo');
 

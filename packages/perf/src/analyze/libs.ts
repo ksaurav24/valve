@@ -56,6 +56,7 @@ export function aggregateLibraries(
         ...new Set(group.flatMap((c) => c.notes ?? [])),
         versions,
         'Paired differences are library minus Valve; Valve A/A uses the same build in separate trials. Intervals require at least five pairs and a stable A/A control.',
+        'Valve distributed correctness audits are separate valve-audit arms; their timings never enter library or A/A comparisons. Performance rows retain their own safety coverage.',
         `Interval alpha is split across ${categories.size} planned categories, ${armFamilies} arm families (including A/A), three metrics, and ${plan.looks.length} preregistered looks.`,
         'appCpuUsPerGrant is application CPU microseconds per useful callback start. Wait P99 is conditional on starting; inspect outcome counts alongside it.',
         'Identity is an unconstrained harness floor, reported as raw absolutes only; no floor is subtracted.',
@@ -71,7 +72,10 @@ export function aggregateLibraries(
     const analysisRows = rows.flatMap((row) => {
       const cell = byId.get(row.cellId);
       if (!cell) return [];
-      if (row.arm !== 'base' && !(cell.library === 'valve' && row.arm === 'aa'))
+      if (
+        row.arm !== 'base' &&
+        !(cell.library === 'valve' && ['aa', 'audit'].includes(row.arm))
+      )
         throw new Error(
           `Unexpected library trial arm ${row.arm} in ${row.cellId}`,
         );
@@ -80,7 +84,12 @@ export function aggregateLibraries(
           ...row,
           cellId: spec.id,
           cellHash: hash,
-          arm: row.arm === 'aa' ? 'aa' : cell.library,
+          arm:
+            row.arm === 'audit'
+              ? 'valve-audit'
+              : row.arm === 'aa'
+                ? 'aa'
+                : cell.library,
         },
       ];
     });

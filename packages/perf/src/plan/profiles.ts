@@ -8,7 +8,8 @@ import {
   type SuiteDef,
 } from './suites.ts';
 
-export type ProfileName = 'smoke' | 'targeted' | 'nightly' | 'decision';
+export type ProfileName =
+  'smoke' | 'targeted' | 'nightly' | 'decision' | 'sylvie';
 
 export interface ProfileDef {
   name: ProfileName;
@@ -39,6 +40,15 @@ export const PROFILES: Record<ProfileName, ProfileDef> = {
     audit: true,
     description:
       'Risk cells of selected suites, base/aa/head arms, 5 reps (fixed n).',
+  },
+  sylvie: {
+    name: 'sylvie',
+    looks: [10],
+    alpha: 0.05,
+    budgetSec: null,
+    audit: true,
+    description:
+      'Two-worker rate and lease cells, 15 s windows, 10 fixed pairs, isolated physical cores. About 20 min on Sylvie (i5-12450H).',
   },
   nightly: {
     name: 'nightly',
@@ -73,6 +83,44 @@ export function profileCells(
   options: { store?: string; valkey?: boolean } = {},
 ): ProfileCells {
   const store = options.store ?? 'redis74';
+  if (profile === 'sylvie') {
+    const selected = [
+      ['gcra', 'gcra/sat-4w-500-b1'],
+      ['lease', 'lease/sat-16w-c8-20ms-sub'],
+    ] as const;
+    for (const name of suites ?? [])
+      if (!selected.some(([s]) => s === name))
+        throw new Error(
+          `sylvie covers gcra and lease; use targeted for ${name}`,
+        );
+    const cells = selected
+      .filter(([name]) => !suites?.length || suites.includes(name))
+      .map(([name, id]): CellSpec => {
+        const base = suite(name)
+          .risk(store)
+          .find((c) => c.id === id)!;
+        return {
+          ...base,
+          id: `sylvie/${name}-2w`,
+          workers: 2,
+          timing: { warmupMs: 2000, windowMs: 15000, drainMs: 500 },
+          tags: [...base.tags, 'sylvie'],
+          notes: [
+            ...(base.notes ?? []),
+            `Sylvie workload derived from ${id}, reduced to two workers; a focused comparison, not full fleet coverage.`,
+          ],
+        };
+      });
+    return {
+      cells: available.has(store) ? cells : [],
+      skipped: available.has(store)
+        ? []
+        : cells.map((c) => ({
+            what: c.id,
+            reason: `server ${store} not set up`,
+          })),
+    };
+  }
   const chosen: SuiteDef[] = suites?.length ? suites.map(suite) : SUITES;
   const cells: CellSpec[] = [];
   const skipped: ProfileCells['skipped'] = [];
@@ -121,6 +169,8 @@ export function decisionPlan(
 export function metricsFor(cell: CellSpec): DecisionMetric[] {
   const def = SUITES.find((s) => s.name === cell.suite);
   return (def?.decision ?? []).filter((m) => {
+    // Equal-share fairness needs at least two workers; N/A must not gate A/A.
+    if (m.metric === 'jain' && cell.workers < 2) return false;
     if (
       m.metric.startsWith('open.') &&
       ['backlog', 'clients'].includes(cell.workload.arrival.kind)

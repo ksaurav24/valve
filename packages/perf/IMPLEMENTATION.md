@@ -5,8 +5,8 @@ Node 24.21.0, pnpm 11.28.4, valvejs 0.5.2.
 
 Local checkpoint `65c0e78` preserves the original complete harness. Merge `a6d14fe` brings in
 master through `161ea0d`, including the C1 fix and the 0.5.2 release. The only merge conflict
-was `.gitignore`; both sets of benchmark exclusions were retained. This work adds no further
-production source changes, release, issue, or pull request.
+was `.gitignore`; both sets of benchmark exclusions were retained. The harness adds no further
+production source changes or package release.
 
 ## Updated behavior
 
@@ -19,6 +19,98 @@ production source changes, release, issue, or pull request.
 - PR CI covers real-store integration, the C1 command, and memory/Redis/Valkey smoke.
 - The nightly workflow is manual-only, defaulting to hosted smoke. Enable its schedule only
   after provisioning the `valve-perf` runner and disjoint server/worker CPU variables.
+
+## Sylvie preset
+
+The preset is named after Sylvie, the i5-12450H laptop used for calibration. It was originally
+validated under the name `laptop`; the retained run IDs and source hashes below preserve that
+historical identity. The rename changes the command, profile, and cell names, not the default
+workloads, timing, replication count, resource limits, or statistical margins.
+
+After closing other apps, available RAM increased from about 5.8 GiB to 8.2 GiB on the
+i5-12450H laptop. `pnpm perf:sylvie` now supplies a focused paired plan: GCRA 500/s and global
+leases, two workers, ten fixed repetitions, 15-second windows, two-second warmups, and one
+correctness audit per cell. The calibrated estimate is 21.3 minutes for 62 trials.
+
+On this topology, workers use logical CPUs 2/4 and Redis uses CPU 6, all on separate fast
+physical cores. The preset requires isolation, limits the process scope to 3 GiB with no swap,
+and uses a 2 GiB memory guard with 4 GiB starting / 2 GiB running host headroom. Margins and
+A/A withholding remain unchanged. Provisioning and cleanup apply only to the owned store
+created for the run; matching registered stores are preserved.
+
+All 154 unit tests, harness typecheck, root lint/format, and source checks passed. New tests
+cover hybrid-core placement, bounded planning, dry-run behavior, and failure cleanup without
+removing reused stores. `laptop-probe-node24` completed four isolated sample trials, including
+a passing correctness audit, and removed its temporary Redis store.
+
+`laptop-validation-node24` then ran the complete default plan with identical `HEAD` builds:
+62/62 trials completed successfully in 20.96 minutes, with zero resource rejections or retries.
+Both instrumented correctness audits passed. Trial telemetry recorded peak scope memory
+0.374 GiB, minimum available host memory 7.034 GiB, and maximum background CPU 0.451 cores.
+The live kernel scope was separately verified with a 3 GiB cap and zero permitted swap.
+
+Seven of nine A/A metric intervals are EQUIVALENT. Two remain UNSTABLE: rate utilization
+(difference interval -1.788 to +2.689 percentage points against a ±1 point margin) and lease
+Jain fairness (-0.03590 to +0.02686 against ±0.02). Both cell controls remain UNSTABLE and all
+nine candidate comparisons remain INCONCLUSIVE. This is successful execution with unresolved
+performance evidence, not proof of an optimization. The preset's focused workloads differ from
+the earlier one-worker run and are not pooled with it.
+
+Probe and full-run manifests record harness SHA-256
+`b4dbf88068354ff0caec4cbac95ecf6f8bd3081a3a74dac85b757e33d5401155`.
+Run metadata and live scope observations are also retained in `.perf/verify-laptop-20261019/`.
+The automatically provisioned Redis container was removed after each run.
+
+## PR preparation after the Sylvie rename
+
+`pnpm check` passed again, including 389 production tests, type tests, all builds, package
+validation, and size checks. The renamed harness passed all 154 unit tests and 48 Redis/Valkey
+integration tests. C1 passed on memory, Redis 7.4, and Valkey 8
+(`c1-1792393940129-b23882b6`). `pr-final-smoke-node24` completed all 34 selected
+memory/Redis/Valkey smoke trials with safety PASS and exit 0.
+
+`sylvie-rename-probe-node24` separately completed four isolated trials under the new command
+and cell names, including a passing correctness audit and automatic store cleanup. Its one-rep
+performance results remain descriptive. The earlier 62-trial study retains its original names,
+source hash, and unresolved A/A findings; it was not relabelled as a new full run.
+
+## Follow-up audit coverage
+
+The follow-up fixes harness evidence gaps without changing production Valve or statistical
+margins:
+
+- Distributed Valve library cells now receive one separate `valve-audit` correctness arm.
+  Audit timings never enter performance or A/A comparisons. Performance rows retain their
+  own UNVERIFIED rate/window coverage; a separate audit cannot retroactively verify a run.
+- Planned restart correctness trials atomically capture the Lua log and pause writes until
+  the server restarts without persistence. Pre-reset snapshots survive outside the container;
+  replay uses server-clock reset boundaries. Missing or expired checkpoints remain UNVERIFIED,
+  and incomplete grant logs behind a claimed complete checkpoint fail reconciliation.
+  This tests a planned restart with an audit barrier, not an unannounced crash.
+- Single-worker plans exclude Jain fairness before execution, because the analyzer cannot
+  estimate equal-share fairness with one worker. Missing applicable metrics still block A/A.
+
+Validation: 150 unit tests, 48 real-store integration tests, harness typecheck, and ESLint passed.
+Integration checks prove both pre-reset and post-reset events survive on Redis 7.4 and Valkey 8.
+`audited-libs-node24` completed 12 trials over D1-D3; all three Valve correctness audits passed.
+Its six uninstrumented rate/window rows remain UNVERIFIED. One-rep library comparisons remain
+descriptive. `audited-restart-node24` passed its ten-second Valkey 8 restart trial, with measured
+throughput recovery about 917 ms after fault completion.
+
+`isolated-aa-node24` completed ten fixed pairs with ten-second windows, CPU 6 for Redis and
+CPU 4 for workers, protected cgroup memory limits, and the original margins. Both refs point
+to the same production artifact. All 31 planned trials completed; two additional attempts were
+rejected for background CPU activity and successfully retried. The correctness audit passed.
+Utilization, calls per grant, and Redis CPU A/A intervals are EQUIVALENT. Application CPU
+remains UNSTABLE: its mean-difference interval is about -33.34 to +63.93 microseconds per start,
+outside the resolved margin of ±35.62. Overall A/A remains UNSTABLE, so all four candidate
+comparisons remain INCONCLUSIVE. More controlled, longer measurements are still needed.
+
+These three follow-up manifests record harness source SHA-256
+`a58032c2b487709668ff3da684c165afe49f6852d1d65cb1fb83b804ccbb3bec`.
+
+Exact competitor rate/window semantics still need library-specific reservation traces. Callback
+timing tolerances have not been widened, and historical results have not been rewritten.
 
 ## Post-merge verification
 
@@ -47,8 +139,9 @@ raw compressed payloads, rows, and JSON/CSV/Markdown/HTML reports. Preserve comp
 
 ## Interpretation and limits
 
-- Local timings are non-authoritative: controlled resource scopes and CPU pinning were not used.
-  Do not pool runs across fingerprints or harness/build identities.
+- The post-merge samples in the table are non-authoritative: controlled resource scopes and CPU
+  pinning were not used. Follow-up isolated studies record their controls separately. Do not pool
+  runs across fingerprints or harness/build identities.
 - One-rep library samples are descriptive. Short paired windows verify execution and statistical
   withholding, not release performance. Long decision/nightly profiles and hour-scale soaks were
   not run; no performance improvement or long-term leak conclusion is established.

@@ -167,6 +167,47 @@ describe('bounded library comparisons', () => {
     );
   });
 
+  it('plans separate distributed Valve audits and never pools them into comparisons', () => {
+    const prepared = preparePlan({ tier: 'libs', categories: ['D2'], reps: 5 });
+    expect(prepared.audit).toBe(true);
+    const trials = prepared.cells.flatMap((cell) =>
+      Array.from(
+        {
+          length:
+            5 * (cell.library === 'valve' ? 2 : 1) +
+            (cell.library === 'valve' ? 1 : 0),
+        },
+        () => ({ cell }),
+      ),
+    );
+    expect(prepared.estimateSec).toBe(
+      estimate(trials, loadCalibration(), false).withRetriesSeconds,
+    );
+    const rows = rowsFor(prepared.cells);
+    const audit = structuredClone(
+      rows.find((r) => r.cellId.endsWith('/valve'))!,
+    );
+    audit.arm = 'audit';
+    audit.safety.checked = ['rate-bound'];
+    audit.metrics.usefulStartsPerSec = 99999;
+    rows.push(audit);
+    const result = analyze(prepared.cells, rows).cells[0]!;
+    expect(result.safety.find((s) => s.arm === 'valve-audit')).toMatchObject({
+      status: 'PASS',
+      trials: 1,
+    });
+    expect(result.metrics.valve?.usefulStartsPerSec?.mean).toBe(100);
+    expect(result.comparisons.find((c) => c.arm === 'aa')?.n).toBe(5);
+    expect(result.comparisons.some((c) => c.arm === 'valve-audit')).toBe(false);
+    audit.safety.status = 'FAIL';
+    audit.safety.counts = { 'rate-bound': 1 };
+    const failed = analyze(prepared.cells, rows);
+    expect(failed.safety).toBe('FAIL');
+    expect(
+      failed.cells[0]!.safety.find((s) => s.arm === 'valve-audit')?.counts,
+    ).toEqual({ 'rate-bound': 1 });
+  });
+
   it('withholds inference below five pairs and on unstable A/A', () => {
     const cells = libsCells('matrix', ['L1-noop']).cells;
     expect(

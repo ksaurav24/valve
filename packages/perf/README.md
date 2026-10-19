@@ -29,6 +29,29 @@ pnpm perf infra down valkey8
 See [REPRODUCING.md](./REPRODUCING.md) for comparisons, run archives, and exact reproduction.
 [IMPLEMENTATION.md](./IMPLEMENTATION.md) records executed checks, retained run IDs, and limits.
 
+## Sylvie laptop comparison
+
+The `sylvie` preset is named after Sylvie, the laptop used to calibrate and validate it:
+an Intel i5-12450H with 16 GB RAM.
+
+For a quiet Linux laptop with at least three comparable physical cores and 4 GiB available RAM:
+
+```sh
+pnpm perf plan --profile sylvie
+pnpm perf:sylvie
+```
+
+The preset compares `HEAD` against the current checkout using two workers, GCRA at 500/s,
+and a global-lease workload. Each cell gets ten base/A-A/head repetitions, 15-second windows,
+two seconds of warmup, and a separate correctness audit. The calibrated estimate on an
+i5-12450H is about 21 minutes. `--suite gcra` selects just the rate case for a shorter run.
+
+It pins workers and the server to separate fast physical cores, requires isolation,
+caps the process scope at 3 GiB with swap disabled, and provisions a disposable Redis 7.4
+container if needed. It removes only the store it created. Existing mismatched stores are
+refused, not recreated. Original margins and A/A gates remain in force; completion does not
+guarantee a resolved performance result. See [REPRODUCING.md](./REPRODUCING.md).
+
 ## Five evidence tiers
 
 | Tier          | Commands                                         | Claims and limitations                                                                                                                                  |
@@ -55,6 +78,12 @@ Every report carries two independent conclusions:
 `UNVERIFIED` means the run did not contain enough instrumentation to establish an invariant; it
 does not mean pass. `DESCRIPTIVE` means fewer than five independent replications. `UNSTABLE`
 means the A/A control failed, so the A/B result is downgraded to `INCONCLUSIVE`.
+
+Distributed library runs include separate `valve-audit` correctness trials. Their timings are
+excluded from comparisons, and their PASS status does not replace missing coverage in
+uninstrumented performance rows. Planned restart audits preserve pre-reset logs outside the
+server behind a temporary write pause. See [REPRODUCING.md](./REPRODUCING.md) for coverage
+limits and controlled A/A reruns.
 
 ## Portable and authoritative runs
 

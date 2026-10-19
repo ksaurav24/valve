@@ -1,8 +1,12 @@
 // Server-side fault injection on harness-owned containers. Worker crashes and joins are handled
 // by the trial supervisor. Every fault returns a log entry with its measured effect.
 import { execFileSync, spawn, type ChildProcess } from 'node:child_process';
+import { writeFileSync } from 'node:fs';
+import { join } from 'node:path';
 import { Redis } from 'ioredis';
 import type { FaultSpec } from '../core/types.ts';
+import { encode } from '../core/codec.ts';
+import { timeMs } from '../lua/log.ts';
 import { assertDisposable, flushDisposable, type Endpoint } from './safety.ts';
 import { SENTINEL_KEY } from './servers.ts';
 
@@ -13,6 +17,14 @@ export interface FaultLog {
   doneAtMs?: number;
   detail?: Record<string, unknown>;
   error?: string;
+}
+
+export interface RestartAudit {
+  file: string;
+  /** Server TIME at the atomic checkpoint; no admissions can occur until reset. */
+  resetAt: number;
+  entries: number;
+  complete: boolean;
 }
 
 function requireContainer(endpoint: Endpoint): string {
@@ -41,6 +53,7 @@ export class FaultRunner {
   private completions: Promise<void>[] = [];
   private timers: NodeJS.Timeout[] = [];
   readonly log: FaultLog[] = [];
+  readonly restartAudits: RestartAudit[] = [];
   private stallRate: number | undefined;
 
   constructor(
@@ -48,6 +61,7 @@ export class FaultRunner {
     private admin: Redis,
     private startAt: number,
     private keyPrefix: string,
+    private restartAudit?: { logKey: string; dir: string },
   ) {}
 
   private now = () => performance.timeOrigin + performance.now() - this.startAt;
@@ -95,13 +109,55 @@ export class FaultRunner {
       switch (f.type) {
         case 'redis-restart': {
           const c = requireContainer(this.endpoint);
-          execFileSync('docker', ['restart', '-t', '0', c], {
-            stdio: 'ignore',
-          });
-          // Restart without persistence empties the DB: restore the sentinel before anything else.
-          await this.waitReachable();
-          await this.admin.set(SENTINEL_KEY, this.endpoint.server!.token);
-          entry.doneAtMs = this.now();
+          const pauseMs = 30000;
+          const pauseStartedAt = this.now();
+          let checkpoint: RestartAudit | undefined;
+          try {
+            if (this.restartAudit) {
+              // MULTI/EXEC makes the log snapshot and write pause one atomic boundary.
+              // WRITE also blocks EVAL/EVALSHA. Keep the log outside the dying server;
+              // merely polling LRANGE would leave an unobservable gap before the crash.
+              // https://redis.io/docs/latest/commands/client-pause/
+              const result = await this.admin
+                .multi()
+                .lrange(this.restartAudit.logKey, 0, -1)
+                .time()
+                .client('PAUSE', pauseMs, 'WRITE')
+                .exec();
+              if (!result || result.some(([error]) => error))
+                throw new Error('pre-restart audit transaction failed');
+              const lines = result[0]![1] as string[];
+              const time = result[1]![1] as [string, string];
+              const file = join(
+                this.restartAudit.dir,
+                `restart-audit-${this.restartAudits.length}.json`,
+              );
+              writeFileSync(file, encode(lines));
+              checkpoint = {
+                file,
+                resetAt: timeMs(`${time[0]}.${time[1]}`),
+                entries: lines.length,
+                complete: false,
+              };
+              this.restartAudits.push(checkpoint);
+              entry.detail = { audit: checkpoint, writePauseMs: pauseMs };
+            }
+            execFileSync('docker', ['restart', '-t', '0', c], {
+              stdio: 'ignore',
+              timeout: 20000,
+            });
+            // Conservatively require restart to finish before the pause could expire.
+            if (checkpoint)
+              checkpoint.complete = this.now() < pauseStartedAt + pauseMs;
+            // Restart without persistence empties the DB: restore the sentinel.
+            await this.waitReachable();
+            await this.admin.set(SENTINEL_KEY, this.endpoint.server!.token);
+            entry.doneAtMs = this.now();
+          } finally {
+            // A failed snapshot or restart must not leave the disposable server paused.
+            if (this.restartAudit)
+              await this.admin.client('UNPAUSE').catch(() => undefined);
+          }
           break;
         }
         case 'redis-pause': {

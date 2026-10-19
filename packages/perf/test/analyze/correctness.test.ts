@@ -21,6 +21,7 @@ import {
 } from '../../src/core/types.ts';
 import type { RunSummary } from '../../src/analyze/summary.ts';
 import { safetyReport } from '../../src/oracle/safety.ts';
+import { metricsFor } from '../../src/plan/profiles.ts';
 
 const metric = { metric: 'throughput', better: 'higher' as const, margin: 1 };
 const plan: DecisionPlan = {
@@ -134,6 +135,33 @@ function job(i: number, overrides: Partial<JobRecord>): JobRecord {
 }
 
 describe('aggregation evidence', () => {
+  it('does not gate a single-worker A/A control on inapplicable fairness', () => {
+    const c = cell();
+    const decision = metricsFor(c);
+    expect(decision.some((m) => m.metric === 'jain')).toBe(false);
+    expect(
+      metricsFor({ ...c, workers: 2 }).some((m) => m.metric === 'jain'),
+    ).toBe(true);
+    const values = Object.fromEntries(decision.map((m) => [m.metric, 100]));
+    const rows = Array.from({ length: 5 }, (_, rep) => [
+      row('base', rep, values),
+      row('aa', rep, values),
+    ]).flat();
+    const result = aggregate(
+      rows,
+      [c],
+      {
+        base: 'base',
+        candidates: [],
+        aa: 'aa',
+        plan: { metrics: decision, looks: [5], alpha: 0.05 },
+        metricsFor,
+        isFinalLook: true,
+      },
+      meta,
+    );
+    expect(result.cells[0]!.aaVerdict).toBe('EQUIVALENT');
+  });
   it('does not discard not-reached rep quantiles from raw summaries', () => {
     expect(metricStat([1, Infinity, null])).toMatchObject({
       n: 2,
@@ -264,6 +292,19 @@ describe('aggregation evidence', () => {
 });
 
 describe('trial denominators and censoring', () => {
+  it('requires an external restart checkpoint even when missing grants are not observable', () => {
+    const d = data();
+    d.events = [];
+    d.resets = [1005];
+    const incomplete = analyzeTrial(d);
+    expect(incomplete.safety.status).toBe('UNVERIFIED');
+    expect(incomplete.metrics.admittedPerSec).toBeNull();
+    expect(incomplete.safety.unverified).toContain('reconciliation');
+    d.restartAuditComplete = true;
+    expect(analyzeTrial(d).safety.status).toBe('PASS');
+    d.calls = [{ w: 0, op: 'acquire', t0: 1001, t1: 1002, g: 1, n: 1, ra: 0 }];
+    expect(analyzeTrial(d).safety.counts).toEqual({ reconciliation: 1 });
+  });
   it('fails reconciliation and withholds exact server metrics when grant logs are incomplete', () => {
     const d = data();
     d.events = [];

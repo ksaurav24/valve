@@ -59,6 +59,64 @@ describe.skipIf(process.env.PERF_INTEGRATION !== '1')(
       });
     }
     for (const server of ['redis74', 'valkey8']) {
+      it(`${server} preserves both admission generations across a planned restart`, async () => {
+        const dir = await mkdtemp(join(tmpdir(), 'valve-restart-'));
+        try {
+          const base = suite('faults')
+            .risk(server)
+            .find((c) => c.id.includes('restart'))!;
+          const cell: CellSpec = {
+            ...base,
+            workers: 2,
+            timing: { warmupMs: 0, windowMs: 4000, drainMs: 300 },
+            faults: [{ type: 'redis-restart', atMs: 1500 }],
+          };
+          const rec = await runTrial(
+            {
+              runId: 'integration-restart',
+              cell,
+              cellHash: cellHash(cell),
+              arm: {
+                name: 'audit',
+                build: currentBuild({ rebuild: false }),
+                instrument: 'correctness',
+              },
+              rep: 0,
+              seed: 123,
+              attempt: 1,
+              fingerprintId: 'test',
+            },
+            { runDir: dir, authoritative: false },
+          );
+          expect(rec.error).toBeUndefined();
+          expect(rec.status).toBe('ok');
+          expect(rec.safety.status).toBe('PASS');
+          const payload = decode<{
+            events: ServerEvent[];
+            restartAudits: {
+              file: string;
+              entries: number;
+              resetAt: number;
+              complete: boolean;
+            }[];
+          }>(gunzipSync(await readFile(join(dir, rec.payload!))).toString());
+          const checkpoint = payload.restartAudits[0]!;
+          expect(checkpoint.complete).toBe(true);
+          expect(checkpoint.entries).toBeGreaterThan(0);
+          expect(
+            (await readFile(checkpoint.file, 'utf8')).length,
+          ).toBeGreaterThan(0);
+          expect(payload.events.some((e) => e.t < checkpoint.resetAt)).toBe(
+            true,
+          );
+          expect(payload.events.some((e) => e.t > checkpoint.resetAt)).toBe(
+            true,
+          );
+          expect(rec.metrics.admittedPerSec).toBeGreaterThan(0);
+        } finally {
+          await rm(dir, { recursive: true, force: true });
+        }
+      });
       it(`${server} records first-call grants, finishes workers, and checks the public API end to end`, async () => {
         const dir = await mkdtemp(join(tmpdir(), 'valve-trial-'));
         try {

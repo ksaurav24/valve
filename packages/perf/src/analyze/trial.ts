@@ -45,6 +45,8 @@ export interface TrialData {
   killedWorkers: Set<number>;
   /** Epoch times at which store state was lost (restart faults). */
   resets: number[];
+  /** Every reset has an external snapshot protected against intervening writes. */
+  restartAuditComplete?: boolean;
   /** Planned churn or faults: fairness is not an equal-share test then. */
   asymmetric: boolean;
   /** Fault log, times relative to the epoch (ms). */
@@ -380,8 +382,10 @@ export function analyzeTrial(d: TrialData): TrialAnalysis {
   const missingLogGrants =
     d.events !== undefined &&
     loggedGrants < Math.max(recordedGrants, observedStarts);
-  const serverLogComplete = d.events !== undefined && !missingLogGrants;
-  if (missingLogGrants && !d.resets.length)
+  const restartAuditGap = d.resets.length > 0 && !d.restartAuditComplete;
+  const serverLogComplete =
+    d.events !== undefined && !missingLogGrants && !restartAuditGap;
+  if (missingLogGrants && !restartAuditGap)
     notes.push(
       `server log incomplete: ${loggedGrants} logged grants, ${recordedGrants} client grants, ${observedStarts} callback starts; exact server metrics withheld`,
     );
@@ -679,7 +683,7 @@ export function analyzeTrial(d: TrialData): TrialAnalysis {
 
   // Safety: client oracles in every arm, server oracles when the log exists.
   const violations: Violation[] = [];
-  if (missingLogGrants && !d.resets.length)
+  if (missingLogGrants && !restartAuditGap)
     violations.push({
       class: 'reconciliation',
       detail: `incomplete server log: ${loggedGrants} grants vs ${recordedGrants} client grants and ${observedStarts} starts`,
@@ -692,12 +696,15 @@ export function analyzeTrial(d: TrialData): TrialAnalysis {
     'worker-crash',
   ];
   const unverified: ViolationClass[] = [];
-  if (missingLogGrants && d.resets.length) {
+  if (restartAuditGap) {
     unverified.push('reconciliation');
     notes.push(
-      'Redis restart discarded pre-reset Lua logs; pre-reset server safety and exact grant metrics are unverified.',
+      'Redis restart lacks a complete external Lua audit checkpoint; pre-reset server safety and exact grant metrics are unverified.',
     );
-  }
+  } else if (d.resets.length)
+    notes.push(
+      'Planned restart audit: atomically captured Lua logs outside Redis and paused writes until state loss; safety is checked separately across each reset. This does not cover an unannounced crash.',
+    );
   const lease = leaseOf(cell);
   const localConcurrency =
     cell.library === 'identity'

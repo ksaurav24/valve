@@ -7,11 +7,68 @@ import {
   authoritativeCapability,
   type Fingerprint,
 } from '../core/fingerprint.ts';
-import { cpuList, isolationStatus, DEFAULT_POLICY } from './resources.ts';
+import {
+  cpuList,
+  isolationStatus,
+  DEFAULT_POLICY,
+  type ResourcePolicy,
+} from './resources.ts';
 import { readInfra } from '../infra/servers.ts';
 import { expandCpus } from './resources.ts';
 
 export const ISOLATED_ENV = 'VALVE_PERF_ISOLATED';
+
+export interface CpuTopology {
+  cpu: number;
+  core: string;
+  maxMHz: number;
+}
+
+/** One thread per physical core, all from the fastest core class on hybrid CPUs. */
+export function selectSylvieCpus(topology: readonly CpuTopology[]): {
+  serverCpus: string;
+  workerCpus: string;
+} {
+  const cores = [
+    ...new Map(
+      [...topology].sort((a, b) => b.cpu - a.cpu).map((c) => [c.core, c]),
+    ).values(),
+  ].sort((a, b) => a.cpu - b.cpu);
+  const fastest = Math.max(...cores.map((c) => c.maxMHz));
+  const chosen = cores.filter((c) => c.maxMHz === fastest).slice(-3);
+  if (chosen.length < 3 || !(fastest > 0))
+    throw new Error(
+      'sylvie needs three available physical cores of the fastest CPU class',
+    );
+  return {
+    serverCpus: String(chosen[2]!.cpu),
+    workerCpus: chosen
+      .slice(0, 2)
+      .map((c) => c.cpu)
+      .join(','),
+  };
+}
+
+export function sylvieCpus() {
+  try {
+    return selectSylvieCpus(
+      cpuList().map((cpu) => {
+        const base = `/sys/devices/system/cpu/cpu${cpu}`;
+        const read = (file: string) =>
+          readFileSync(`${base}/${file}`, 'utf8').trim();
+        return {
+          cpu,
+          core: `${read('topology/physical_package_id')}:${read('topology/core_id')}`,
+          maxMHz: Number(read('cpufreq/cpuinfo_max_freq')) / 1000,
+        };
+      }),
+    );
+  } catch (error) {
+    throw new Error(`sylvie CPU placement unavailable: ${String(error)}`, {
+      cause: error,
+    });
+  }
+}
 
 /** Re-exec under systemd-run when `--isolate` is requested and we are not already inside. Returns exit code, or null to continue in-process. */
 export function reexecIsolated(
@@ -60,12 +117,13 @@ export function decideIsolation(
   servers: readonly string[],
   requested: boolean,
   workerCpus?: string,
+  policy: ResourcePolicy = DEFAULT_POLICY,
 ): IsolationDecision {
   const reasons: string[] = [];
   if (!requested) reasons.push('isolation not requested (--isolate)');
   const cap = authoritativeCapability(fp);
   reasons.push(...cap.reasons);
-  const iso = isolationStatus();
+  const iso = isolationStatus(policy);
   if (requested && !iso.protected)
     reasons.push(`process not in a protected cgroup (${iso.detail})`);
   const infra = readInfra().servers;

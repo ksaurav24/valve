@@ -299,7 +299,13 @@ export async function runTrial(
       },
     );
     if (admin && endpoint) {
-      faults = new FaultRunner(endpoint, admin, epochAt, keyPrefix);
+      faults = new FaultRunner(
+        endpoint,
+        admin,
+        epochAt,
+        keyPrefix,
+        luaLogKey ? { logKey: luaLogKey, dir } : undefined,
+      );
       await faults.prepare(serverFaults);
     }
     let infoA: InfoSnapshot | undefined;
@@ -469,8 +475,17 @@ export async function runTrial(
         resources: resources as unknown as TrialRecord['resources'],
       });
     let events: ServerEvent[] | undefined;
-    if (luaLogKey && admin)
-      events = decodeLog(await admin.lrange(luaLogKey, 0, -1));
+    const restartAudits = faults?.restartAudits ?? [];
+    const restartAuditComplete =
+      !!luaLogKey &&
+      restartAudits.length === resets.length &&
+      restartAudits.every((audit) => audit.complete);
+    if (luaLogKey && admin) {
+      const prior = restartAudits.flatMap((audit) =>
+        decode<string[]>(readFileSync(audit.file, 'utf8')),
+      );
+      events = decodeLog([...prior, ...(await admin.lrange(luaLogKey, 0, -1))]);
+    }
     const info = infoA && infoB ? infoDelta(infoA, infoB) : undefined;
     const analysis = analyzeTrial({
       cell,
@@ -483,7 +498,10 @@ export async function runTrial(
       ...(events ? { events } : {}),
       ...(info ? { info } : {}),
       killedWorkers: killed,
-      resets,
+      resets: restartAuditComplete
+        ? restartAudits.map((audit) => audit.resetAt)
+        : resets,
+      restartAuditComplete,
       asymmetric: !!cell.faults?.length,
       faultLog: faults?.log ?? [],
       ...(samples.length ? { samples } : {}),
@@ -511,6 +529,7 @@ export async function runTrial(
           jobs,
           calls,
           events: events ?? null,
+          restartAudits,
           notes: analysis.notes,
         }),
       ),
