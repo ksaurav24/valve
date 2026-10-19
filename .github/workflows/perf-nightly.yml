@@ -1,0 +1,112 @@
+name: Performance nightly
+
+on:
+  schedule:
+    - cron: '23 2 * * *'
+  workflow_dispatch:
+    inputs:
+      run_kind:
+        description: Authoritative nightly needs the dedicated runner; hosted smoke is portable.
+        required: true
+        default: authoritative
+        type: choice
+        options: [authoritative, hosted-smoke]
+      base_ref:
+        description: Git ref used as the comparison baseline.
+        required: true
+        default: HEAD^
+        type: string
+      budget:
+        description: Nightly wall-time planning budget.
+        required: true
+        default: 40m
+        type: string
+
+permissions:
+  contents: read
+
+concurrency:
+  group: perf-nightly-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  authoritative:
+    name: Budgeted authoritative matrix
+    if: github.event_name == 'schedule' || inputs.run_kind == 'authoritative'
+    runs-on: [self-hosted, linux, valve-perf]
+    timeout-minutes: 60
+    env:
+      PERF_SERVER_CPUS: ${{ vars.PERF_SERVER_CPUS }}
+      PERF_WORKER_CPUS: ${{ vars.PERF_WORKER_CPUS }}
+      PERF_BASE_REF: ${{ inputs.base_ref || 'HEAD^' }}
+      PERF_BUDGET: ${{ inputs.budget || '40m' }}
+    steps:
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - uses: pnpm/action-setup@0977fd99725f1db4007ccb2928dbb4e90d06cc86 # v6
+      - uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6
+        with:
+          node-version-file: .node-version
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm --filter valvejs build
+      - name: Check the dedicated host
+        run: pnpm perf doctor
+      - name: Start guarded disposable stores
+        run: |
+          test -n "$PERF_SERVER_CPUS"
+          test -n "$PERF_WORKER_CPUS"
+          pnpm perf infra up redis74 --cpuset "$PERF_SERVER_CPUS" --recreate
+          pnpm perf infra up valkey8 --cpuset "$PERF_SERVER_CPUS" --recreate
+          pnpm perf infra status
+      - name: Print the immutable plan before running
+        run: pnpm perf plan --profile nightly --budget "$PERF_BUDGET"
+      - name: Run the budgeted matrix
+        run: pnpm perf matrix --profile nightly --base "$PERF_BASE_REF" --current --budget "$PERF_BUDGET" --isolate --require-authoritative --worker-cpus "$PERF_WORKER_CPUS" --yes
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        if: always()
+        with:
+          name: perf-nightly-${{ github.run_id }}-${{ github.run_attempt }}
+          path: .perf/runs/
+          if-no-files-found: warn
+          retention-days: 30
+      - name: Remove disposable stores
+        if: always()
+        run: |
+          pnpm perf infra down redis74
+          pnpm perf infra down valkey8
+
+  hosted-smoke:
+    name: Portable hosted smoke
+    if: github.event_name == 'workflow_dispatch' && inputs.run_kind == 'hosted-smoke'
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - uses: pnpm/action-setup@0977fd99725f1db4007ccb2928dbb4e90d06cc86 # v6
+      - uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6
+        with:
+          node-version-file: .node-version
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm --filter valvejs build
+      - run: pnpm perf infra up redis74
+      - run: pnpm perf infra up valkey8
+      - run: pnpm perf smoke --stores redis74,valkey8 --suite gcra,fixed-window,multi-rule,scoped,weighted,lease,combined,api,stores,lifecycle,faults,runtime
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        if: always()
+        with:
+          name: perf-nightly-hosted-smoke-${{ github.run_id }}-${{ github.run_attempt }}
+          path: .perf/runs/
+          if-no-files-found: warn
+          retention-days: 14
+      - name: Remove disposable stores
+        if: always()
+        run: |
+          pnpm perf infra down redis74
+          pnpm perf infra down valkey8

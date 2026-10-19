@@ -41,6 +41,7 @@
     "bench:compare": "pnpm --filter valvejs exec tsx bench/compare.ts",
     "bench:paced": "pnpm --filter valvejs exec tsx bench/paced.ts",
     "bench:drift": "node packages/valve/bench/drift.mjs",
+    "perf": "pnpm --filter @valve/perf perf",
     "codegraph:sync": "codegraph sync"
   },
   "lint-staged": {

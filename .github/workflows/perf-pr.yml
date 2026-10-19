@@ -1,0 +1,88 @@
+name: Performance harness PR
+
+on:
+  pull_request:
+    branches: [master]
+    types: [opened, synchronize, reopened, ready_for_review]
+    paths:
+      - '.github/workflows/perf-*.yml'
+      - 'package.json'
+      - 'pnpm-lock.yaml'
+      - 'pnpm-workspace.yaml'
+      - 'packages/perf/**'
+      - 'packages/valve/**'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: perf-pr-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  portable:
+    name: Unit, typecheck, and quick
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - uses: pnpm/action-setup@0977fd99725f1db4007ccb2928dbb4e90d06cc86 # v6
+      - uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6
+        with:
+          node-version-file: .node-version
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm --filter valvejs build
+      - name: Unit tests
+        run: pnpm --filter @valve/perf test
+      - name: Typecheck
+        run: pnpm --filter @valve/perf typecheck
+      - name: Portable quick tier
+        run: pnpm perf quick
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        if: always()
+        with:
+          name: perf-pr-portable-${{ github.run_attempt }}
+          path: .perf/runs/
+          if-no-files-found: ignore
+          retention-days: 14
+
+  smoke:
+    name: Redis 7.4 and Valkey 8 smoke
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - uses: pnpm/action-setup@0977fd99725f1db4007ccb2928dbb4e90d06cc86 # v6
+      - uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6
+        with:
+          node-version-file: .node-version
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm --filter valvejs build
+      - name: Start guarded disposable stores
+        run: |
+          pnpm perf infra up redis74
+          pnpm perf infra up valkey8
+          pnpm perf infra status
+      - name: Run the smoke profile
+        run: pnpm perf smoke --stores redis74,valkey8 --suite gcra,fixed-window,multi-rule,scoped,weighted,lease,combined,api,stores,lifecycle,faults,runtime
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        if: always()
+        with:
+          name: perf-pr-smoke-${{ github.run_attempt }}
+          path: .perf/runs/
+          if-no-files-found: warn
+          retention-days: 14
+      - name: Remove disposable stores
+        if: always()
+        run: |
+          pnpm perf infra down redis74
+          pnpm perf infra down valkey8
