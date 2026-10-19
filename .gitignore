@@ -28,3 +28,7 @@ apps/web/content/contributing/
 
 # Benchmark harness runs, builds, and infra state
 .perf/
+
+# Benchmark output; reports link to archived raw results instead.
+packages/valve/bench/*.json
+packages/valve/bench/*-results/

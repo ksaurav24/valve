@@ -50,7 +50,12 @@ const crm = createValve({
 - `maxWait` limits how long a job may wait before starting. An expired job
   rejects with `MAX_WAIT_EXCEEDED`. It does **not** limit how long the job
   runs. Override it per job with `run(fn, { maxWait })`. `maxWait: 0` runs a
-  job only if capacity is free on its first admission attempt.
+  job only if capacity is free on its first admission attempt. With an
+  asynchronous store such as Redis, zero-wait jobs queued behind an in-flight
+  store call wait for the valve to send another batch. They reject with
+  `MAX_WAIT_EXCEEDED` without an attempt if the valve does not send one (after
+  a rate denial, a pause, a store outage, or with local concurrency full) or if
+  higher-priority work submitted meanwhile takes their place.
 
 Both turn an overloaded queue into fast, explicit errors that you can handle,
 instead of unbounded memory and latency.

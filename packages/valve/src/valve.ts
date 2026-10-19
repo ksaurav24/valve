@@ -41,6 +41,8 @@ interface Job {
   leaseSignal?: AbortSignal;
   scopes?: Readonly<Record<string, string>>;
   location: 'queue' | 'acquire' | 'delayed' | null;
+  // Jobs sent count by which a held zero-wait job must have been sent.
+  holdUntil?: number;
 }
 
 /** Create a named outbound queue with shared rate rules and local or leased concurrency.
@@ -70,6 +72,8 @@ export function createValve(options: ValveOptions): Valve {
     storeErrors: 0,
   };
   let running = 0;
+  // Granted jobs retained in waiting for cancellation until invocation.
+  let reserved = 0;
   let seq = 0;
   let scheduled = false;
   let inFlight = false;
@@ -102,6 +106,12 @@ export function createValve(options: ValveOptions): Valve {
   let leaseSequence = 0;
   let unsubscribe: (() => void) | undefined;
   let noticeVersion = 0;
+  // Zero-wait jobs whose expiry ran while another batch was in flight. They wait
+  // for the scheduler, not for capacity, so they keep their single attempt.
+  const held = new Set<Job>();
+  let heldCheck: ReturnType<typeof setTimeout> | undefined;
+  // Jobs sent in asynchronous admissions, which bounds how long a job stays held.
+  let sent = 0;
   const leases = config.global
     ? leaseManager(store, id, config.leaseTtl, reportStore, () => {
         if (!leaseWait) return;
@@ -163,6 +173,24 @@ export function createValve(options: ValveOptions): Valve {
     job.timer = undefined;
     if (job.abort) job.options.signal?.removeEventListener('abort', job.abort);
     job.abort = undefined;
+    if (held.delete(job) && !held.size) {
+      clearTimeout(heldCheck);
+      heldCheck = undefined;
+    }
+  }
+  /** End an asynchronous admission, then give held jobs one timer turn to be sent. */
+  function admitted() {
+    inFlight = false;
+    if (held.size) heldCheck ??= setTimeout(expireHeld, 0);
+  }
+  /** Reject held zero-wait jobs the scheduler could not send after the last reply,
+   * or that other work (newer, or retried) kept out of the batches that sent the
+   * backlog they joined. Their rejection frees no capacity, so no pump follows. */
+  function expireHeld() {
+    heldCheck = undefined;
+    for (const job of held)
+      if (job.location === 'queue' && (!inFlight || sent >= job.holdUntil!))
+        missed(job);
   }
   function finishIdle() {
     if (waiting.size || running || retrying) return;
@@ -203,6 +231,7 @@ export function createValve(options: ValveOptions): Valve {
     cause?: unknown,
   ) {
     if (job.state !== 'queued') return;
+    if (job.location === null) reserved--;
     if (job.location === 'delayed') delayed!.remove(job);
     if (job.location === 'queue') queue.cancel(job);
     else job.state = 'cancelled';
@@ -265,29 +294,31 @@ export function createValve(options: ValveOptions): Valve {
     // A released lease wakes the valve once the store has the slot back.
     if (!job.lease) schedule();
   }
-  /** Start a grant unless cancelled or past a positive queue-wait deadline. */
+  /** Reserve capacity, then check eligibility immediately before invoking a grant. */
   function start(job: Job) {
-    if (job.state !== 'queued') {
-      if (job.lease) leases!.release(job.lease);
-      return;
-    }
-    if (job.waitMs && job.deadline <= Date.now()) {
-      rejectJob(
-        job,
-        'MAX_WAIT_EXCEEDED',
-        `job waited longer than maxWait ${job.waitMs}ms.`,
-      );
-      if (job.lease) leases!.release(job.lease);
-      return;
-    }
-    waiting.delete(job);
-    cleanup(job);
-    job.state = 'running';
-    job.location = null;
     running++;
-    totals.started++;
+    if (job.state === 'queued') reserved++;
+    job.location = null;
     // Jobs always execute in a microtask, including the memory fast path.
     queueMicrotask(() => {
+      if (job.state === 'queued' && job.waitMs && job.deadline <= Date.now())
+        rejectJob(
+          job,
+          'MAX_WAIT_EXCEEDED',
+          `job waited longer than maxWait ${job.waitMs}ms.`,
+        );
+      if (job.state !== 'queued') {
+        running--;
+        if (job.lease) leases!.release(job.lease);
+        else schedule();
+        finishIdle();
+        return;
+      }
+      reserved--;
+      waiting.delete(job);
+      cleanup(job);
+      job.state = 'running';
+      totals.started++;
       const leaseError = job.lease ? leases!.error(job.lease) : undefined;
       if (leaseError) {
         settle(job, false, leaseError);
@@ -672,19 +703,20 @@ export function createValve(options: ValveOptions): Valve {
         }
       } else {
         inFlight = true;
+        sent += live.length;
         try {
           store.acquireScoped!(scopedRequest).then(
             (value) => {
-              inFlight = false;
+              admitted();
               handleScoped(live, value, acquiredAt, version);
             },
             (error) => {
-              inFlight = false;
+              admitted();
               storeError(live, error);
             },
           );
         } catch (error) {
-          inFlight = false;
+          admitted();
           storeError(live, error);
         }
       }
@@ -699,22 +731,23 @@ export function createValve(options: ValveOptions): Valve {
       return;
     }
     inFlight = true;
+    sent += live.length;
     const acquiredTime = config.global ? undefined : performance.now();
     let result: Promise<AcquireResult>;
     try {
       result = store.acquire(request);
     } catch (error) {
-      inFlight = false;
+      admitted();
       storeError(live, error);
       return;
     }
     result.then(
       (value) => {
-        inFlight = false;
+        admitted();
         handle(live, value, acquiredAt, version, acquiredTime);
       },
       (error) => {
-        inFlight = false;
+        admitted();
         storeError(live, error);
       },
     );
@@ -770,7 +803,7 @@ export function createValve(options: ValveOptions): Valve {
             'job was aborted before starting.',
             jobOptions.signal.reason,
           );
-        if (!retry && waiting.size >= config.maxQueue)
+        if (!retry && waiting.size - reserved >= config.maxQueue)
           throw failure(
             id,
             'QUEUE_FULL',
@@ -797,8 +830,17 @@ export function createValve(options: ValveOptions): Valve {
         active = true;
         if (maxWait !== Infinity) {
           const expire = () => {
-            // The pending admission settles a zero-wait job.
-            if (!maxWait && job.location === 'acquire') return;
+            // The pending admission settles a zero-wait job. One queued behind
+            // it is held until the scheduler can send it.
+            if (!maxWait && (job.location === 'acquire' || inFlight)) {
+              if (job.location === 'queue') {
+                held.add(job);
+                // Sending as many jobs as are queued now reaches this one
+                // unless other work goes first.
+                job.holdUntil = sent + queue.size;
+              }
+              return;
+            }
             const left = job.deadline - Date.now();
             if (left > 0) {
               job.timer = setTimeout(expire, Math.min(2147483647, left));
@@ -1010,7 +1052,10 @@ export function createValve(options: ValveOptions): Valve {
         }
         if (!held) return response;
         // Return the provider response when its retry cannot be queued.
-        if ((closed && !draining) || waiting.size >= config.maxQueue) {
+        if (
+          (closed && !draining) ||
+          waiting.size - reserved >= config.maxQueue
+        ) {
           release();
           return response;
         }
@@ -1104,7 +1149,7 @@ export function createValve(options: ValveOptions): Valve {
         schedule();
       }),
     stats: () => ({
-      queued: waiting.size,
+      queued: waiting.size - reserved,
       running,
       pausedUntil: pausedUntil > Date.now() ? pausedUntil : null,
       totals: { ...totals },

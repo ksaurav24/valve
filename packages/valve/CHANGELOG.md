@@ -1,5 +1,17 @@
 # valvejs
 
+## 0.5.2
+
+### Patch Changes
+
+- 5b3e793: Check positive maxWait deadlines immediately before invoking callbacks, including jobs admitted in the same batch. Skip expired or cancelled callbacks and release their reserved concurrency slots and global leases without counting them as started. Preserve maxWait: 0 as a single immediate admission attempt.
+
+## 0.5.1
+
+### Patch Changes
+
+- 8c0de08: `maxWait: 0` jobs queued behind an in-flight store call now wait for the valve to send another batch instead of being rejected right away. Previously, with `redisStore` or another asynchronous store, only the first batch reached the store and every other zero-wait job was rejected with `MAX_WAIT_EXCEEDED` without an attempt. Zero-wait jobs still reject with `MAX_WAIT_EXCEEDED` when the store denies them. They reject without an attempt when the valve sends no further batch (after a rate denial, a pause, or a store outage, or with local concurrency full) or when newer higher-priority work keeps them out of every batch.
+
 ## 0.5.0
 
 ### Minor Changes

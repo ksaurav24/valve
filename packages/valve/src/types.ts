@@ -126,7 +126,11 @@ export interface ValveOptions {
    * Default max time a job may wait in the queue before it is rejected
    * with `MAX_WAIT_EXCEEDED`. Default: no limit. Does not limit how long
    * the job runs once started. `0` runs a job only if its first admission
-   * attempt is granted.
+   * attempt is granted. With an asynchronous store, a zero-wait job queued
+   * behind an in-flight store call waits for the valve to send another
+   * batch. It rejects without an attempt if the valve does not send one
+   * (after a rate denial, a pause, a store outage, or with local concurrency
+   * full) or if higher-priority work submitted meanwhile takes its place.
    */
   maxWait?: Duration;
   /**
