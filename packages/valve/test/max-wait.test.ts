@@ -61,6 +61,48 @@ describe.each(['sync', 'async'] as const)('%s admission', (kind) => {
     },
   );
 
+  it.each([false, true])(
+    'excludes reserved grants from queue limits and stats (cancel: %s)',
+    async (cancel) => {
+      const store = memoryStore();
+      if (kind === 'async') delete store.acquireSync;
+      const valve = createValve({
+        id: 'reserved',
+        concurrency: 2,
+        maxQueue: 2,
+        store,
+      });
+      const controller = new AbortController();
+      let queued = -1;
+      let nested!: Promise<PromiseSettledResult<number>[]>;
+      try {
+        const first = valve.run(() => {
+          if (cancel) controller.abort();
+          queued = valve.stats().queued;
+          nested = Promise.allSettled([
+            valve.run(() => 1),
+            valve.run(() => 2),
+            valve.run(() => 3),
+          ]);
+        });
+        const second = valve.run(() => undefined, {
+          signal: controller.signal,
+        });
+        await Promise.allSettled([first, second]);
+        expect(await nested).toMatchObject([
+          { status: 'fulfilled', value: 1 },
+          { status: 'fulfilled', value: 2 },
+          { status: 'rejected', reason: { code: 'QUEUE_FULL' } },
+        ]);
+        expect(queued).toBe(0);
+        expect(valve.stats()).toMatchObject({ queued: 0, running: 0 });
+      } finally {
+        await valve.close();
+        await store.close();
+      }
+    },
+  );
+
   it.each(['deadline', 'abort', 'abort-at-deadline', 'zero'] as const)(
     'releases reserved global slots before invocation for %s',
     async (scenario) => {

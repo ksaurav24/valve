@@ -72,6 +72,8 @@ export function createValve(options: ValveOptions): Valve {
     storeErrors: 0,
   };
   let running = 0;
+  // Granted jobs retained in waiting for cancellation until invocation.
+  let reserved = 0;
   let seq = 0;
   let scheduled = false;
   let inFlight = false;
@@ -229,6 +231,7 @@ export function createValve(options: ValveOptions): Valve {
     cause?: unknown,
   ) {
     if (job.state !== 'queued') return;
+    if (job.location === null) reserved--;
     if (job.location === 'delayed') delayed!.remove(job);
     if (job.location === 'queue') queue.cancel(job);
     else job.state = 'cancelled';
@@ -294,6 +297,7 @@ export function createValve(options: ValveOptions): Valve {
   /** Reserve capacity, then check eligibility immediately before invoking a grant. */
   function start(job: Job) {
     running++;
+    if (job.state === 'queued') reserved++;
     job.location = null;
     // Jobs always execute in a microtask, including the memory fast path.
     queueMicrotask(() => {
@@ -310,6 +314,7 @@ export function createValve(options: ValveOptions): Valve {
         finishIdle();
         return;
       }
+      reserved--;
       waiting.delete(job);
       cleanup(job);
       job.state = 'running';
@@ -798,7 +803,7 @@ export function createValve(options: ValveOptions): Valve {
             'job was aborted before starting.',
             jobOptions.signal.reason,
           );
-        if (!retry && waiting.size >= config.maxQueue)
+        if (!retry && waiting.size - reserved >= config.maxQueue)
           throw failure(
             id,
             'QUEUE_FULL',
@@ -1047,7 +1052,10 @@ export function createValve(options: ValveOptions): Valve {
         }
         if (!held) return response;
         // Return the provider response when its retry cannot be queued.
-        if ((closed && !draining) || waiting.size >= config.maxQueue) {
+        if (
+          (closed && !draining) ||
+          waiting.size - reserved >= config.maxQueue
+        ) {
           release();
           return response;
         }
@@ -1141,7 +1149,7 @@ export function createValve(options: ValveOptions): Valve {
         schedule();
       }),
     stats: () => ({
-      queued: waiting.size,
+      queued: waiting.size - reserved,
       running,
       pausedUntil: pausedUntil > Date.now() ? pausedUntil : null,
       totals: { ...totals },
