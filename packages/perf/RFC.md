@@ -1,6 +1,6 @@
 # RFC: `@valve/perf`, the Valve performance and correctness harness
 
-Status: revision 3 (integrated implementation; verification is recorded in IMPLEMENTATION.md). Supersedes the design-only RFC posted in the
+Status: revision 4 (integrated with valvejs 0.5.2; verification is recorded in IMPLEMENTATION.md). Supersedes the design-only RFC posted in the
 architecture thread on 2026-10-19. This revision resolves eight review blockers, each checked
 against the source at `1979020` (valvejs 0.5.0). Sections marked **Decision** are binding for the
 implementation. The build checklist in section 12 tracks delivery.
@@ -244,7 +244,7 @@ and repeated up to 3 times, and a sensitivity table includes them.
 
 ## 4. Blocker 4: the inherited `maxWait` gap is a safety failure
 
-**Source check.** `start()` checks `job.deadline <= Date.now()` (`valve.ts:274`) when the store
+**Historical source check (0.5.0).** `start()` checks `job.deadline <= Date.now()` (`valve.ts:274`) when the store
 reply is handled. The callback runs later in a microtask (`valve.ts:290`), after the other
 callbacks granted in the same batch. With synchronous work in an earlier callback of the batch,
 or an event-loop stall between the check and the microtask, the callback can start after its
@@ -260,13 +260,15 @@ deadline. Prior evidence: forced 21-26 ms late; 3 natural cases of at most 0.26 
 - Any violation makes the arm's safety status **FAIL**. Reports print the safety status before
   any performance verdict. No suite is called passing while it has a C1 violation. The status
   reads `FAIL (C1 × n)`, and the regression status is reported separately.
-- `perf c1` and the vitest repro `test/c1.repro.test.ts` reproduce the gap with
-  the memory store and with Redis, using a batch whose first callback runs synchronous work past
-  the next job's deadline. The focused test asserts that the defect reproduces; a green unit test verifies the
-  reproducer, while `perf c1` exits 1 and affected real-time trials remain **FAIL**. The report labels this
-  `KNOWN DEFECT REPRODUCED`, not pass.
-- `docs/C1-ISSUE.md` drafts an issue recommendation. **It is not filed.** Production code is
-  **not** changed in this work.
+- C1 was fixed in valvejs 0.5.2 by [PR #101](https://github.com/ksaurav24/valve/pull/101).
+  `perf c1` now verifies deadline rejection: the blocking job must finish, its stall must cross
+  the later deadline, and the later job must reject with `MAX_WAIT_EXCEEDED` without starting.
+  A verified check exits 0; a late callback exits 1; unrelated rejection or missing coverage
+  exits 2. Unit and Redis/Valkey integration tests assert the fixed behavior.
+- Every deadline violation stops execution and makes safety FAIL. Historical vulnerable builds
+  keep `KNOWN DEFECT REPRODUCED` labels; missing historical evidence is not upgraded to PASS.
+- [Issue #100](https://github.com/ksaurav24/valve/issues/100) is closed as fixed. The harness
+  consumes that upstream production fix and does not introduce another production change.
 
 ## 5. Blocker 5: execution budgets. Decision: measured cost model, budgets enforced by dry run
 
@@ -539,9 +541,11 @@ The implementation status of each item, with evidence, is recorded in `IMPLEMENT
   correlation. It is not guessed from a retry hint or a single server timestamp.
 - OLS memory slopes are diagnostic under their residual-independence assumption. Serially
   correlated GC/RSS samples can violate that assumption; slope intervals are not release gates.
-- Full smoke includes intentional C1 exposure and can exit 1 on unchanged production. PR CI
-  runs selected mechanism cells plus the explicit unit reproducer; full manual smoke preserves
-  absolute failure reporting. No known-defect safety waiver exists.
+- Full smoke includes positive-deadline exposure and stops on any regression. PR CI covers
+  memory/Redis/Valkey smoke, real-store integration, and the verified C1 rejection command.
+  Historical failures remain failures; there is no known-defect waiver.
+- The nightly workflow is manual-only until its dedicated runner and CPU variables exist.
+  Hosted smoke is the default manual choice; enabling cron requires provisioning the host first.
 - All five tiers, CLI and runner controls are implemented. Long decision and soak durations are
   not implied by unit coverage. See IMPLEMENTATION.md for actual executed run IDs and limits.
 

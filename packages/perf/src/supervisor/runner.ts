@@ -32,6 +32,8 @@ export const FATAL: ViolationClass[] = [
   'scoped-bound',
   'lease-oversubscription',
   'start-after-abort',
+  'maxwait-C1-check-before-deadline',
+  'maxwait-late-grant',
   'lost-job',
   'worker-crash',
   'reconciliation',
@@ -57,7 +59,7 @@ export interface RunOptions {
   decision?: DecisionPlan;
   metricsFor(cell: CellSpec): DecisionMetric[];
   trial: Omit<TrialContext, 'runDir'>;
-  /** Classes that stop the run immediately (C1 is reported as FAIL but does not stop measurement). */
+  /** Classes that stop the run immediately, including every deadline violation. */
   stopOn?: ViolationClass[];
   maxAttempts?: number;
   cooldownMs?: number;

@@ -101,12 +101,16 @@ pnpm perf legacy catalog|golden
 selection uses `--budget` and drops lower-priority cells deterministically rather than cutting a
 random partial run.
 
-## Known boundary
+## Deadline regression verification
 
-The harness intentionally reproduces the inherited C1 deadline defect: a callback can begin
-after its `maxWait` deadline if an earlier callback blocks the event loop after the store reply.
-`pnpm perf c1` reports `KNOWN DEFECT REPRODUCED`; that is evidence of a safety failure, not a
-passing test. This package does not fix production code. See [docs/C1-ISSUE.md](./docs/C1-ISSUE.md).
+C1 was fixed in valvejs 0.5.2 by checking positive `maxWait` deadlines immediately before
+callback invocation. `pnpm perf c1 --stores memory,redis74,valkey8` verifies the fix against
+registered stores. It passes only when the earlier blocking callback finishes, the stall crosses
+the later job's deadline, and the later job rejects with `MAX_WAIT_EXCEEDED` without running.
+
+The command exits 0 for verified rejection, 1 for a late callback, and 2 for an inconclusive
+probe or setup failure. Unrelated rejection is not a safety pass. Vulnerable historical builds
+and their retained reports remain safety failures. See [docs/C1-ISSUE.md](./docs/C1-ISSUE.md).
 
 ## Bounded samples and dedicated-host CI
 
@@ -114,7 +118,9 @@ passing test. This package does not fix production code. See [docs/C1-ISSUE.md](
 integration sample. Explicitly shortened windows are labelled samples and cannot support the
 normal minimum-slot performance claim. Use `--dry-run` before longer work.
 
-For dedicated runners, configure repository variables `PERF_SERVER_CPUS` and
+The nightly workflow is manual-only until dedicated infrastructure is configured; its default
+manual choice is hosted smoke. Before enabling a cron schedule or authoritative runs, configure
+a self-hosted Linux runner labelled `valve-perf` and repository variables `PERF_SERVER_CPUS` and
 `PERF_WORKER_CPUS` as disjoint CPU lists. Nightly and decision jobs use `--isolate` and
 `--require-authoritative`; missing protection fails before trials. Hosted smoke stays portable.
 
@@ -123,6 +129,5 @@ fleet budget per trial, disk buffering is bounded, and schedules stop at 250,000
 Exceeding a budget fails the trial explicitly. These controls make long low-load leak checks
 possible without presenting them as unrestricted high-rate stress.
 
-The full smoke profile includes deliberate C1 exposure and may exit 1 on the current release.
-PR CI selects mechanism smoke cells and separately checks the known-defect reproducer; its
-passing unit assertion does not establish production deadline safety.
+The full smoke profile includes deadline exposure. Any deadline violation fails and stops the
+run. PR CI runs memory/Redis/Valkey smoke, real-store integration, and the C1 regression command.

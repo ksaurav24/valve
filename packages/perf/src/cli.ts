@@ -25,6 +25,7 @@ import { PROFILES, type ProfileName } from './plan/profiles.ts';
 import { writeReports } from './report/index.ts';
 import { reexecIsolated } from './supervisor/isolate.ts';
 import { c1, calibrate, doctor, micro, model } from './tiers/local.ts';
+import { c1Safety, type C1Result } from './tiers/c1.ts';
 import {
   preparePlan,
   printPlan,
@@ -53,7 +54,7 @@ Real-time options:
   --endpoint URL  --run-id ID  --html  --keep-raw
 Dry runs print estimates without builds or trial execution. Estimates >60 min require --yes.
 Exit: 0 completed; 1 safety/regression/execution failure; 2 invalid arguments or setup.
-C1 exits 1 when the known deadline defect reproduces (KNOWN DEFECT REPRODUCED).`;
+C1: 0 verified deadline rejection; 1 late callback; 2 inconclusive verification.`;
 
 const strings = [
   'ref',
@@ -467,11 +468,16 @@ export async function main(
             ? 'calibration-trials.json'
             : `${manifest.tier}.json`;
         const raw = readFileSync(join(dir, file), 'utf8');
+        const c1Status =
+          manifest.tier === 'c1'
+            ? c1Safety(decode<C1Result[]>(raw))
+            : undefined;
         const safety =
-          manifest.tier === 'c1' &&
-          decode<{ reproduced: boolean }[]>(raw).some((r) => r.reproduced)
+          c1Status === 'FAIL'
             ? 'FAIL - KNOWN DEFECT REPRODUCED'
-            : 'UNVERIFIED - local diagnostic tier';
+            : c1Status === 'PASS'
+              ? 'PASS - DEADLINE REGRESSION CHECK'
+              : 'UNVERIFIED - local diagnostic tier';
         const markdown = `# Valve ${manifest.tier}: ${manifest.runId}\n\nSafety: ${safety}\n\nPortable local evidence. No distributed performance inference.\n\n\`\`\`json\n${raw}\n\`\`\`\n`;
         writeFileSync(join(dir, 'report.md'), markdown);
         if (v.html) {

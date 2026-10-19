@@ -1,6 +1,7 @@
 import { randomUUID } from 'node:crypto';
 import { describe, expect, it } from 'vitest';
 import { currentBuild } from '../../src/identity/build.ts';
+import { reproduceC1 } from '../../src/tiers/c1.ts';
 import { valveAdapter } from '../../src/adapters/valve.ts';
 import type { AdapterContext, Limiter } from '../../src/adapters/types.ts';
 import { resolveEndpoint, cleanupPrefix } from '../../src/infra/safety.ts';
@@ -122,6 +123,27 @@ describe.skipIf(process.env.PERF_INTEGRATION !== '1')(
           await cleanupPrefix(admin, prefix);
           admin.disconnect();
         }
+      });
+  },
+);
+
+describe.skipIf(process.env.PERF_INTEGRATION !== '1')(
+  'deadline invocation regression',
+  () => {
+    for (const server of ['redis74', 'valkey8'])
+      it(`${server} skips the expired callback with MAX_WAIT_EXCEEDED`, async () => {
+        const result = await reproduceC1(currentBuild({ rebuild: false }), {
+          redisUrl: resolveEndpoint(server).url,
+        });
+        expect(result).toMatchObject({
+          safety: 'PASS',
+          outcome: 'rejected',
+          rejectionCode: 'MAX_WAIT_EXCEEDED',
+          firstOutcome: 'fulfilled',
+          blockedThroughDeadline: true,
+          reproduced: false,
+          lateMs: 0,
+        });
       });
   },
 );

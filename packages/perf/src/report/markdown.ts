@@ -41,7 +41,7 @@ export function renderMarkdown(s: RunSummary): string {
   );
   out.push(
     `## OVERALL SAFETY: ${s.safety}`,
-    'C1 maxWait violations are failures. A known C1 defect is labelled KNOWN DEFECT REPRODUCED, never a passing result.',
+    'C1 maxWait violations are failures. Vulnerable historical builds are labelled KNOWN DEFECT REPRODUCED, never a passing result.',
     table(
       [
         'Cell',

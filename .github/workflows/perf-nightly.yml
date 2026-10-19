@@ -1,14 +1,13 @@
 name: Performance nightly
 
 on:
-  schedule:
-    - cron: '23 2 * * *'
+  # Enable a schedule only after the valve-perf runner and CPU variables are configured.
   workflow_dispatch:
     inputs:
       run_kind:
         description: Authoritative nightly needs the dedicated runner; hosted smoke is portable.
         required: true
-        default: authoritative
+        default: hosted-smoke
         type: choice
         options: [authoritative, hosted-smoke]
       base_ref:
@@ -32,7 +31,7 @@ concurrency:
 jobs:
   authoritative:
     name: Budgeted authoritative matrix
-    if: github.event_name == 'schedule' || inputs.run_kind == 'authoritative'
+    if: inputs.run_kind == 'authoritative'
     runs-on: [self-hosted, linux, valve-perf]
     timeout-minutes: 60
     env:
@@ -97,7 +96,7 @@ jobs:
       - run: pnpm --filter valvejs build
       - run: pnpm perf infra up redis74
       - run: pnpm perf infra up valkey8
-      - run: pnpm perf smoke --stores redis74,valkey8 --suite gcra,fixed-window,multi-rule,scoped,weighted,lease,combined,api,stores,lifecycle,faults,runtime
+      - run: pnpm perf smoke --stores memory,redis74,valkey8
       - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         if: always()
         with:

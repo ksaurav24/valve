@@ -1,62 +1,44 @@
-# C1 issue: callbacks can start after their `maxWait` deadline
+# C1: callback invocation after maxWait
 
-Status: filed as [ksaurav24/valve#100](https://github.com/ksaurav24/valve/issues/100) at the user’s request.
-The issue includes a standalone reproducer and verified memory, Redis, and Valkey results.
-The performance harness does not change Valve production code.
+[Issue #100](https://github.com/ksaurav24/valve/issues/100) was fixed by
+[PR #101](https://github.com/ksaurav24/valve/pull/101), included in valvejs 0.5.2.
+The harness consumes the upstream fix and keeps the regression probe.
 
-## Summary
+## Original behavior
 
-Valve can start a callback after the deadline established by `maxWait`. The store response is
-checked against the deadline, but granted callbacks are scheduled in later microtasks. If an
-earlier callback in the same granted batch performs synchronous work, a later callback can cross
-its deadline between the check and its actual start.
+In valvejs 0.5.0, Valve checked a positive `maxWait` deadline when processing admission, then
+invoked the callback in a later microtask. An earlier synchronous callback in the same batch
+could block through the later job's deadline. The later callback still ran and fulfilled.
 
-This is a safety issue, not a latency percentile or performance regression. The required
-invariant is: a callback whose monotonic start time is later than `submit + maxWait` must not run.
+The issue includes a standalone public-API reproducer and verified memory, Redis 7.4, and
+Valkey 8 observations. Deliberately forced lateness was about 30-31 ms. These observations do
+not estimate the natural frequency of the defect.
 
-## Reproduction
+## Regression command
 
 ```sh
-pnpm install --frozen-lockfile
-pnpm --filter valvejs build
-pnpm perf c1
+pnpm perf c1 --stores memory,redis74,valkey8
 ```
 
-The deterministic reproducer uses a granted batch whose first callback blocks synchronously past
-the next job's deadline. It exercises memory and Redis paths. The expected report label is
-`KNOWN DEFECT REPRODUCED`, with safety `FAIL (C1 × n)` and the worst lateness recorded.
+Redis/Valkey names must refer to registered harness-owned disposable stores. With no store
+option, the command checks memory and the first registered Redis-compatible store, if any.
 
-An expected-failure test may keep CI green while the defect remains. That green check means the
-known behavior was reproduced; it must not be described as a safety pass.
+| Result     | Required observation                                                                                                        | Exit |
+| ---------- | --------------------------------------------------------------------------------------------------------------------------- | ---- |
+| PASS       | The first job finishes and blocks through the later deadline; the later job rejects with MAX_WAIT_EXCEEDED without starting | 0    |
+| FAIL       | A callback starts after its positive maxWait deadline                                                                       | 1    |
+| UNVERIFIED | Unrelated rejection, missing blocking interval, or another incomplete observation                                           | 2    |
 
-## Classification
+Setup errors also exit 2. Every result records the build/environment identity, exact rejection
+code, blocking condition, and safety status. `report <runId> --html` preserves these statuses.
+Historical failures remain failures; old incomplete observations never become safety passes.
 
-- `C1-check-before-deadline`: the grant reply was handled before the deadline, but the callback
-  began after it.
-- `late-grant`: the grant reply was handled after the deadline and the callback still began.
+## Fixed production behavior
 
-Both classifications make the arm's absolute safety status `FAIL`. Performance conclusions are
-reported separately and cannot override that status.
+Valve checks expiry immediately before callback invocation. Expired or cancelled callbacks are
+skipped, reserved concurrency and leases are released, and skipped callbacks are not counted
+as started. `maxWait: 0` retains its separate single-attempt semantics.
 
-## Expected behavior
-
-Immediately before invoking each callback, Valve should check the same monotonic deadline used by
-the client oracle. A job that has crossed its deadline should settle with the documented timeout
-outcome and its callback should never begin. Any proposed fix needs focused tests for multi-grant
-batches, synchronous earlier callbacks, event-loop stalls, memory and Redis stores, abort races,
-and equality at the deadline.
-
-## Scope and evidence to attach before filing
-
-Attach the complete `.perf/runs/<runId>/` directory or its CI artifact, including the manifest,
-build identity, environment fingerprint, raw events, and rendered report. Include the exact
-Valve commit and distinguish forced lateness from naturally observed lateness.
-
-The RFC records earlier evidence of forced 21-26 ms lateness and three natural cases no worse
-than 0.26 ms. Those historical observations require their archived provenance when quoted. Run
-the current reproducer before filing so the issue does not rely only on historical numbers.
-
-## Non-goals
-
-This document does not choose or implement a production fix or change `maxWait` semantics.
-Fix design and compatibility review belong in a separate change.
+The harness unit suite verifies the fixed memory path. Its real-store integration suite and
+C1 command verify Redis/Valkey paths. The oracle continues to classify every late callback as
+an absolute safety failure and stops a real-time run on deadline violations.

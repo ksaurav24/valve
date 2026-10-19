@@ -26,7 +26,7 @@ import type { Rule } from '../model/state.ts';
 import { LEGACY_CALIBRATION, saveCalibration } from '../plan/budget.ts';
 import { resolveEndpoint } from '../infra/safety.ts';
 import { imageId, readInfra } from '../infra/servers.ts';
-import { reproduceC1 } from './c1.ts';
+import { c1Safety, reproduceC1 } from './c1.ts';
 import { runTrial } from '../supervisor/trial.ts';
 
 const median = (xs: number[]) =>
@@ -254,7 +254,7 @@ export async function calibrate(
   return 0;
 }
 
-/** Persist the deadline reproduction with the same build/environment provenance as other tiers. */
+/** Persist deadline regression verification with the same provenance as other tiers. */
 export async function c1(
   options: { stores?: string[] | undefined; endpoint?: string | undefined },
   log: (line: string) => void = console.log,
@@ -276,12 +276,13 @@ export async function c1(
         ? {}
         : { redisUrl: resolveEndpoint(options.endpoint ?? store).url },
     );
-    results.push(result);
+    results.push({ ...result, store });
     writeFileSync(join(runDir(manifest.runId), 'c1.json'), encode(results, 2));
     log(
-      `${result.reproduced ? 'FAIL - KNOWN DEFECT REPRODUCED' : 'UNVERIFIED - defect did not reproduce'} ${encode(result)}`,
+      `${result.safety === 'PASS' ? 'PASS - DEADLINE REGRESSION CHECK' : result.safety === 'FAIL' ? 'FAIL - KNOWN DEFECT REPRODUCED' : 'UNVERIFIED - expected deadline rejection not established'} ${encode({ ...result, store })}`,
     );
   }
   log(`Results: ${runDir(manifest.runId)}`);
-  return results.some((r) => r.reproduced) ? 1 : 2;
+  const safety = c1Safety(results);
+  return safety === 'PASS' ? 0 : safety === 'FAIL' ? 1 : 2;
 }

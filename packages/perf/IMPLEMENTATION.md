@@ -1,94 +1,89 @@
 # Performance harness implementation record
 
-Verified locally on 2026-10-19 with Node 24.21.0 and pnpm 11.28.4.
+Updated on 2026-10-19 after merging `origin/master` into `feat/perf-harness`.
+Node 24.21.0, pnpm 11.28.4, valvejs 0.5.2.
 
-The complete five-tier harness, CLI, competitor adapters, models/oracles, statistics, reports,
-and three CI workflows are implemented. This record describes executed verification; it does
-not establish an authoritative performance result. Production Valve source and its runtime
-dependencies are unchanged. No release, pull request, or publication was created.
-C1 was subsequently filed at the user’s request as [issue #100](https://github.com/ksaurav24/valve/issues/100).
+Local checkpoint `65c0e78` preserves the original complete harness. Merge `a6d14fe` brings in
+master through `161ea0d`, including the C1 fix and the 0.5.2 release. The only merge conflict
+was `.gitignore`; both sets of benchmark exclusions were retained. This work adds no further
+production source changes, release, issue, or pull request.
 
-## Integrated coverage
+## Updated behavior
 
-- T0 uses Tinybench for local operation costs; T1 checks admission models, parity, and bounds.
-- T2 launches fresh worker processes against memory and guarded Redis/Valkey endpoints.
-- T3 supports immutable current/ref/patch builds, paired trials, A/A, staged 5/10/20 decisions,
-  and category-matched competitor comparisons with pinned versions and explicit N/A pairs.
-- T4 keeps continuous state for low-load soaks and injects server/worker faults on owned infra.
-- JSON, CSV, Markdown, and standalone HTML retain raw absolutes, independent safety status,
-  missing/censored outcomes, A/A instability, and non-authoritative-run notices.
-- Manifests hash the harness, builds, lockfile, Lua, environment, cells, seeds, endpoints, runtime
-  policy, and statistical plan. Resume rejects incompatible evidence. Dist snapshots are frozen
-  before execution, and source changes during a trial invalidate it.
-- Recording and arrival limits fail explicitly. Endpoint locks prevent concurrent local runs
-  from flushing the same server through direct-IP and loopback aliases.
+- C1 is now a regression check. PASS requires the blocking job to finish, its stall to cross
+  the next deadline, and the next job to reject with `MAX_WAIT_EXCEEDED` without starting.
+- C1 exits 0 for verified rejection, 1 for a late callback, and 2 for incomplete evidence or
+  unrelated rejection. Raw results include the rejection code and proof conditions.
+- Every real-time deadline violation now stops execution. Historical pre-fix failures remain
+  failures, including when their reports are regenerated.
+- PR CI covers real-store integration, the C1 command, and memory/Redis/Valkey smoke.
+- The nightly workflow is manual-only, defaulting to hosted smoke. Enable its schedule only
+  after provisioning the `valve-perf` runner and disjoint server/worker CPU variables.
 
-## Verification results
+## Post-merge verification
 
-| Check                      | Evidence and result                                                                                                                                                                                                                                         |
-| -------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Portable unit suite        | 145 tests in 19 files passed on Node 24; includes model/boundary, statistics golden, censoring, reports, CLI, safety, library analysis, and the C1 reproducer.                                                                                              |
-| Real-store integration     | 44 tests in four files passed on Redis 7.4 and Valkey 8, including real processes, first-call Lua logging, public API feedback, and warmed identity/p-queue/distributed Bottleneck backlogs.                                                                |
-| Quick tier                 | Model/parity/golden/oracle checks passed; all nine Tinybench tasks completed. Runs `model-1792384571287-9103fd4c` and `micro-1792384573226-9972a2b3`.                                                                                                       |
-| Full smoke                 | `verified-final-smoke-node24`: all 41 trials executed; 40 safety PASS, one safety FAIL with 22 C1 late starts. Expected exit 1; no production safety claim.                                                                                                 |
-| Paired matrix sample       | `verified-final-paired-node24`: 16 successful trials, five base/A-A/head reps plus audit. Audit safety PASS; uninstrumented rate arms UNVERIFIED. A/A unstable; four estimable A/B metrics INCONCLUSIVE. Single-worker Jain has no inferential sample.      |
-| Competitor sample          | `verified-libs-node24-v4`: all 35 trials over 26 supported cells and nine categories completed. Safety: 24 PASS, 11 UNVERIFIED, no violations. All 69 comparison entries DESCRIPTIVE at one rep; floor/approximate mappings remain raw-only.                |
-| Continuous soak sample     | `verified-soak-node24`: one continuous eight-second Valkey 8 lease trial, safety PASS, seven worker and eight server resource samples. Drift metrics are diagnostic only.                                                                                   |
-| Chaos sample               | `verified-chaos-node24`: six two-second Valkey 8 fault cells completed. Five safety PASS; restart UNVERIFIED because the server lost its pre-restart audit log. All faults recorded their effect/completion; CPU/load helpers recorded expected exit codes. |
-| Standalone C1              | `c1-1792384491360-e5624fdc`: memory and Valkey 8; `c1-1792384735891-1275b1fa`: Redis 7.4. All reproduced about 30–31 ms late, persisted safety FAIL, and exited 1.                                                                                          |
-| Build identities           | Current, isolated HEAD-ref, and comment-only patch builds completed with identical production dist SHA-256 `8347f92e03f68d000f164e4d6fb0651467ff3cd54c71d382f7bc61022c3e5c93`.                                                                              |
-| Repository checks          | Workspace typecheck, lint/format, source conventions, production 366 tests, three type tests, package/exports/size checks passed.                                                                                                                           |
-| Website                    | 22 tests and `pnpm docs:build` passed; 74 routes built, including changelog, releases, and homepage. No changeset or release metadata changed.                                                                                                              |
-| Legacy golden regeneration | The archived analyzer ran over all 17 confirm cells and regenerated the three-cell fixtures; portable golden tests passed afterward.                                                                                                                        |
-| CI                         | Workflow YAML formats and public CLI arguments checked locally. GitHub Actions jobs have not been executed.                                                                                                                                                 |
+| Check                                | Result and retained evidence                                                                                                                                                                                                                                                                                  |
+| ------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Repository check                     | `pnpm check` passed: lint/format, workspace typecheck, 389 production tests, three type tests, coverage thresholds, all builds, source conventions, package/exports, and size budgets. Runtime smoke additionally passed on Node 20, 22, and 24 for ESM, CommonJS, and subpath exports.                       |
+| Website                              | 22 tests passed; 74 routes rebuilt. Changelog, releases, and homepage show 0.5.2, 0.5.1, 0.5.0 in newest-first order. Release maturity remains beta.                                                                                                                                                          |
+| Harness unit                         | 147 tests in 19 files passed, including strict C1 proof conditions and historical report preservation.                                                                                                                                                                                                        |
+| Harness integration                  | 46 tests in four files passed on Redis 7.4 and Valkey 8, including the new positive C1 rejection checks.                                                                                                                                                                                                      |
+| Production integrations and examples | 385 passing executions across Redis 6.2/7.4/8 and Valkey 7.2/8: 85 combined Redis 7.4/cluster/recovery/subscriber checks plus 75 on each other store. Examples passed on all five stores. Ten fixture-specific cases are skipped on the other stores because they already ran in the combined suite.          |
+| C1 controls                          | Old `1979020` build: FAIL with about 30 ms lateness. Fixed master: PASS with MAX_WAIT_EXCEEDED and no callback start. `c1-1792387387683-875cf969` separately passed memory, Redis 7.4, and Valkey 8 with exit 0.                                                                                              |
+| Quick and calibration                | All nine micro tasks and 75 portable model/golden/oracle checks passed. Runs model-1792387046505-42fe9a81 and micro-1792387048235-65389116. Cold-process calibration completed at one/four workers.                                                                                                           |
+| Full smoke                           | `merged-smoke-node24`: all 41 trials executed successfully and all 41 reported safety PASS, including the deadline cell that failed before the upstream fix. Exit 0.                                                                                                                                          |
+| Library samples                      | `merged-libs-local-node24`: 26 local trials; `merged-libs-node24`: nine distributed trials. All 35 executed successfully over L1-L5 (including L1-noop) and D1-D3. Safety: 24 PASS, 11 UNVERIFIED, no violations. One-rep comparisons are descriptive; results from the separate fingerprints are not pooled. |
+| Paired matrix                        | `merged-paired-node24`: 16 successful trials (five base/A-A/head reps plus audit). Audit safety PASS; uninstrumented rate arms UNVERIFIED. A/A unstable; four estimable A/B metrics INCONCLUSIVE. Single-worker Jain has no inferential sample.                                                               |
+| Continuous soak and chaos            | `merged-soak-node24`: one continuous eight-second lease trial, safety PASS. `merged-chaos-node24`: all six two-second fault cells completed, five safety PASS and restart UNVERIFIED because pre-restart audit evidence was lost. All fault helpers recorded completion without errors.                       |
+| Legacy and patch builds              | Legacy golden regeneration passed against the read-only archive. Current, master-ref, and comment-only patch builds passed; current production dist hash is 48e3876a8684352ebd063ca19018f9117df5b15cacabf874998394f52bc688e9.                                                                                 |
+| CI                                   | Workflow syntax/arguments checked locally. GitHub Actions have not run for this branch. Automatic nightly execution is disabled until its host exists.                                                                                                                                                        |
 
-Smoke exercised Redis 6.2/7.4/8 and Valkey 7.2/8, a built netem image with 5 ± 2 ms delay,
-memory, wrapped public APIs, shared feedback, weighted/scoped rules, leases, lifecycle churn,
-worker crash/join, client disconnection, event-loop blocking, and deadline exposure. Retained
-platform/mechanism runs include `verify-mechanisms-v3` and `verify-platform-v2`.
+All six real-time run manifests record harness source SHA-256
+`23766ddca2b45baa130c20c961ae3b478783e614a65644f8878622007d37bcaa`.
 
-Final smoke and unit/integration checks include the last CLI correction. Library/soak/chaos runs
-include the final backlog/comparator and clock-tap changes and precede only the CLI relative-patch-path
-correction. Every manifest retains its own harness hash; evidence from different implementations
-is not pooled. Earlier full smoke (`verified-full-smoke-node24`), paired samples, and failed
-exploratory runs are also retained.
+Command logs, production-matrix results, C1 controls, website checks, and setup/cleanup records
+live in `.perf/verify-merged-20261019/`. Run directories under `.perf/runs/` retain manifests,
+raw compressed payloads, rows, and JSON/CSV/Markdown/HTML reports. Preserve complete directories.
 
-## Statistical and measurement limits
+## Interpretation and limits
 
-- Every local timing run is non-authoritative: server/worker CPU pinning and controlled resource
-  scopes were not used. Fingerprints differ with the selected server set; never pool those runs.
-- One-rep runs are descriptive. Explicitly shortened windows do not satisfy normal eligibility
-  requirements. The paired sample validates execution and A/A withholding, not a release decision.
-- Competitor callback concurrency and queued cancellation are observable. Rate/window callback
-  envelopes are diagnostics; exact third-party reservation clocks remain UNVERIFIED. Bottleneck
-  L4 is approximate and raw-only. Identity is an unconstrained floor, never subtracted.
-- L1/L1-noop use uniform 100 ms windows to keep raw recording bounded. This is a local overhead
-  diagnostic, not a distributed performance claim. Backlog refill yields uniformly for all
-  adapters, including synchronous identity callbacks.
-- T1 models admission state, not JavaScript scheduler, timer, socket, or promise behavior.
-- Runtime bounds are withheld where valid exogenous weighted/scoped/duration demand cannot be
-  reconstructed. Zero-grant early/race attribution is withheld without call correlation.
-- OLS memory trends assume independent residuals. GC/RSS samples may be correlated; these
-  slopes are diagnostics, not leak-proof or release gates.
-- Long decision/nightly profiles, hour-scale soaks, authoritative cgroup/pinning execution,
-  remote CI runs, and every possible factor combination were not run locally.
-- Redis Cluster, Sentinel, TLS, multi-host fleets, and more than 64 processes remain outside v1.
-- C1 is deliberately exposed as an absolute safety failure. Its focused unit test passes when
-  it reproduces the production defect; the standalone reproducer and full smoke exit 1.
+- Local timings are non-authoritative: controlled resource scopes and CPU pinning were not used.
+  Do not pool runs across fingerprints or harness/build identities.
+- One-rep library samples are descriptive. Short paired windows verify execution and statistical
+  withholding, not release performance. Long decision/nightly profiles and hour-scale soaks were
+  not run; no performance improvement or long-term leak conclusion is established.
+- Competitor concurrency and queued cancellation are observable. Rate/window callback envelopes
+  are diagnostics; exact third-party reservation clocks remain UNVERIFIED. Approximate Bottleneck
+  L4 and identity floor rows remain raw-only. Nothing is subtracted from the floor.
+- T1 models admission state, not JavaScript scheduling, timers, sockets, or promise ordering.
+  Production cluster compatibility is tested separately from distributed performance claims.
+- Runtime bounds and zero-grant race attribution remain withheld where the required exogenous
+  demand or call correlation cannot be reconstructed. OLS memory slopes remain diagnostics.
+- Job/call streams each have a 64 MiB fleet budget, queued disk writes are bounded, and schedules
+  cap at 250,000 arrivals. Exceeding a limit fails explicitly rather than sampling silently.
+- Redis Cluster performance, Sentinel, TLS, multi-host fleets, and more than 64 processes remain
+  outside the performance harness's v1 scope.
 
-## Evidence retention
+All six owned store containers and the three verification-only cluster containers were removed.
+All eight pre-existing containers remain present with their original running state. Evidence
+archives, raw trial payloads, and build snapshots remain available.
 
-Verification containers were removed through the guarded CLI. All eight unrelated containers
-were checked afterward and preserved. Local run/build evidence remains available.
+## Historical evidence
 
-Local runs live under `.perf/runs/<runId>/` and are ignored by git. Preserve the entire run
-directory, including its manifest, rows, raw compressed payloads, and reports. PR/hosted-smoke
-artifacts retain runs for 14 days, nightly artifacts for 30 days, and decision artifacts for
-90 days. Workflow upload and cleanup steps use `always()`.
+Pre-merge verification against valvejs 0.5.0 is retained, not rewritten: `verified-final-smoke-node24`
+completed 41 trials with 40 safety PASS and one FAIL (22 C1 late starts); the earlier five-rep
+paired sample withheld conclusions after unstable A/A. `verified-libs-node24-v4` completed all
+35 trials, and the earlier short soak/chaos samples retain their original statuses. These are
+historical observations, not verification of the fixed build.
 
-Pre-harness evidence remains read-only at
-`/home/xlr8/valve-evidence-archive/2026-10-19-pre-harness/`, with its tar archive, 6,906-file
-hash manifest, and archive-time git status. Legacy raw evidence is not deleted or rewritten.
+[Issue #100](https://github.com/ksaurav24/valve/issues/100) is fixed by
+[PR #101](https://github.com/ksaurav24/valve/pull/101), included in 0.5.2. The C1 issue document
+records the original defect and current regression contract.
 
-Start with [README.md](./README.md), use [REPRODUCING.md](./REPRODUCING.md) for exact commands,
-and read [RFC.md](./RFC.md) for the measurement and decision rules.
+The pre-harness archive remains read-only at
+`/home/xlr8/valve-evidence-archive/2026-10-19-pre-harness/`, with its tar archive, 6,906-file hash
+manifest, and archive-time git status. Master pruned tracked benchmark output; that archive and
+new local evidence remain intact.
+
+Start with [README.md](./README.md), use [REPRODUCING.md](./REPRODUCING.md) for commands, and
+read [RFC.md](./RFC.md) for measurement and decision rules.

@@ -1,12 +1,10 @@
-// Focused reproduction of the inherited maxWait check-to-callback gap (C1).
-// Valve checks a job's deadline when the admission reply is handled (valve.ts `start()`), then
-// runs the callback in a later microtask after the batch's earlier callbacks. If an earlier
-// callback in the same batch does synchronous work past the deadline, the later callback starts
-// after its maxWait. This is a correctness failure; it is reported, never waived.
+// Regression check for the maxWait check-to-callback gap fixed in valvejs 0.5.2.
+// The first callback blocks through the second job's deadline. Passing requires the first
+// job to finish and the second to reject with MAX_WAIT_EXCEEDED without invoking its body.
 import { Redis } from 'ioredis';
 import { join } from 'node:path';
 import { pathToFileURL } from 'node:url';
-import type { BuildIdentity } from '../core/types.ts';
+import type { BuildIdentity, SafetyStatus } from '../core/types.ts';
 import { cleanupPrefix } from '../infra/safety.ts';
 
 export interface C1Result {
@@ -17,11 +15,44 @@ export interface C1Result {
   lateMs: number;
   reproduced: boolean;
   outcome: 'started' | 'rejected';
+  firstOutcome: 'fulfilled' | 'rejected';
+  blockedThroughDeadline: boolean;
+  rejectionCode?: string;
+  safety: SafetyStatus;
 }
 
 const now = () => performance.timeOrigin + performance.now();
 
-/** Run the reproduction against a build's memory store, or Redis when `redisUrl` is given. */
+export function classifyC1(
+  result: Pick<
+    C1Result,
+    | 'lateMs'
+    | 'outcome'
+    | 'firstOutcome'
+    | 'blockedThroughDeadline'
+    | 'rejectionCode'
+  >,
+): SafetyStatus {
+  if (result.lateMs > 0) return 'FAIL';
+  return result.firstOutcome === 'fulfilled' &&
+    result.blockedThroughDeadline &&
+    result.outcome === 'rejected' &&
+    result.rejectionCode === 'MAX_WAIT_EXCEEDED'
+    ? 'PASS'
+    : 'UNVERIFIED';
+}
+
+/** Older evidence without a verified rejection stays unverified; a late callback always fails. */
+export function c1Safety(
+  results: readonly { reproduced: boolean; safety?: SafetyStatus }[],
+): SafetyStatus {
+  if (results.some((r) => r.reproduced || r.safety === 'FAIL')) return 'FAIL';
+  return results.length > 0 && results.every((r) => r.safety === 'PASS')
+    ? 'PASS'
+    : 'UNVERIFIED';
+}
+
+/** Check any build, retaining FAIL for vulnerable historical builds. */
 export async function reproduceC1(
   build: Pick<BuildIdentity, 'packageDir'>,
   options: {
@@ -62,12 +93,14 @@ export async function reproduceC1(
     store,
   });
   try {
-    // Open the connection and load Lua before testing the short callback deadline.
-    if (client) await v.run(() => undefined);
+    // Open connections, load Lua and warm the public API before the short deadline.
+    await v.run(() => undefined);
     let startedAt = -1;
+    let blockedUntil = -1;
     const first = v.run(() => {
       const until = performance.now() + spinMs;
       while (performance.now() < until);
+      blockedUntil = now();
     });
     const submittedAt = now();
     const second = v.run(
@@ -76,19 +109,26 @@ export async function reproduceC1(
       },
       { maxWait: maxWaitMs },
     );
-    const outcome = await Promise.all([first, second]).then(
-      () => 'started' as const,
-      () => 'rejected' as const,
-    );
+    const [a, b] = await Promise.allSettled([first, second]);
+    const outcome =
+      b.status === 'fulfilled' ? ('started' as const) : ('rejected' as const);
+    const rejectionCode =
+      b.status === 'rejected' && typeof b.reason?.code === 'string'
+        ? (b.reason.code as string)
+        : undefined;
     const lateMs = startedAt < 0 ? 0 : startedAt - submittedAt - maxWaitMs;
-    return {
+    const observed = {
       store: options.redisUrl ? 'redis' : 'memory',
       maxWaitMs,
       spinMs,
       lateMs,
       reproduced: lateMs > 0,
       outcome,
+      firstOutcome: a.status,
+      blockedThroughDeadline: blockedUntil > submittedAt + maxWaitMs,
+      ...(rejectionCode ? { rejectionCode } : {}),
     };
+    return { ...observed, safety: classifyC1(observed) };
   } finally {
     await v.close().catch(() => undefined);
     await store.close().catch(() => undefined);
@@ -98,17 +138,3 @@ export async function reproduceC1(
     }
   }
 }
-
-export const C1_ISSUE = `C1: a job's callback can start after its maxWait.
-
-Location: packages/valve/src/valve.ts start() checks \`job.deadline <= Date.now()\` when the store
-reply is handled, then runs the callback in a later microtask (queueMicrotask), after earlier
-callbacks of the same granted batch. Synchronous work in an earlier callback, or any event-loop
-stall between the check and the microtask, makes the later callback start after its deadline.
-
-Repro: \`pnpm perf c1\` (memory store and Redis), or packages/perf/test/c1.repro.test.ts.
-Prior evidence: forced 21-26 ms late; 3 natural occurrences ≤ 0.26 ms (slotExp validation, 2026-10-19).
-
-Options to evaluate (not decided here): re-check the deadline inside the callback microtask
-before invoking fn (reject with MAX_WAIT_EXCEEDED and release any lease/budget accounting as
-documented for cancelled grants); or document maxWait as a bound on admission, not on callback start.`;

@@ -72,8 +72,12 @@ jobs:
           pnpm perf infra up redis74
           pnpm perf infra up valkey8
           pnpm perf infra status
+      - name: Verify real-store integration and C1 regression
+        run: |
+          PERF_INTEGRATION=1 pnpm --filter @valve/perf test:integration
+          pnpm perf c1 --stores memory,redis74,valkey8
       - name: Run the smoke profile
-        run: pnpm perf smoke --stores redis74,valkey8 --suite gcra,fixed-window,multi-rule,scoped,weighted,lease,combined,api,stores,lifecycle,faults,runtime
+        run: pnpm perf smoke --stores memory,redis74,valkey8
       - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         if: always()
         with:

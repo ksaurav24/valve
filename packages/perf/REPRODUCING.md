@@ -66,15 +66,22 @@ Use `--current` instead of `--head` to include the current checkout. If the esti
 minutes, review the plan and add `--yes`. Do not compare result summaries whose manifests have
 different environment, build, suite, cell, plan, margin, or seed hashes.
 
-## Reproduce the known C1 defect
+## Verify the C1 deadline fix
+
+With registered disposable Redis 7.4 and Valkey 8 stores:
 
 ```sh
-pnpm perf c1
+pnpm perf c1 --stores memory,redis74,valkey8
 ```
 
-The expected finding is `KNOWN DEFECT REPRODUCED` with safety `FAIL (C1 × n)`. The focused unit test passing means the reproducer behaved as designed; `perf c1` exits 1
-when it reproduces the defect; it does not mean the
-production invariant passed. The harness makes no production fix.
+On valvejs 0.5.2 or later, expect `PASS - DEADLINE REGRESSION CHECK` and exit 0: the blocking
+job finished, the following job's deadline elapsed, and that job rejected with
+`MAX_WAIT_EXCEEDED` without invoking its callback. A late callback is safety FAIL and exits 1.
+An unrelated rejection or ineffective probe remains UNVERIFIED and exits 2.
+
+Historical pre-fix runs retain their original FAIL status. Re-rendering evidence without a
+verified rejection never upgrades it to PASS. Compare new builds in new run directories;
+immutable old manifests and raw evidence remain intact.
 
 ## Render and archive evidence
 
