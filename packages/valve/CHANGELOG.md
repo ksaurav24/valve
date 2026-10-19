@@ -1,5 +1,11 @@
 # valvejs
 
+## 0.5.2
+
+### Patch Changes
+
+- 5b3e793: Check positive maxWait deadlines immediately before invoking callbacks, including jobs admitted in the same batch. Skip expired or cancelled callbacks and release their reserved concurrency slots and global leases without counting them as started. Preserve maxWait: 0 as a single immediate admission attempt.
+
 ## 0.5.1
 
 ### Patch Changes
