@@ -2,7 +2,7 @@
 # Rebuild the checked-in legacy slotexp golden fixtures from the read-only archive.
 set -euo pipefail
 
-archive_dir=${VALVE_EVIDENCE_ARCHIVE:-/home/xlr8/valve-evidence-archive/2026-10-19-pre-harness}
+archive_dir=${VALVE_EVIDENCE_ARCHIVE:?set VALVE_EVIDENCE_ARCHIVE to the pre-harness archive directory}
 package_dir=$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)
 fixture_dir="$package_dir/test/fixtures/legacy"
 temporary_dir=$(mktemp -d)

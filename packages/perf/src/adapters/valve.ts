@@ -22,6 +22,7 @@ type RedisModule = typeof import('valvejs/redis');
 type Store = import('valvejs').Store;
 
 const modules = new Map<string, Promise<[ValveModule, RedisModule]>>();
+/** Load and cache the public Valve modules from one frozen build directory. */
 function load(packageDir: string) {
   let m = modules.get(packageDir);
   if (!m) {
@@ -192,6 +193,7 @@ export function countingStore(
   return wrapped;
 }
 
+/** Determine whether this cell requires the distributed Store adapter. */
 function needsRedis(cell: CellSpec) {
   return cell.store.kind === 'redis';
 }
@@ -358,12 +360,12 @@ export const valveAdapter: Adapter = {
         });
       },
       async close() {
-        try {
-          await v.close();
-          await store.close();
-        } catch {
-          // close must not reject
-        }
+        for (const resource of [v, store])
+          try {
+            await resource.close();
+          } catch {
+            // Each layer must get its cleanup attempt even if another close rejects.
+          }
         for (const c of clients) c.disconnect();
       },
       stats: () => ({

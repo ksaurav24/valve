@@ -182,6 +182,7 @@ const csv = (value: string | undefined) =>
         .split(',')
         .map((x) => x.trim())
         .filter(Boolean);
+/** Validate a bounded numeric CLI value before any build or infrastructure operation. */
 function numberOption(
   value: string | undefined,
   name: string,
@@ -203,6 +204,7 @@ function numberOption(
     );
   return number;
 }
+/** Parse a positive CLI duration, bounded to twelve hours. */
 function duration(value: string | undefined, name: string): number | undefined {
   if (value === undefined) return undefined;
   let result: number;
@@ -230,6 +232,7 @@ const cpus = (value: string | undefined) => {
   return value;
 };
 
+/** Validate command-specific options and resolve user paths from the invocation directory. */
 export function parseCli(argv: string[]) {
   let parsed: ReturnType<typeof parseArgs>;
   try {
@@ -341,6 +344,7 @@ export function parseCli(argv: string[]) {
   return { command, args, values: v, options };
 }
 
+/** Dispatch a validated command and return its documented process exit status. */
 export async function main(
   argv = process.argv.slice(2),
   log: (line: string) => void = console.log,
@@ -560,9 +564,11 @@ export async function main(
           encode(
             await catalogArchive(
               resolve(
-                text('archive') ??
-                  process.env.VALVE_EVIDENCE_ARCHIVE ??
-                  '/home/xlr8/valve-evidence-archive/2026-10-19-pre-harness',
+                text('archive') ||
+                  process.env.VALVE_EVIDENCE_ARCHIVE ||
+                  fail(
+                    'legacy catalog requires --archive DIR or VALVE_EVIDENCE_ARCHIVE',
+                  ),
               ),
             ),
             2,

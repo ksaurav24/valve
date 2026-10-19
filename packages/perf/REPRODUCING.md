@@ -10,6 +10,11 @@ comparable. Commands run from the repository root.
 - Docker for Redis/Valkey tiers;
 - Linux with delegated cgroup v2 and CPU isolation for authoritative performance evidence.
 
+Dedicated-runner dispatch must use trusted, reviewed revisions: installation and builds execute
+their code with the runner account's permissions and Docker access. Cgroups constrain resource
+use, not filesystem, credential, or network access. Local endpoint locks coordinate this
+checkout only; use separate stores across hosts/checkouts and serialize infrastructure setup.
+
 ## Reproduce portable checks
 
 ```sh
@@ -157,6 +162,16 @@ The pre-harness evidence is preserved separately at
 extracted and hash-verified, then made read-only. It is provenance for legacy golden comparisons,
 not a substitute for a new run's `.perf/runs/<runId>/` evidence.
 
+Set the archive location explicitly when cataloging or regenerating legacy fixtures:
+
+```sh
+pnpm perf legacy catalog --archive /path/to/archive
+VALVE_EVIDENCE_ARCHIVE=/path/to/archive pnpm perf legacy golden
+```
+
+The archive-dependent test uses the same environment variable and skips when no
+archive is configured. Portable committed-fixture tests always run.
+
 ## Short verification commands
 
 ```sh
@@ -210,6 +225,7 @@ not an optimization. Single-worker cells exclude the inapplicable Jain fairness 
 execution. Isolation and more data can improve precision, but do not guarantee equivalent A/A.
 
 Server locks live in `.perf/locks/` and record their owner's PID and run ID. An interrupted
-supervisor can leave a stale lock. Inspect the PID and retained evidence before removing that
-specific lock; do not clear locks belonging to running processes. Prefix-mode URLs permit
+supervisor can leave a stale lock. The next acquisition recovers a complete record only when
+its owner PID is confirmed dead. Live, inaccessible, malformed, or interrupted-recovery owners
+fail closed with an inspection message; do not clear locks belonging to running processes. Prefix-mode URLs permit
 ordinary isolated trials, while faults require a recorded, sentinel-verified disposable endpoint.

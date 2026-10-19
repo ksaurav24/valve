@@ -18,6 +18,7 @@ export const infraFile = join(stateDir, 'infra.json');
 export const calibrationFile = join(stateDir, 'calibration.json');
 export const workerEntry = join(perfDir, 'src/driver/worker.ts');
 
+/** Create a harness state directory if missing and return its path. */
 export function ensureDir(path: string): string {
   if (!existsSync(path)) mkdirSync(path, { recursive: true });
   return path;

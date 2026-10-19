@@ -6,6 +6,7 @@ import type { NormalizedRule, ScopedAcquireRequest, Store } from 'valvejs';
 import type { BuildIdentity } from '../core/types.ts';
 import { cleanupPrefix, resolveEndpoint } from '../infra/safety.ts';
 
+/** Construct immutable public Store policies matching Valve's scoped configuration shape. */
 export function scopedRules(count: number): readonly NormalizedRule[] {
   const rules: NormalizedRule[] = Array.from({ length: count }, (_, i) => ({
     name: i ? `r${i}` : 'shared',
@@ -27,6 +28,7 @@ export const expectedGrants = (evaluated: number, workload: string) =>
       ? 1
       : Math.floor(evaluated / 2) + 1;
 
+/** Check grants and measure scoped admission cardinality and contention using only public Store operations. */
 export async function scopedProbe(
   artifact: BuildIdentity,
   options: {

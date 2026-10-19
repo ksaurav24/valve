@@ -8,6 +8,7 @@ import type {
   ViolationClass,
 } from '../core/types.ts';
 
+/** Evaluate only observable guarantees supported by the selected competitor's declared contract. */
 export function competitorContract(
   cell: CellSpec,
   jobs: readonly JobRecord[],

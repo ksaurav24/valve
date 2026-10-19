@@ -1361,6 +1361,7 @@ export const SUITES: SuiteDef[] = [
   apiSuite,
 ];
 
+/** Resolve a workload suite by name and report the available names on invalid input. */
 export function suite(name: string): SuiteDef {
   const s = SUITES.find((x) => x.name === name);
   if (!s)

@@ -25,6 +25,7 @@ export function sampleProcess(
   return JSON.parse(child.stdout) as Record<string, unknown>;
 }
 
+/** Measure import and initialization in a fresh, uninstrumented Node process. */
 export function startupSample(
   artifact: BuildIdentity,
   entry: 'core' | 'redis' | 'headers',

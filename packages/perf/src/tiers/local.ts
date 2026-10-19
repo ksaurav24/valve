@@ -32,6 +32,7 @@ import { runTrial } from '../supervisor/trial.ts';
 const median = (xs: number[]) =>
   [...xs].sort((a, b) => a - b)[Math.floor(xs.length / 2)]!;
 
+/** Persist portable-tier provenance, including optional comparison builds and server identities. */
 export function localManifest(
   tier: RunManifest['tier'],
   build: BuildIdentity,
@@ -77,6 +78,7 @@ export function localManifest(
   return m;
 }
 
+/** Record host capabilities and timer lateness for deciding which evidence tiers can run. */
 export async function doctor(
   log: (line: string) => void = console.log,
 ): Promise<number> {
@@ -109,6 +111,7 @@ export async function doctor(
   return Number(Number(process.versions.node.split('.')[0]) < 24);
 }
 
+/** Run compiled-artifact microbenchmarks and retain operation costs without distributed claims. */
 export async function micro(
   options: { quick?: boolean; filter?: string | undefined; rebuild?: boolean },
   log: (line: string) => void = console.log,
@@ -132,6 +135,7 @@ export async function micro(
   return 0;
 }
 
+/** Execute model and oracle self-tests and persist illustrative admission-state results. */
 export async function model(
   log: (line: string) => void = console.log,
 ): Promise<number> {

@@ -5,8 +5,6 @@ import { execFileSync, spawn, type ChildProcess } from 'node:child_process';
 import { randomBytes } from 'node:crypto';
 import {
   existsSync,
-  closeSync,
-  openSync,
   readFileSync,
   readdirSync,
   rmSync,
@@ -41,6 +39,7 @@ import {
   type Endpoint,
 } from '../infra/safety.ts';
 import type { WorkerConfig } from '../driver/worker.ts';
+import { acquireEndpointLock } from '../infra/lock.ts';
 import {
   awaitHeadroom,
   containerScopes,
@@ -209,7 +208,7 @@ export async function runTrial(
   let resourceAbort: string[] = [];
   const timers = new Set<NodeJS.Timeout>();
   let redisSampler: NodeJS.Timeout | undefined;
-  let endpointLock: string | undefined;
+  let releaseEndpoint: (() => void) | undefined;
   try {
     if (ctx.harnessSha256 && harnessSha256() !== ctx.harnessSha256)
       throw new Error(
@@ -227,13 +226,10 @@ export async function runTrial(
     if (endpoint) {
       // Serialize use of this endpoint across local invocations before any flush or fault.
       const lock = endpointLockPath(endpoint.url);
-      const fd = openSync(lock, 'wx');
-      endpointLock = lock;
-      writeFileSync(
-        fd,
-        encode({ pid: process.pid, runId: spec.runId, trialId }),
-      );
-      closeSync(fd);
+      releaseEndpoint = acquireEndpointLock(lock, {
+        runId: spec.runId,
+        trialId,
+      });
       admin = new Redis(endpoint.url, { maxRetriesPerRequest: 3 });
       // Fresh store per trial: flush only verified disposable endpoints; otherwise prefix isolation.
       if (endpoint.disposable) await flushDisposable(admin, endpoint);
@@ -286,9 +282,12 @@ export async function runTrial(
 
     // Shared epoch; instruments at the window edges.
     const epochAt = now() + 300 + cell.workers * 5;
-    const scopes = endpoint?.server?.container
-      ? containerScopes(serverContainerIds(endpoint))
+    const ids = endpoint
+      ? endpoint.server?.container
+        ? serverContainerIds(endpoint)
+        : null
       : [];
+    const scopes = ids === null ? null : containerScopes(ids);
     monitor = new ResourceMonitor(
       policy,
       ctx.authoritative,
@@ -595,11 +594,12 @@ export async function runTrial(
       }
       admin.disconnect();
     }
-    if (endpointLock) rmSync(endpointLock, { force: true });
+    releaseEndpoint?.();
   }
 }
 
-function serverContainerIds(endpoint: Endpoint): string[] {
+/** Resolve the full server container ID; failed inspection leaves CPU ownership unknown. */
+function serverContainerIds(endpoint: Endpoint): string[] | null {
   try {
     return [
       execFileSync(
@@ -609,6 +609,6 @@ function serverContainerIds(endpoint: Endpoint): string[] {
       ).trim(),
     ];
   } catch {
-    return [];
+    return null;
   }
 }

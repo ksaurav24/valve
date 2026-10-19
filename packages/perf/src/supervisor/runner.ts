@@ -70,6 +70,7 @@ export interface RunOptions {
   includeTrial?(trial: PlannedTrial): boolean;
 }
 
+/** Derive replayable cell seeds, sharing library-category seeds across competitor arms. */
 export function seedFor(baseSeed: number, cell: CellSpec, rep: number) {
   if (cell.suite === 'libs')
     return deriveSeed(baseSeed, cell.id.split('/')[1]!, rep);
@@ -108,11 +109,13 @@ export function orderTrials(
 
 const rowsFile = (runId: string) => join(runDir(runId), 'rows.jsonl');
 
+/** Read retained trial rows for resume; a new run has no prior rows. */
 export function readRows(runId: string): TrialRecord[] {
   const f = rowsFile(runId);
   return existsSync(f) ? decodeLines<TrialRecord>(readFileSync(f, 'utf8')) : [];
 }
 
+/** Resume compatible trials and evaluate only the preregistered statistical looks. */
 export async function executeRun(
   opts: RunOptions,
 ): Promise<{ rows: TrialRecord[]; summary: RunSummary; stopped?: string }> {

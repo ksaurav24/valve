@@ -120,6 +120,7 @@ export function overrideCell(cell: CellSpec, opts: TierOptions): CellSpec {
   };
 }
 
+/** Select available workload cells and preregister replications, decision metrics, and execution estimates. */
 export function preparePlan(opts: TierOptions): TierPlan {
   const profile =
     opts.profile ?? (opts.tier === 'smoke' ? 'smoke' : 'targeted');
@@ -132,10 +133,11 @@ export function preparePlan(opts: TierOptions): TierPlan {
         'sylvie supports at most two workers; use targeted for larger fleets',
       );
   }
+  const registered = new Set(Object.keys(readInfra().servers));
   const known = new Set([
     ...Object.keys(CATALOG),
     ...Object.keys(CATALOG).map((x) => `${x}-netem`),
-    ...Object.keys(readInfra().servers),
+    ...registered,
   ]);
   const server = opts.stores?.find((s) => s !== 'memory') ?? 'redis74';
   let cells: CellSpec[];
@@ -198,7 +200,9 @@ export function preparePlan(opts: TierOptions): TierPlan {
       );
     }
   } else {
-    const plan = profileCells(profile, opts.suites, known, {
+    const availability =
+      profile === 'sylvie' || opts.dryRun || opts.endpoint ? known : registered;
+    const plan = profileCells(profile, opts.suites, availability, {
       store: server,
       valkey:
         server !== 'valkey8' &&
@@ -299,6 +303,7 @@ export function preparePlan(opts: TierOptions): TierPlan {
   };
 }
 
+/** Print selected cells and explicit exclusion reasons before execution. */
 export function printPlan(plan: TierPlan, log: (line: string) => void): void {
   log(
     `${plan.profile}: ${plan.cells.length} cells; arms ${plan.armNames.join('/')}${plan.audit ? ' + audit' : ''}; looks ${plan.looks.join('/')}; estimate ${fmtDuration(plan.estimateSec)}`,
@@ -310,6 +315,7 @@ export function printPlan(plan: TierPlan, log: (line: string) => void): void {
   for (const s of plan.skipped) log(`  skipped ${s.what}: ${s.reason}`);
 }
 
+/** Validate authority, freeze builds, execute the immutable plan, and report safety and inference separately. */
 export async function runTier(
   opts: TierOptions,
   log: (line: string) => void = console.log,

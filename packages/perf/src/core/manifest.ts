@@ -1,8 +1,9 @@
 // Run manifests: everything needed to reproduce a run and to refuse stale or mixed rows.
-import { existsSync, readFileSync, writeFileSync } from 'node:fs';
+import { existsSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { decode, encode } from './codec.ts';
 import { objectHash } from './hash.ts';
+import { atomicWrite } from './files.ts';
 import type { Fingerprint } from './fingerprint.ts';
 import type { BuildIdentity, CellSpec, DecisionPlan } from './types.ts';
 import { ensureDir, runsDir } from './paths.ts';
@@ -47,6 +48,7 @@ export interface RunManifest {
 
 export const cellHash = (cell: CellSpec) => objectHash(cell);
 
+/** Hash the immutable measurement inputs used to reject incompatible resumes. */
 export function planHash(
   m: Omit<RunManifest, 'planHash' | 'createdAt' | 'command' | 'estimateSec'>,
 ): string {
@@ -83,6 +85,7 @@ export const runDir = (runId: string) => {
   return join(runsDir, runId);
 };
 
+/** Atomically create a run manifest, refusing to reuse an ID with a different plan. */
 export function writeManifest(m: RunManifest): string {
   const dir = ensureDir(runDir(m.runId));
   const path = join(dir, 'manifest.json');
@@ -94,10 +97,11 @@ export function writeManifest(m: RunManifest): string {
       );
     return path;
   }
-  writeFileSync(path, encode(m, 2));
+  atomicWrite(path, encode(m, 2));
   return path;
 }
 
+/** Read a run's persisted identity without changing its recorded provenance. */
 export function readManifest(runId: string): RunManifest {
   return decode<RunManifest>(
     readFileSync(join(runDir(runId), 'manifest.json'), 'utf8'),

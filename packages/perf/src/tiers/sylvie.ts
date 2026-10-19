@@ -1,11 +1,12 @@
 // Sylvie defaults reuse the normal matrix, manifests, oracles and statistical rules.
 import { execFileSync } from 'node:child_process';
-import { existsSync } from 'node:fs';
 import { CATALOG, down, readInfra, up } from '../infra/servers.ts';
 import { endpointLockPath } from '../infra/safety.ts';
+import { acquireEndpointLock } from '../infra/lock.ts';
 import { sylvieCpus } from '../supervisor/isolate.ts';
 import { preparePlan, runTier, type TierOptions } from './run.ts';
 
+/** Run the isolated laptop preset, provisioning only a missing store and preserving reused stores. */
 export async function runSylvie(
   options: TierOptions,
   log: (line: string) => void = console.log,
@@ -41,10 +42,9 @@ export async function runSylvie(
       throw new Error(
         `sylvie needs ${name} pinned to CPU ${placement.serverCpus}; inspect infra before recreating it`,
       );
-    if (existsSync(endpointLockPath(previous.url)))
-      throw new Error(
-        `${name} has an endpoint lock; another run may be active`,
-      );
+    acquireEndpointLock(endpointLockPath(previous.url), {
+      runId: 'sylvie-preflight',
+    })();
   } else {
     const existing = execFileSync(
       'docker',

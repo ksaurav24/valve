@@ -9,6 +9,7 @@ export interface InfoSnapshot {
   version: string;
 }
 
+/** Capture Redis or Valkey CPU, command counters, memory, and version at a window edge. */
 export async function infoSnapshot(client: Redis): Promise<InfoSnapshot> {
   const text = await client.info('all');
   const field = (k: string) => new RegExp(`^${k}:(\\S+)`, 'm').exec(text)?.[1];
@@ -39,6 +40,7 @@ export interface InfoDelta {
 // Only the sampler's own commands are excluded; commands run inside scripts are server work.
 const HARNESS = new Set(['info']);
 
+/** Compute window counter differences, excluding only the harness's own INFO commands. */
 export function infoDelta(a: InfoSnapshot, b: InfoSnapshot): InfoDelta {
   const d = (name: string, k: 'calls' | 'usec') =>
     (b.commands[name]?.[k] ?? 0) - (a.commands[name]?.[k] ?? 0);

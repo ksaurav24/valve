@@ -40,6 +40,7 @@ export function maxOverlap(
   return max;
 }
 
+/** Check callback execution, cancellation, deadlines, concurrency, and lost-job accounting. */
 export function checkClient(
   jobs: readonly JobRecord[],
   options: ClientCheckOptions = {},

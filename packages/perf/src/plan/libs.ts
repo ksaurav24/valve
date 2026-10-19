@@ -222,6 +222,7 @@ export interface LibsPlan {
   na: { category: string; library: LibraryId; reason: string }[];
 }
 
+/** Build contract-compatible library cells and record unsupported category/library combinations. */
 export function libsCells(
   scale: Scale,
   categories?: readonly string[],

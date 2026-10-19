@@ -28,11 +28,13 @@ export const LEGACY_CALIBRATION: Calibration = {
   source: 'legacy slotExp medians (2,136 trials, i5-12450H)',
 };
 
+/** Load measured supervisor overhead, falling back to the recorded initial calibration. */
 export function loadCalibration(): Calibration {
   if (existsSync(calibrationFile))
     return decode<Calibration>(readFileSync(calibrationFile, 'utf8'));
   return LEGACY_CALIBRATION;
 }
+/** Persist host calibration for subsequent deterministic budget estimates. */
 export function saveCalibration(c: Calibration) {
   ensureDir(stateDir);
   writeFileSync(calibrationFile, encode(c, 2));
@@ -65,6 +67,7 @@ export interface Estimate {
   withRetriesSeconds: number;
 }
 
+/** Estimate trial time plus declared rejection, cooldown, and setup allowances. */
 export function estimate(
   trials: readonly { cell: CellSpec }[],
   cal: Calibration,

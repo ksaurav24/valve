@@ -4,6 +4,7 @@ import { main, parseCli, UsageError } from '../src/cli.ts';
 import { preparePlan, runTier } from '../src/tiers/run.ts';
 import * as isolation from '../src/supervisor/isolate.ts';
 import * as builds from '../src/identity/build.ts';
+import * as infra from '../src/infra/servers.ts';
 
 vi.mock('../src/supervisor/isolate.ts', async (original) => ({
   ...(await original<typeof import('../src/supervisor/isolate.ts')>()),
@@ -117,12 +118,14 @@ describe('CLI validation and bounded planning', () => {
     const full = preparePlan({
       tier: 'matrix',
       profile: 'targeted',
+      dryRun: true,
       suites: ['gcra'],
       stores: ['redis74'],
     });
     const cut = preparePlan({
       tier: 'matrix',
       profile: 'nightly',
+      dryRun: true,
       suites: ['gcra'],
       stores: ['redis74'],
       budgetSec: 300,
@@ -209,4 +212,16 @@ describe('CLI validation and bounded planning', () => {
     expect(() => preparePlan({ tier: 'smoke', suites: ['typo'] })).toThrow();
     expect(() => preparePlan({ tier: 'libs', categories: ['L9'] })).toThrow();
   });
+});
+
+it('executes only registered stores while dry plans can describe future infrastructure', () => {
+  const read = vi
+    .spyOn(infra, 'readInfra')
+    .mockReturnValue({ version: 1, servers: {} });
+  const plan = preparePlan({ tier: 'smoke', suites: ['gcra'] });
+  read.mockRestore();
+  expect(plan.skipped.some((s) => s.reason.includes('not set up'))).toBe(true);
+  expect(plan.cells.every((c) => c.store.kind === 'memory')).toBe(true);
+  const dry = preparePlan({ tier: 'smoke', suites: ['network'], dryRun: true });
+  expect(dry.cells.some((c) => c.store.kind === 'redis')).toBe(true);
 });

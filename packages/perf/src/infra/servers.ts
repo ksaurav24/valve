@@ -2,9 +2,10 @@
 // recorded in .perf/infra.json are ever flushed, restarted, paused or shaped.
 import { execFileSync } from 'node:child_process';
 import { randomUUID } from 'node:crypto';
-import { existsSync, readFileSync, writeFileSync } from 'node:fs';
+import { existsSync, readFileSync } from 'node:fs';
 import { Redis } from 'ioredis';
 import { decode, encode } from '../core/codec.ts';
+import { atomicWrite } from '../core/files.ts';
 import { ensureDir, infraFile, stateDir } from '../core/paths.ts';
 
 export const LABEL = 'dev.valve.perf';
@@ -74,13 +75,15 @@ const docker = (args: string[], opts: { quiet?: boolean } = {}) =>
     stdio: ['ignore', 'pipe', opts.quiet ? 'ignore' : 'pipe'],
   }).trim();
 
+/** Read this checkout's server registry; an absent registry represents no owned servers. */
 export function readInfra(): InfraState {
   if (!existsSync(infraFile)) return { version: 1, servers: {} };
   return decode<InfraState>(readFileSync(infraFile, 'utf8'));
 }
+/** Atomically publish the server registry after ownership and sentinel checks succeed. */
 function writeInfra(state: InfraState) {
   ensureDir(stateDir);
-  writeFileSync(infraFile, encode(state, 2));
+  atomicWrite(infraFile, encode(state, 2));
 }
 
 const baseName = (name: string) => name.replace(/-netem$/, '');
@@ -94,6 +97,7 @@ export function serverUrl(s: ServerState): string {
   return s.url;
 }
 
+/** Poll a server until PING succeeds, releasing each probe connection on every attempt. */
 async function waitReady(url: string) {
   const deadline = Date.now() + 20000;
   for (;;) {
@@ -155,68 +159,94 @@ export async function up(
       `${container} is not harness-owned; refusing to start or recreate it`,
     );
   if (exists && options.recreate) docker(['rm', '-f', container]);
-  if (!exists || options.recreate) {
-    const port = def.port + (netem ? 1000 : 0);
-    const image = netem ? netemImage(name) : def.image;
-    docker([
-      'run',
-      '-d',
-      '--name',
+  const creating = !exists || options.recreate;
+  const creation = randomUUID();
+  try {
+    if (!exists || options.recreate) {
+      const port = def.port + (netem ? 1000 : 0);
+      const image = netem ? netemImage(name) : def.image;
+      docker([
+        'run',
+        '-d',
+        '--name',
+        container,
+        '--label',
+        `${LABEL}=1`,
+        '--label',
+        `${LABEL}.server=${name}`,
+        '--label',
+        `${LABEL}.creation=${creation}`,
+        ...(options.cpuset ? ['--cpuset-cpus', options.cpuset] : []),
+        ...(netem ? ['--cap-add', 'NET_ADMIN'] : []),
+        '-p',
+        `127.0.0.1:${port}:6379`,
+        image,
+        def.binary,
+        '--save',
+        '',
+        '--appendonly',
+        'no',
+      ]);
+    } else docker(['start', container], { quiet: true });
+    const labels = docker([
+      'inspect',
+      '-f',
+      `{{index .Config.Labels "${LABEL}"}}`,
       container,
-      '--label',
-      `${LABEL}=1`,
-      '--label',
-      `${LABEL}.server=${name}`,
-      ...(options.cpuset ? ['--cpuset-cpus', options.cpuset] : []),
-      ...(netem ? ['--cap-add', 'NET_ADMIN'] : []),
-      '-p',
-      `127.0.0.1:${port}:6379`,
-      image,
-      def.binary,
-      '--save',
-      '',
-      '--appendonly',
-      'no',
     ]);
-  } else docker(['start', container], { quiet: true });
-  const labels = docker([
-    'inspect',
-    '-f',
-    `{{index .Config.Labels "${LABEL}"}}`,
-    container,
-  ]);
-  if (labels !== '1')
-    throw new Error(
-      `${container} exists but is not harness-owned (missing label ${LABEL}=1); refusing to use it.`,
-    );
-  const ip = docker([
-    'inspect',
-    '-f',
-    '{{range .NetworkSettings.Networks}}{{.IPAddress}}{{end}}',
-    container,
-  ]);
-  const hostPort = docker(['port', container, '6379/tcp'])
-    .split('\n')[0]!
-    .split(':')
-    .at(-1);
-  const prev = state.servers[name];
-  const s: ServerState = {
-    container,
-    image: docker(['inspect', '-f', '{{.Config.Image}}', container]),
-    url: `redis://${ip}:6379`,
-    hostUrl: `redis://127.0.0.1:${hostPort}`,
-    token: prev?.token ?? randomUUID(),
-    createdAt: prev?.createdAt ?? new Date().toISOString(),
-    cpuset:
-      docker(['inspect', '-f', '{{.HostConfig.CpusetCpus}}', container]) ||
-      null,
-    netem,
-  };
-  await waitReady(serverUrl(s));
-  await writeSentinel(serverUrl(s), s.token);
-  state.servers[name] = s;
-  writeInfra(state);
-  return s;
+    if (labels !== '1')
+      throw new Error(
+        `${container} exists but is not harness-owned (missing label ${LABEL}=1); refusing to use it.`,
+      );
+    const ip = docker([
+      'inspect',
+      '-f',
+      '{{range .NetworkSettings.Networks}}{{.IPAddress}}{{end}}',
+      container,
+    ]);
+    const hostPort = docker(['port', container, '6379/tcp'])
+      .split('\n')[0]!
+      .split(':')
+      .at(-1);
+    const prev = state.servers[name];
+    const s: ServerState = {
+      container,
+      image: docker(['inspect', '-f', '{{.Config.Image}}', container]),
+      url: `redis://${ip}:6379`,
+      hostUrl: `redis://127.0.0.1:${hostPort}`,
+      token: prev?.token ?? randomUUID(),
+      createdAt: prev?.createdAt ?? new Date().toISOString(),
+      cpuset:
+        docker(['inspect', '-f', '{{.HostConfig.CpusetCpus}}', container]) ||
+        null,
+      netem,
+    };
+    await waitReady(serverUrl(s));
+    await writeSentinel(serverUrl(s), s.token);
+    state.servers[name] = s;
+    writeInfra(state);
+    return s;
+  } catch (error) {
+    if (creating) {
+      try {
+        // A unique creation label identifies only this attempt, even if names race.
+        const owned = docker([
+          'ps',
+          '-aq',
+          '--filter',
+          `label=${LABEL}.creation=${creation}`,
+        ]);
+        if (owned) for (const id of owned.split('\n')) docker(['rm', '-f', id]);
+      } catch (cleanupError) {
+        throw new AggregateError(
+          [error, cleanupError],
+          `Failed to provision and clean up ${container}`,
+          { cause: cleanupError },
+        );
+      }
+    }
+    throw error;
+  }
 }
 
 /** Stop and remove a harness-owned container (label checked). */

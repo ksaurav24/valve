@@ -2,6 +2,7 @@
 // including the inherited maxWait check-to-callback gap (C1); nothing is waived.
 import type { SafetyReport, Violation, ViolationClass } from '../core/types.ts';
 
+/** Combine independent oracle findings without converting missing evidence into a pass. */
 export function safetyReport(
   violations: readonly Violation[],
   checked: readonly ViolationClass[],

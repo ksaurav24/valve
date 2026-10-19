@@ -158,6 +158,7 @@ export function profileCells(
   return { cells, skipped };
 }
 
+/** Combine a profile's preregistered looks and alpha with its selected decision metrics. */
 export function decisionPlan(
   profile: ProfileDef,
   metrics: DecisionMetric[],

@@ -8,8 +8,8 @@ import {
   renameSync,
   readdirSync,
   readFileSync,
+  rmSync,
   statSync,
-  writeFileSync,
 } from 'node:fs';
 import { join, relative, resolve } from 'node:path';
 import { decode, encode } from '../core/codec.ts';
@@ -24,6 +24,7 @@ import {
 } from '../core/paths.ts';
 import type { BuildIdentity } from '../core/types.ts';
 import { loadScripts } from '../lua/sources.ts';
+import { atomicWrite } from '../core/files.ts';
 
 const git = (cwd: string, args: string[]) =>
   execFileSync('git', args, {
@@ -63,7 +64,7 @@ export function identify(
   const scripts = loadScripts(packageDir);
   return {
     label,
-    gitSha: git(root, ['rev-parse', 'HEAD']),
+    gitSha: extra.gitSha ?? git(root, ['rev-parse', 'HEAD']),
     dirty: false,
     packageDir,
     distSha256: sha256(
@@ -182,10 +183,18 @@ export function refBuild(
   const patchSha256 = patchText ? sha256(patchText) : undefined;
   const key = `${sha.slice(0, 12)}${patchSha256 ? `-p${patchSha256.slice(0, 12)}` : ''}`;
   const cached = join(ensureDir(buildsDir), `${key}.json`);
-  if (existsSync(cached)) {
+  const tree = join(ensureDir(join(stateDir, 'worktrees')), key);
+  const ready = `${tree}.ready`;
+  const preparation = encode({ gitSha: sha, patchSha256: patchSha256 ?? null });
+  const prepared =
+    existsSync(tree) &&
+    existsSync(ready) &&
+    readFileSync(ready, 'utf8') === preparation;
+  if (prepared && existsSync(cached)) {
     const id = decode<BuildIdentity>(readFileSync(cached, 'utf8'));
     // Re-verify content: a cached identity is only reused if its files still hash the same.
     const again = identify(id.packageDir, id.label, {
+      gitSha: id.gitSha,
       ...(patchSha256 ? { patchSha256 } : {}),
     });
     if (
@@ -196,10 +205,14 @@ export function refBuild(
     )
       return id;
   }
-  const tree = join(stateDir, 'worktrees', key);
-  if (!existsSync(tree)) {
+  if (!prepared) {
+    rmSync(ready, { force: true });
+    if (existsSync(tree)) {
+      git(repoRoot, ['worktree', 'remove', '--force', tree]);
+    }
     git(repoRoot, ['worktree', 'add', '--detach', tree, sha]);
     if (options.patch) git(tree, ['apply', '--index', resolve(options.patch)]);
+    atomicWrite(ready, preparation);
   }
   execFileSync(
     'pnpm',
@@ -228,7 +241,7 @@ export function refBuild(
       },
     ),
   );
-  writeFileSync(cached, encode(id, 2));
+  atomicWrite(cached, encode(id, 2));
   return id;
 }
 

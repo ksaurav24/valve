@@ -21,6 +21,7 @@ export interface BundleRow {
   modules: Record<string, number>;
 }
 
+/** Bundle source entries, built entries, and consumers with the same pinned settings. */
 export async function bundleFootprint(
   artifact: BuildIdentity,
 ): Promise<BundleRow[]> {

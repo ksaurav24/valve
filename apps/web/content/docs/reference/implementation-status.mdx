@@ -102,11 +102,11 @@ entry sizes, using Node.js 24.21.0 and esbuild 0.28.2:
 | Headers |   1,130 bytes |     2,048 bytes | Within target |
 
 Those historical measurements predate scoped admission. The scoped extension
-uses source-entry CI ceilings of 12,000 bytes for core, 6,200 for Redis, and
+uses source-entry CI ceilings of 12,750 bytes for core, 6,300 for Redis, and
 2,048 for headers. It adds identity validation, a delayed queue, and a second
 Lua script; it does not meet the original core or Redis size targets. See the
 [scoped benchmark report](https://github.com/ksaurav24/valve/blob/master/packages/perf/docs/history/SCOPED.md)
-for current sizes and measured growth. Consumer sizes depend on which exports
+for historical sizes and measured growth. Consumer sizes depend on which exports
 remain reachable after bundling; the full headers entry is larger than a
 consumer importing only `retryAfter()`.
 

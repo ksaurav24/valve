@@ -57,6 +57,7 @@ const keyed = (path: string) =>
       .map((s) => s.trim().split(/\s+/))
       .map(([k, v]) => [k!.replace(':', ''), Number(v)]),
   ) as Record<string, number>;
+/** Read cumulative memory-pressure stalls; return zero counters if PSI is unavailable. */
 function psi(path: string): { some: number; full: number } {
   const v = { some: 0, full: 0 };
   try {
@@ -86,6 +87,7 @@ export function ownCgroup(): string | null {
   }
 }
 
+/** Read a cgroup scalar, preserving unlimited values and unavailable measurements. */
 function cgNum(cg: string | null, f: string): number {
   if (!cg) return NaN;
   try {
@@ -95,6 +97,7 @@ function cgNum(cg: string | null, f: string): number {
     return NaN;
   }
 }
+/** Read cumulative cgroup CPU usage in microseconds, or NaN when unavailable. */
 function cgCpuUs(dir: string | null): number {
   if (!dir) return NaN;
   try {
@@ -123,13 +126,24 @@ interface Snapshot {
 }
 
 /** Docker scope dirs of server containers (their CPU is accounted as "server", not background). */
-export function containerScopes(containerIds: readonly string[]): string[] {
-  return containerIds
-    .map((id) => `/sys/fs/cgroup/system.slice/docker-${id}.scope`)
-    .filter((p) => existsSync(p));
+export function containerScopes(
+  containerIds: readonly string[],
+): string[] | null {
+  const paths = containerIds.map((id) =>
+    [
+      `/sys/fs/cgroup/system.slice/docker-${id}.scope`,
+      `/sys/fs/cgroup/docker/${id}`,
+    ].find((p) => existsSync(p)),
+  );
+  // A partial sum would misclassify an unobserved server's CPU as background load.
+  return paths.every((p) => p !== undefined) ? (paths as string[]) : null;
 }
 
-function snapshot(cg: string | null, scopes: readonly string[]): Snapshot {
+/** Capture host and scope resource counters; null server scopes represent unknown accounting. */
+function snapshot(
+  cg: string | null,
+  scopes: readonly string[] | null,
+): Snapshot {
   if (!linux)
     return {
       at: Date.now(),
@@ -172,7 +186,8 @@ function snapshot(cg: string | null, scopes: readonly string[]): Snapshot {
     events,
     busyJiffies: total - (cpu[3] ?? 0) - (cpu[4] ?? 0),
     groupCpuUs: cgCpuUs(cg),
-    serverCpuUs: scopes.reduce((a, d) => a + cgCpuUs(d), 0),
+    serverCpuUs:
+      scopes === null ? NaN : scopes.reduce((a, d) => a + cgCpuUs(d), 0),
   };
 }
 
@@ -260,7 +275,7 @@ export class ResourceMonitor {
   constructor(
     private policy: ResourcePolicy,
     private authoritative: boolean,
-    private serverScopes: readonly string[],
+    private serverScopes: readonly string[] | null,
     private onAbort: (reasons: string[]) => void,
     private cg = ownCgroup(),
   ) {
@@ -339,14 +354,13 @@ export class ResourceMonitor {
       const serverUs = B.serverCpuUs - A.serverCpuUs;
       bench = Number.isFinite(groupUs) ? groupUs / wallUs : null;
       server = Number.isFinite(serverUs) ? serverUs / wallUs : null;
+      if (server === null) reasons.push('server-cpu-unavailable');
+      if (bench === null) reasons.push('benchmark-cpu-unavailable');
       background =
-        Math.max(
-          0,
-          totalUs -
-            (Number.isFinite(groupUs) ? groupUs : 0) -
-            (Number.isFinite(serverUs) ? serverUs : 0),
-        ) / wallUs;
-      if (background > this.policy.maxBackgroundCores)
+        Number.isFinite(groupUs) && Number.isFinite(serverUs)
+          ? Math.max(0, totalUs - groupUs - serverUs) / wallUs
+          : null;
+      if (background !== null && background > this.policy.maxBackgroundCores)
         reasons.push('background-cpu');
     }
     const gaps = this.samples
@@ -392,6 +406,7 @@ export function cpuList(): number[] {
   return cpus().map((_, i) => i);
 }
 
+/** Expand a validated CPU range list while rejecting malformed or excessive ranges. */
 export function expandCpus(list: string): number[] {
   if (!/^\d+(?:-\d+)?(?:,\d+(?:-\d+)?)*$/.test(list))
     throw new Error(`invalid CPU list: ${list}`);

@@ -27,6 +27,7 @@ export interface MeasurementOptions {
   stores?: string[] | undefined;
 }
 
+/** Build both revisions before collecting descriptive samples and persisting their provenance. */
 export async function measure(
   tier: Measurement,
   options: MeasurementOptions,

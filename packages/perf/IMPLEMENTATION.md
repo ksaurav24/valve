@@ -20,6 +20,58 @@ production source changes or package release.
 - The nightly workflow is manual-only, defaulting to hosted smoke. Enable its schedule only
   after provisioning the `valve-perf` runner and disjoint server/worker CPU variables.
 
+## CodeRabbit review follow-up
+
+Addressed all ten inline findings and four additional review suggestions on PR #104.
+
+- Manifest, revision-cache, and infra-registry writes now publish atomically.
+  Cached artifact verification reuses its recorded git SHA, including when
+  `VALVE_PERF_HOME` is outside Git. A completion marker containing the full ref SHA
+  and patch digest is written only after checkout and patch application succeed.
+  Unproven worktrees and old unproven caches are prepared again; a failed patch
+  retry never builds or labels the unpatched base as a candidate.
+- Endpoint locks publish complete owner records and reclaim only confirmed dead
+  PIDs. Recovery is serialized, and release checks ownership. Live, inaccessible,
+  malformed, or interrupted-recovery owners fail closed. Sylvie uses the same
+  recovery path. The real-store smoke run recovered an injected stale PID lock.
+- Store provisioning removes only containers bearing the unique creation token
+  of the failed attempt. Readiness and sentinel failures roll back before registry
+  publication, while reused containers remain intact. Adapter shutdown attempts
+  Valve and Store cleanup independently even when either close throws or rejects.
+- Server CPU accounting recognizes systemd and cgroupfs Docker layouts. Missing
+  or partial accounting is unknown, not zero; background CPU is withheld when it
+  cannot be calculated. Authoritative resource qualification fails closed for
+  unavailable CPU counters. Memory-only trials retain a known zero server cost.
+- Normal smoke execution skips unregistered stores; dry plans, Sylvie provisioning,
+  and explicit endpoint overrides retain catalog-based planning. The standalone
+  perf test command builds Valve before Vitest. Legacy archive locations are
+  explicit, and archive-dependent tests use `VALVE_EVIDENCE_ARCHIVE`.
+- Zipf draws reuse a bounded cumulative-weight cache and binary search. Seeded
+  regression checks compare 18,000 draws with the former sampler. Floating-point
+  threshold boundaries can differ; historical harness identities remain separate.
+- Current website size ceilings match the unchanged perf budgets. The repository
+  actionlint config declares `valve-perf`. Function contracts were expanded to
+  address the documentation warning, and dedicated-runner trust/local-lock limits
+  are explicit in the reproduction guide.
+
+Validation passed on Node 24.21.0: `pnpm check`, all 184 perf tests, 48 real-store
+integration tests, 21 release/CI script tests, 22 website tests, and 32 browser
+checks. The measurement tests also passed after moving the existing Valve dist
+out of the way, verifying the standalone test prerequisite. Actionlint passed
+without a temporary custom config. The legacy replay regenerated identical fixture
+values, and missing archive configuration fails before extraction.
+
+`coderabbit-unprovisioned-node24` selected its memory GCRA cell and explicitly skipped
+three unavailable store cells. `coderabbit-final-smoke-node24` passed all 34 cells, including
+actual stale-lock recovery. `c1-1792406038645-f6f4f34c` passed all three store checks. The quick
+tier completed 77 model/oracle checks and 13 micro tasks.
+
+These command manifests record harness SHA-256 `ba95feac35b0670d3979747efda0e71e5cab5089ee2dd37e1b8dd431ff44d762`.
+Both temporary stores were removed, all endpoint locks released, and all eight
+pre-existing containers remained running. Review snapshots, command logs, and
+external-cache proof are retained in `.perf/verify-coderabbit-20261019/`.
+No performance margins were relaxed or historical performance verdicts upgraded.
+
 ## Complete benchmark ownership migration
 
 All active benchmarks now belong to `packages/perf`, including size budgets,

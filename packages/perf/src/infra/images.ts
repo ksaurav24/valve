@@ -2,6 +2,7 @@
 import { execFileSync } from 'node:child_process';
 import { CATALOG, netemImage } from './servers.ts';
 
+/** Check whether a Docker image is already available locally without pulling it. */
 export function hasImage(tag: string): boolean {
   try {
     execFileSync('docker', ['image', 'inspect', tag], { stdio: 'ignore' });

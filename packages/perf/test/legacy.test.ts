@@ -10,14 +10,14 @@ import { describe, expect, it } from 'vitest';
 import { catalogArchive } from '../src/legacy/catalog.ts';
 import { readSlotexpRows } from '../src/legacy/slotexp.ts';
 
-const archiveDir = '/home/xlr8/valve-evidence-archive/2026-10-19-pre-harness';
+const archiveDir = process.env.VALVE_EVIDENCE_ARCHIVE;
 const fixture = resolve('test/fixtures/legacy/confirm-subset.jsonl');
 
 describe('legacy evidence', () => {
-  it.skipIf(!existsSync(archiveDir))(
+  it.skipIf(!archiveDir || !existsSync(archiveDir))(
     'catalogs the preserved archive manifest',
     async () => {
-      const catalog = await catalogArchive(archiveDir);
+      const catalog = await catalogArchive(archiveDir!);
       expect(catalog.files).toBe(6_906);
       expect(catalog.families).toEqual({
         baseline: 54,

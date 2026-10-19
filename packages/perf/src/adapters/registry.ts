@@ -14,9 +14,11 @@ export const competitorAdapters: Adapter[] = [
 const adapters = new Map(
   competitorAdapters.map((adapter) => [adapter.id, adapter]),
 );
+/** Register a limiter implementation under its declared library identity. */
 export function registerAdapter(adapter: Adapter): void {
   adapters.set(adapter.id, adapter);
 }
+/** Resolve a library adapter or reject an unsupported library identity. */
 export function adapterFor(id: LibraryId): Adapter {
   const adapter = adapters.get(id);
   if (!adapter) throw new Error(`Adapter not registered: ${id}`);
@@ -176,6 +178,7 @@ export const CATEGORIES: Category[] = [
 ];
 export type MatrixStatus =
   'supported' | { na: string } | { approximate: string };
+/** Describe category support and explicit incompatibilities for every registered adapter. */
 export function naMatrix(): Record<
   string,
   Partial<Record<LibraryId, MatrixStatus>>

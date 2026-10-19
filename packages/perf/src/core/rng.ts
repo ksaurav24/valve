@@ -95,11 +95,29 @@ export function choose(rnd: Random, weights: readonly number[]): number {
   return weights.length - 1;
 }
 
-/** Zipf-distributed index in [0, n) with exponent s (s = 0 is uniform). */
+const zipfCdfs = new Map<string, Float64Array>();
+
+/** Draw one Zipf rank with one RNG draw; cache up to 32 distributions per worker. */
 export function zipf(rnd: Random, n: number, s: number): number {
   if (s === 0) return Math.floor(rnd() * n);
-  const weights = Array.from({ length: n }, (_, i) => 1 / (i + 1) ** s);
-  return choose(rnd, weights);
+  const key = `${n}:${s}`;
+  let cdf = zipfCdfs.get(key);
+  if (!cdf) {
+    cdf = new Float64Array(n);
+    let total = 0;
+    for (let i = 0; i < n; i++) cdf[i] = total += 1 / (i + 1) ** s;
+    if (zipfCdfs.size >= 32) zipfCdfs.delete(zipfCdfs.keys().next().value!);
+    zipfCdfs.set(key, cdf);
+  }
+  const x = rnd() * cdf[n - 1]!;
+  let lo = 0,
+    hi = n - 1;
+  while (lo < hi) {
+    const mid = (lo + hi) >>> 1;
+    if (x < cdf[mid]!) hi = mid;
+    else lo = mid + 1;
+  }
+  return lo;
 }
 
 /** Seeded Fisher-Yates shuffle (returns a new array). */

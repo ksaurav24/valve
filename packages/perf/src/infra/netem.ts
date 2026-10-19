@@ -51,6 +51,7 @@ export function applyNetwork(
   tc(c, args);
 }
 
+/** Remove traffic shaping only from a verified controllable server container. */
 export function clearNetwork(endpoint: Endpoint) {
   if (endpoint.server?.netem && endpoint.server.container)
     applyNetwork(endpoint, undefined);
