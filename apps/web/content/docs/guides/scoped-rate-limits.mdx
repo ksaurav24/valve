@@ -199,7 +199,7 @@ reduce round trips. The maximum 128 jobs x 16 rules can make Redis Lua expensive
 and block other clients on that shard; it is a safety bound, not a recommended
 batch size.
 
-Start with 32. In the checked-in [scoped benchmark report](https://github.com/ksaurav24/valve/blob/master/packages/valve/bench/SCOPED.md),
+Start with 32. In the checked-in [scoped benchmark report](https://github.com/ksaurav24/valve/blob/master/packages/perf/docs/history/SCOPED.md),
 32 jobs with two rules and cold identities took 0.298 ms median / 0.837 ms p99 per
 Redis admission. At 128 jobs and 16 rules (1,921 unique keys), this grew to
 12.46 ms / 20.83 ms. These are local measurements, not production latency

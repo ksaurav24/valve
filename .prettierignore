@@ -18,3 +18,5 @@ apps/web/next-env.d.ts
 .agent/
 .agents/
 .taste-skill/
+packages/perf/.tmp/
+packages/perf/.vitest/

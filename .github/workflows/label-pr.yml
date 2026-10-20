@@ -32,9 +32,7 @@ jobs:
             });
             // Generated lockfile and results are excluded from review-size estimates.
             const ignored = (path) =>
-              path === 'pnpm-lock.yaml' ||
-              path.startsWith('packages/valve/bench/drift-results/') ||
-              path.startsWith('packages/valve/bench/footprint-results/');
+              path === 'pnpm-lock.yaml' || path.startsWith('.perf/');
             const lines = files.filter(f => !ignored(f.filename))
               .reduce((sum, f) => sum + f.additions + f.deletions, 0);
             const size = lines <= 20 ? 'size/xs'

@@ -136,6 +136,26 @@ test('test-only and benchmark-only work does not force package releases', () => 
   });
 });
 
+test('perf owns benchmark selection without triggering library releases', () => {
+  for (const path of [
+    'packages/perf/src/measure/bundle.ts',
+    'packages/perf/package.json',
+    '.github/workflows/perf-pr.yml',
+  ]) {
+    assert.deepEqual(classifyChanges([path]), {
+      library: false,
+      package: false,
+      website: false,
+      benchmarks: true,
+      changeset: false,
+    });
+  }
+  assert.equal(
+    classifyChanges(['packages/perf/docs/history/SCOPED.md']).benchmarks,
+    false,
+  );
+});
+
 test('git detection distinguishes version bumps, metadata edits, deletions, and manual runs', () => {
   const cwd = mkdtempSync(join(tmpdir(), 'valve-ci-'));
   const script = new URL('./ci-changes.mjs', import.meta.url).pathname;

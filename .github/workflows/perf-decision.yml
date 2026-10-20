@@ -1,0 +1,81 @@
+name: Performance decision
+
+on:
+  workflow_dispatch:
+    inputs:
+      base_ref:
+        description: Baseline git ref.
+        required: true
+        type: string
+      head_ref:
+        description: Candidate git ref; leave empty to test the current checkout.
+        required: false
+        type: string
+      suite:
+        description: Optional suite name; empty runs the complete decision profile.
+        required: false
+        type: string
+
+permissions:
+  contents: read
+
+concurrency:
+  group: perf-decision-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  decision:
+    name: Staged 5/10/20 decision matrix
+    runs-on: [self-hosted, linux, valve-perf]
+    timeout-minutes: 720
+    env:
+      PERF_SERVER_CPUS: ${{ vars.PERF_SERVER_CPUS }}
+      PERF_WORKER_CPUS: ${{ vars.PERF_WORKER_CPUS }}
+      PERF_BASE_REF: ${{ inputs.base_ref }}
+      PERF_HEAD_REF: ${{ inputs.head_ref }}
+      PERF_SUITE: ${{ inputs.suite }}
+    steps:
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - uses: pnpm/action-setup@0977fd99725f1db4007ccb2928dbb4e90d06cc86 # v6
+      - uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6
+        with:
+          node-version-file: .node-version
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm --filter valvejs build
+      - run: pnpm perf doctor
+      - name: Start guarded disposable stores
+        run: |
+          test -n "$PERF_SERVER_CPUS"
+          test -n "$PERF_WORKER_CPUS"
+          pnpm perf infra up redis74 --cpuset "$PERF_SERVER_CPUS" --recreate
+          pnpm perf infra up valkey8 --cpuset "$PERF_SERVER_CPUS" --recreate
+          pnpm perf infra status
+      - name: Print the preregistered plan and estimate
+        shell: bash
+        run: |
+          args=(plan --profile decision)
+          if [[ -n "$PERF_SUITE" ]]; then args+=(--suite "$PERF_SUITE"); fi
+          pnpm perf "${args[@]}"
+      - name: Run the decision profile
+        shell: bash
+        run: |
+          args=(matrix --profile decision --base "$PERF_BASE_REF" --isolate --require-authoritative --worker-cpus "$PERF_WORKER_CPUS" --yes)
+          if [[ -n "$PERF_HEAD_REF" ]]; then args+=(--head "$PERF_HEAD_REF"); else args+=(--current); fi
+          if [[ -n "$PERF_SUITE" ]]; then args+=(--suite "$PERF_SUITE"); fi
+          pnpm perf "${args[@]}"
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        if: always()
+        with:
+          name: perf-decision-${{ github.run_id }}-${{ github.run_attempt }}
+          path: .perf/runs/
+          if-no-files-found: warn
+          retention-days: 90
+      - name: Remove disposable stores
+        if: always()
+        run: |
+          pnpm perf infra down redis74
+          pnpm perf infra down valkey8

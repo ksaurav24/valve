@@ -26,6 +26,5 @@ apps/web/content/contributing/
 /.agent/
 /.agents/
 
-# Benchmark output; reports link to archived raw results instead.
-packages/valve/bench/*.json
-packages/valve/bench/*-results/
+# Benchmark harness runs, builds, and infra state
+.perf/

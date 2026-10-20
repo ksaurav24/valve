@@ -1,0 +1,35 @@
+{
+  "name": "@valve/perf",
+  "private": true,
+  "version": "0.0.0",
+  "description": "Valve performance, load, and correctness harness. Not published.",
+  "type": "module",
+  "license": "Apache-2.0",
+  "engines": {
+    "node": ">=24.0.0"
+  },
+  "bin": {
+    "valve-perf": "./src/cli.ts"
+  },
+  "scripts": {
+    "perf": "tsx src/cli.ts",
+    "test": "pnpm --filter valvejs build && vitest run",
+    "test:integration": "vitest run --config vitest.integration.config.ts",
+    "typecheck": "tsc --noEmit"
+  },
+  "devDependencies": {
+    "@stdlib/stats-base-dists-t-quantile": "0.2.3",
+    "@types/node": "^24.19.1",
+    "bottleneck": "2.19.5",
+    "esbuild": "0.28.2",
+    "fast-check": "4.10.2",
+    "ioredis": "5.11.1",
+    "p-limit": "7.3.3",
+    "p-queue": "9.3.3",
+    "tinybench": "6.2.2",
+    "tsx": "4.23.15",
+    "typescript": "^6.0.3",
+    "valvejs": "workspace:*",
+    "vitest": "5.0.3"
+  }
+}

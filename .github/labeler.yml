@@ -10,6 +10,5 @@ documentation:
 perf:
   - changed-files:
       - any-glob-to-any-file:
-          - 'packages/valve/bench/**'
-          - 'scripts/*bench*'
-          - 'scripts/*footprint*'
+          - 'packages/perf/**'
+          - '.github/workflows/perf-*.yml'
