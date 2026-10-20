@@ -6,6 +6,7 @@ import { join } from 'node:path';
 import { pathToFileURL } from 'node:url';
 import type { BuildIdentity, SafetyStatus } from '../core/types.ts';
 import { cleanupPrefix } from '../infra/safety.ts';
+import { epochNow } from '../core/clock.ts';
 
 export interface C1Result {
   store: string;
@@ -21,7 +22,7 @@ export interface C1Result {
   safety: SafetyStatus;
 }
 
-const now = () => performance.timeOrigin + performance.now();
+const now = epochNow;
 
 export function classifyC1(
   result: Pick<

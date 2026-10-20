@@ -48,6 +48,7 @@ import {
   type ResourcePolicy,
   type ResourceSummary,
 } from './resources.ts';
+import { epochNow } from '../core/clock.ts';
 
 export interface TrialSpec {
   runId: string;
@@ -83,7 +84,7 @@ interface Handle {
   stderr: string;
 }
 
-const now = () => performance.timeOrigin + performance.now();
+const now = epochNow;
 
 function launch(
   cfgPath: string,

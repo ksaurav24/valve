@@ -1,6 +1,6 @@
 // Shared contracts between planning, workers, oracles, analysis, and reports.
 // Times: `*Ms` are durations in milliseconds; `*At` are epoch milliseconds from
-// performance.timeOrigin + performance.now() (same-host, cross-process comparable).
+// core/clock.ts epochNow() (same-host, cross-process comparable).
 
 /** A probability distribution over non-negative milliseconds. */
 export type DistSpec =
