@@ -333,9 +333,12 @@ export async function runTrial(
     for (const f of serverFaults)
       at(f.atMs, () => {
         if (f.type === 'redis-restart') resets.push(now());
-        void faults!.fire(f).then(() => {
-          if (f.type === 'redis-restart') resets[resets.length - 1] = now();
-        });
+        void faults!.fire(f).then(
+          () => {
+            if (f.type === 'redis-restart') resets[resets.length - 1] = now();
+          },
+          (error) => log(`fault dispatch failed: ${String(error)}`),
+        );
       });
     for (const f of killFaults)
       at(f.atMs, () => {
@@ -580,7 +583,8 @@ export async function runTrial(
     for (const h of handles)
       if (h.proc.exitCode === null && h.proc.signalCode === null)
         h.proc.kill('SIGKILL');
-    await faults?.stopAll().catch(() => undefined);
+    // A failed recovery must not disconnect the admin or hand an active fault to the next owner.
+    await faults?.stopAll();
     if (admin && endpoint) {
       try {
         if (!endpoint.disposable) {
