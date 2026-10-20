@@ -1,5 +1,6 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import {
+  mkdirSync,
   mkdtempSync,
   readFileSync,
   readdirSync,
@@ -32,8 +33,12 @@ describe('durable state and endpoint recovery', () => {
     atomicWrite(file, '{"complete":1}');
     atomicWrite(file, '{"complete":2}');
     expect(JSON.parse(readFileSync(file, 'utf8'))).toEqual({ complete: 2 });
-    expect(() => atomicWrite(dir, 'cannot replace a directory')).toThrow();
-    expect(readdirSync(dir)).toEqual(['manifest.json']);
+    const blocked = join(dir, 'blocked');
+    mkdirSync(blocked);
+    writeFileSync(join(blocked, 'keep'), 'preserved');
+    expect(() => atomicWrite(blocked, 'cannot replace a directory')).toThrow();
+    expect(readdirSync(dir).sort()).toEqual(['blocked', 'manifest.json']);
+    expect(readFileSync(join(blocked, 'keep'), 'utf8')).toBe('preserved');
   });
   it('recovers a dead owner, refuses a live PID, and releases only its own record', () => {
     const dead = spawnSync(process.execPath, ['-e', '']);

@@ -1,5 +1,11 @@
-import { describe, expect, it } from 'vitest';
-import { epochNow, measureOffset } from '../src/core/clock.ts';
+import { afterEach, describe, expect, it, vi } from 'vitest';
+import { measureOffset } from '../src/core/clock.ts';
+
+afterEach(() => {
+  vi.restoreAllMocks();
+  vi.unstubAllGlobals();
+  vi.resetModules();
+});
 
 /**
  * Fake host: wall = monotonic + trueOffset, each read advances 1 µs. `stallMs` preempts the
@@ -43,9 +49,44 @@ describe('cross-process epoch clock', () => {
     expect(bracketMs).toBeLessThan(0.02);
   });
 
-  it('agrees with Date.now() in this process', () => {
-    const drift = Date.now() - epochNow();
-    expect(drift).toBeGreaterThan(-1.5);
-    expect(drift).toBeLessThan(1.5);
+  it('bounds calibration when Date.now is frozen even if the monotonic clock advances', () => {
+    let reads = 0;
+    let mono = 25;
+    const result = measureOffset({
+      dateNow: () => {
+        reads++;
+        return 1000;
+      },
+      perfNow: () => ++mono,
+      timeOrigin: 10,
+    });
+    expect(reads).toBeLessThanOrEqual(100_002);
+    expect(result.bracketMs).toBe(Infinity);
+    expect(result.offsetMs).toBe(1000 - (10 + mono - 0.5));
+  });
+
+  it('can load with both clocks frozen and reports the fallback epoch', async () => {
+    vi.resetModules();
+    vi.spyOn(Date, 'now').mockReturnValue(1000);
+    vi.stubGlobal('performance', { timeOrigin: 10, now: () => 25 });
+    const { epochNow } = await import('../src/core/clock.ts');
+    expect(epochNow()).toBe(1000);
+  });
+
+  it('uses its calibrated monotonic clock without another wall-clock read', async () => {
+    vi.resetModules();
+    const readers = host(5_000_000.42);
+    const date = vi.spyOn(Date, 'now').mockImplementation(readers.dateNow);
+    const perf = vi.fn(readers.perfNow);
+    vi.stubGlobal('performance', { timeOrigin: 0, now: perf });
+    const { epochNow } = await import('../src/core/clock.ts');
+    date.mockClear().mockImplementation(() => {
+      throw new Error('wall clock must not be read after calibration');
+    });
+    perf.mockReturnValue(2000.5);
+    expect(Math.abs(epochNow() - 5_002_000.92)).toBeLessThan(0.01);
+    perf.mockReturnValue(2100.5);
+    expect(Math.abs(epochNow() - 5_002_100.92)).toBeLessThan(0.01);
+    expect(date).not.toHaveBeenCalled();
   });
 });
