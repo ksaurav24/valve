@@ -1,5 +1,6 @@
 // Redis INFO snapshots at window edges: server CPU and per-command call/µs counters.
 import type { Redis } from 'ioredis';
+import { epochNow } from '../core/clock.ts';
 
 export interface InfoSnapshot {
   at: number;
@@ -17,7 +18,7 @@ export async function infoSnapshot(client: Redis): Promise<InfoSnapshot> {
   for (const m of text.matchAll(/^cmdstat_(\S+?):calls=(\d+),usec=(\d+)/gm))
     commands[m[1]!] = { calls: Number(m[2]), usec: Number(m[3]) };
   return {
-    at: performance.timeOrigin + performance.now(),
+    at: epochNow(),
     cpuSec:
       Number(field('used_cpu_sys') ?? 0) + Number(field('used_cpu_user') ?? 0),
     commands,

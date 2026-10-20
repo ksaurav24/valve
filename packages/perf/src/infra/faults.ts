@@ -9,6 +9,7 @@ import { encode } from '../core/codec.ts';
 import { timeMs } from '../lua/log.ts';
 import { assertDisposable, flushDisposable, type Endpoint } from './safety.ts';
 import { SENTINEL_KEY } from './servers.ts';
+import { epochNow } from '../core/clock.ts';
 
 export interface FaultLog {
   type: string;
@@ -64,7 +65,7 @@ export class FaultRunner {
     private restartAudit?: { logKey: string; dir: string },
   ) {}
 
-  private now = () => performance.timeOrigin + performance.now() - this.startAt;
+  private now = () => epochNow() - this.startAt;
 
   private async runProcess(
     proc: ChildProcess,

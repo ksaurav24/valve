@@ -22,6 +22,7 @@ import {
 import { adapterFor } from '../adapters/index.ts';
 import type { Limiter } from '../adapters/types.ts';
 import { Recorder } from './recorder.ts';
+import { epochNow } from '../core/clock.ts';
 
 export interface WorkerConfig {
   cell: CellSpec;
@@ -42,7 +43,7 @@ export interface WorkerConfig {
   cold?: { epochAt: number };
 }
 
-const now = () => performance.timeOrigin + performance.now();
+const now = epochNow;
 const sleepUntil = (at: number) =>
   new Promise<void>((r) => setTimeout(r, Math.max(0, at - now())));
 const spin = (ms: number) => {

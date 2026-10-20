@@ -473,9 +473,12 @@ Clock rules:
 
 - Redis `TIME` is the authority for server events.
 - The monotonic clock is used within a process.
-- On one host, `performance.timeOrigin + now()` is used across processes. Alignment is
-  revalidated each run: the fraction of server timestamps inside the client `[send, reply]`
-  window is reported.
+- On one host, `epochNow()` (`core/clock.ts`) is used across processes. Each process anchors
+  its monotonic clock to a `Date.now()` millisecond edge, keeping the narrowest of up to 40
+  bracketed samples. `performance.timeOrigin` alone is not comparable across processes: it is
+  read once at startup without a bracket, and a preemption during that read left loaded workers
+  1-40 ms apart. Alignment is revalidated each run: the fraction of server timestamps inside the
+  client `[send, reply]` window is reported.
 - Wall clocks are never compared across hosts.
 
 ## 11. Commands
