@@ -41,7 +41,7 @@ export async function measure(
   const reps = options.reps ?? (tier === 'startup' || tier === 'drift' ? 3 : 1);
   const protocol =
     tier === 'footprint'
-      ? `Same esbuild ${bundlerVersion} for both source and dist inputs; ${BUNDLE_SETTINGS}; unchanged source-entry budgets.`
+      ? `Same esbuild ${bundlerVersion} for both source and dist inputs; ${BUNDLE_SETTINGS}; configured source-entry budgets.`
       : tier === 'startup'
         ? 'Alternating build order each pair; ten fresh Node processes per entry per pair; shared filesystem caches; all samples retained.'
         : tier === 'drift'

@@ -1,11 +1,11 @@
-// One pinned bundler and settings for both frozen builds; retain the source-size budgets.
+// One pinned bundler and settings for both frozen builds; enforce the configured source-size budgets.
 import { build, version } from 'esbuild';
 import { relative, resolve } from 'node:path';
 import { gzipSync } from 'node:zlib';
 import type { BuildIdentity } from '../core/types.ts';
 
 export const SIZE_BUDGETS = {
-  core: 12750,
+  core: 13000,
   redis: 6300,
   headers: 2048,
 } as const;

@@ -22,6 +22,7 @@ export function leaseManager(
   let cancelWatch: (() => void) | undefined;
   let pending: string[] = [];
   let releases: Promise<void> = Promise.resolve();
+  let releasing = 0;
   function lost(token: string, cause?: unknown) {
     const entry = active.get(token);
     if (entry && !entry.error) {
@@ -96,12 +97,17 @@ export function leaseManager(
     if (!pending.length) return;
     const tokens = pending;
     pending = [];
+    releasing++;
     releases = releases
       .then(() => store.release!(id, tokens))
       .catch(report)
-      .then(wake);
+      .then(() => {
+        releasing--;
+        wake();
+      });
   }
   return {
+    releasing: () => pending.length > 0 || releasing > 0,
     claim(token: string, until: number, signal?: AbortSignal) {
       const controller = new AbortController();
       const abort = () => controller.abort(signal?.reason);

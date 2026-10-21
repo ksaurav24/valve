@@ -90,6 +90,8 @@ export function createValve(options: ValveOptions): Valve {
   let lastStoreEvent = -Infinity;
   let wake: ReturnType<typeof setTimeout> | undefined;
   let wakeAt = Infinity;
+  // Eligibility before optional banked spreading; urgent arrivals can preempt it.
+  let rateWakeAt = Infinity;
   let idleResolvers: (() => void)[] = [];
   let closePromise: Promise<void> | undefined;
   let closeResolve: (() => void) | undefined;
@@ -114,6 +116,9 @@ export function createValve(options: ValveOptions): Valve {
   let sent = 0;
   const leases = config.global
     ? leaseManager(store, id, config.leaseTtl, reportStore, () => {
+        // A completion also supersedes admissions sent before the release;
+        // their denial may arrive after this wake found a call still in flight.
+        noticeVersion++;
         if (!leaseWait) return;
         delayed?.wake();
         clearWake();
@@ -126,6 +131,7 @@ export function createValve(options: ValveOptions): Valve {
     if (wake !== undefined) clearTimeout(wake);
     wake = undefined;
     wakeAt = Infinity;
+    rateWakeAt = Infinity;
   }
   /** Coalesce wake requests into one scheduler microtask. */
   function schedule() {
@@ -141,8 +147,7 @@ export function createValve(options: ValveOptions): Valve {
     wakeAt = at;
     wake = setTimeout(
       () => {
-        wake = undefined;
-        wakeAt = Infinity;
+        clearWake();
         schedule();
       },
       Math.min(2147483647, Math.max(1, Math.ceil(at - Date.now()))),
@@ -167,6 +172,23 @@ export function createValve(options: ValveOptions): Valve {
     return config.global && leaseBlocked !== false
       ? Math.min(store.subscribe ? 1000 : 50, retryAfterMs)
       : retryAfterMs;
+  }
+  /** Spread only asynchronous static GCRA rate denials that can bank the delay.
+   * Keep two milliseconds of bank for transit/lateness and five before deadlines. */
+  function rateSpread(cost: number, at: number) {
+    if (!waiting.size || store.acquireSync || config.scoped || !rules.length)
+      return 0;
+    let room = 25;
+    for (const rule of rules) {
+      if (rule.algorithm !== 'gcra' || rule.burst <= 1) return 0;
+      const step = rule.intervalMs / rule.limit;
+      room = Math.min(room, (rule.burst - cost - Math.ceil(2 / step)) * step);
+    }
+    if (room <= 0) return 0;
+    for (const job of waiting)
+      if (job.location === 'queue')
+        room = Math.min(room, job.deadline - 5 - at);
+    return room > 0 ? Math.random() * room : 0;
   }
   function cleanup(job: Job) {
     if (job.timer !== undefined) clearTimeout(job.timer);
@@ -427,24 +449,27 @@ export function createValve(options: ValveOptions): Valve {
     }
     if (result.granted < heads.length && version !== noticeVersion && leaseWait)
       soon();
-    else if (result.granted < heads.length)
-      arm(
+    else if (result.granted < heads.length) {
+      const rateWait = !config.global || result.leaseBlocked === false;
+      const at =
         now +
-          Math.max(
-            1,
-            config.global
-              ? retryDelay(result.retryAfterMs, result.leaseBlocked)
-              : // The next rate check can overlap time spent obtaining the answer.
-                // Admission remains authoritative if this estimate wakes early.
-                result.retryAfterMs -
-                  (acquiredTime === undefined
-                    ? 0
-                    : performance.now() - acquiredTime),
-          ) +
-          // Global waits may be blocked on contended slots; rate-only waits need no jitter.
-          (config.global ? jitter(result.retryAfterMs) : 0),
-      );
-    else if (waiting.size) schedule();
+        Math.max(
+          1,
+          rateWait
+            ? // The next rate check can overlap time spent obtaining the answer.
+              // Admission remains authoritative if this estimate wakes early.
+              result.retryAfterMs -
+                (acquiredTime === undefined
+                  ? 0
+                  : performance.now() - acquiredTime)
+            : retryDelay(result.retryAfterMs, result.leaseBlocked),
+        );
+      const spread = rateWait
+        ? rateSpread(heads[result.granted]!.cost, at)
+        : jitter(result.retryAfterMs);
+      arm(at + spread);
+      if (spread > 0 && rateWait && wakeAt === at + spread) rateWakeAt = at;
+    } else if (waiting.size) schedule();
     finishIdle();
   }
   /**
@@ -732,7 +757,7 @@ export function createValve(options: ValveOptions): Valve {
     }
     inFlight = true;
     sent += live.length;
-    const acquiredTime = config.global ? undefined : performance.now();
+    const acquiredTime = performance.now();
     let result: Promise<AcquireResult>;
     try {
       result = store.acquire(request);
@@ -870,6 +895,11 @@ export function createValve(options: ValveOptions): Valve {
           jobOptions.signal.addEventListener('abort', job.abort, {
             once: true,
           });
+        }
+        if (rateWakeAt !== Infinity && job.deadline < wakeAt + 5) {
+          const at = rateWakeAt;
+          clearWake();
+          arm(at);
         }
         schedule();
       } catch (error) {
@@ -1092,6 +1122,10 @@ export function createValve(options: ValveOptions): Valve {
       notice,
     ) => {
       if (closed && closingStore) return;
+      // A pending local release already guarantees a wake on completion (even
+      // on failure). Coalesce notices only inside that interval: messages have
+      // no sender id, so saving an echo budget could swallow a foreign release.
+      if (notice.type === 'release' && leases?.releasing()) return;
       noticeVersion++;
       if (notice.type === 'resume') delayed?.wake();
       if (notice.type === 'pause') {
