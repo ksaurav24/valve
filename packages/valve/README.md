@@ -77,7 +77,10 @@ shared cooldowns; `retries: 0` disables automatic retries.
 The default GCRA rule uses `burst: 1`: at most `limit` cost units start in any
 half-open interval of the configured length, with one unit every
 `interval / limit` milliseconds. With a larger burst, the bound becomes
-`limit + burst - 1`.
+`limit + burst - 1`. After a denial, asynchronous static GCRA policies whose
+rules all have `burst > 1` may spread retries randomly by up to 25ms, bounded
+by the available bank and queued deadlines. Strict `burst: 1`, fixed-window,
+scoped policies and synchronous stores receive no banked spread.
 
 Fixed windows admit at most `limit` units per aligned window. Adjacent windows
 can admit `2 * limit` units near a boundary. Several rules each hold separately.

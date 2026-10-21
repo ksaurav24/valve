@@ -4,6 +4,7 @@ import { fileSha256 } from '../src/core/hash.ts';
 import { currentBuild } from '../src/identity/build.ts';
 import {
   bundleFootprint,
+  SIZE_BUDGETS,
   sizeChecks,
   type BundleRow,
 } from '../src/measure/bundle.ts';
@@ -48,7 +49,7 @@ describe('perf-owned artifact measurements', () => {
     expect(sizeChecks(rows).every((c) => c.pass)).toBe(true);
     expect(sizeChecks(rows.slice(1))[0]!.pass).toBe(false);
     expect(sizeChecks([...rows, rows[0]!])[0]!.pass).toBe(false);
-    for (const size of [NaN, Infinity, 0, -1, 12751])
+    for (const size of [NaN, Infinity, 0, -1, SIZE_BUDGETS.core + 1])
       expect(
         sizeChecks([{ ...rows[0]!, gzipBytes: size }, ...rows.slice(1)])[0]!
           .pass,

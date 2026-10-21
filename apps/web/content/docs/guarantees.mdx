@@ -25,10 +25,17 @@ Timers can fire late. Under GCRA with `burst: 1`, the next start follows the
 actual previous start, so small delays add up over a saturated queue. valve
 never catches up by starting jobs closer together than the rule allows.
 
-With local concurrency, rate waits add no random jitter. For asynchronous
-stores, the scheduler subtracts elapsed acquisition time from the store's
-suggested delay. Every wakeup still asks the store, and another worker may
-have spent the budget first.
+For asynchronous stores, rate waits subtract elapsed acquisition time from the
+store's suggested delay, including rate-blocked valves with global concurrency.
+Static GCRA policies whose rules all allow `burst > 1` may then add a uniform
+random spread of up to 25ms after denial to reduce competing retries. The spread
+never exceeds the available bank for the denied cost or a queued deadline;
+Valve keeps slack for transit, timer lateness and callback invocation. Newly
+queued urgent jobs can preempt this added delay. Strict `burst: 1`, fixed-window,
+scoped policies and synchronous stores receive no banked spread.
+
+Every wakeup still asks the store, and another worker may have spent the budget
+first. Admission and rate bounds remain authoritative on the store's clock.
 
 A start is a grant from the store. A delayed callback or network write can
 happen later, so request arrival times at the provider can bunch together.
