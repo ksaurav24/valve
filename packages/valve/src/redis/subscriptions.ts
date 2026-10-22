@@ -15,12 +15,19 @@ export function subscriptions(
   >();
   function deliver(channel: string, message: string) {
     const listeners = entries.get(channel)?.listeners;
+    const limits = /^limits:(\d+\.\d+):([01])$/.exec(message);
     const notice: StoreNotification | undefined =
       message === 'resume' || message === 'release'
         ? { type: message }
         : /^pause:\d+$/.test(message)
           ? { type: 'pause', durationMs: Number(message.slice(6)) }
-          : undefined;
+          : limits
+            ? {
+                type: 'limits',
+                version: limits[1]!,
+                relaxed: limits[2] === '1',
+              }
+            : undefined;
     if (notice) for (const listener of listeners ?? []) listener(notice);
   }
   const io = 'on' in subscriber && !('evalSha' in subscriber);
