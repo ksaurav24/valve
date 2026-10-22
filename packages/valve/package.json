@@ -1,6 +1,6 @@
 {
   "name": "valvejs",
-  "version": "0.5.2",
+  "version": "0.6.0",
   "description": "One rate limit for every worker that calls an API.",
   "homepage": "https://valvejs.vercel.app/",
   "bugs": {
