@@ -134,6 +134,7 @@ export function pin(context: ManagedContext): string {
   return `${scoped ? scopedFingerprint(context.rules) : ruleFingerprint(context.rules)}:${lease(context)}`;
 }
 
+/** Serialize the global lease settings included in shared quota fingerprints. */
 function lease(context: ManagedContext) {
   return context.lease
     ? `${context.lease.limit}:${context.lease.ttlMs}`

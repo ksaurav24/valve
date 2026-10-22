@@ -64,6 +64,7 @@ export function memoryStore(options: MemoryStoreOptions = {}): Store {
     }
   >();
   let lastEpoch = 0;
+  /** Deliver a shared-state hint asynchronously to listeners still subscribed. */
   function notify(id: string, notice: StoreNotification) {
     for (const listener of listeners.get(id) ?? [])
       queueMicrotask(() => {
@@ -368,9 +369,11 @@ export function memoryStore(options: MemoryStoreOptions = {}): Store {
       own.set(id, state.updated ? mark : state.pin);
     return state;
   }
+  /** Combine the registration epoch and revision into an opaque version token. */
   function version(state: { epoch: number; revision: number }) {
     return `${state.epoch}.${state.revision}`;
   }
+  /** Build a frozen snapshot using the caller's matching rule structure and order. */
   function limitsOf(
     state: NonNullable<ReturnType<typeof managed.get>>,
     context: ManagedContext,
@@ -386,6 +389,7 @@ export function memoryStore(options: MemoryStoreOptions = {}): Store {
       ? {}
       : { limits: limitsOf(state, context) };
   }
+  /** Admit a static prefix using authoritative frames and return changed limits. */
   function managedAcquireSync(
     request: ManagedAcquireRequest,
   ): ManagedAcquireResult {
@@ -401,6 +405,7 @@ export function memoryStore(options: MemoryStoreOptions = {}): Store {
       ...extra,
     };
   }
+  /** Admit scoped jobs atomically and retain live debt during rate-decrease expiry windows. */
   function managedScopedSync(
     request: ManagedScopedRequest,
   ): ManagedScopedResult {

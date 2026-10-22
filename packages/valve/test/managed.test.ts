@@ -484,6 +484,80 @@ describe('managed GCRA state', () => {
 
 describe('scheduler reaction to managed limits', () => {
   it.each([
+    { asyncStore: false, cost: 1 },
+    { asyncStore: true, cost: 1 },
+    { asyncStore: false, cost: 3 },
+    { asyncStore: true, cost: 3 },
+  ])(
+    'wakes delayed jobs from an admission reply (async=$asyncStore, cost=$cost)',
+    async ({ asyncStore, cost }) => {
+      vi.useFakeTimers();
+      vi.setSystemTime(0);
+      const backing = memoryStore({ clock: () => Date.now() });
+      const store = { ...backing, managed: { ...backing.managed! } };
+      delete store.subscribe;
+      if (asyncStore) delete store.managed.acquireScopedSync;
+      const acquire = vi.spyOn(
+        store.managed,
+        asyncStore ? 'acquireScoped' : 'acquireScopedSync',
+      );
+      const options = {
+        id: `reply-raise-${asyncStore}-${cost}`,
+        limits: 'managed' as const,
+        store,
+        rate: {
+          name: 'hour',
+          scope: 'account',
+          limit: 1,
+          interval: '1h' as const,
+          algorithm: 'fixed-window' as const,
+        },
+      };
+      const waiting = createValve(options);
+      const updating = createValve(options);
+      const identity = { scopes: { account: 'X' } };
+      await waiting.run(() => 'spent', identity);
+      const fn = vi.fn(() => 'awakened');
+      const delayed = Promise.allSettled([waiting.run(fn, identity)]);
+      try {
+        await tick();
+        expect(fn).not.toHaveBeenCalled();
+        acquire.mockClear();
+        await updating.updateLimits({ hour: { limit: 2 } });
+        const triggerFn = vi.fn(() => 'trigger');
+        const trigger = Promise.allSettled([
+          waiting.run(triggerFn, { cost, scopes: { account: 'Y' } }),
+        ]);
+        await tick();
+        expect(fn).toHaveBeenCalledOnce();
+        expect(await delayed).toEqual([
+          { status: 'fulfilled', value: 'awakened' },
+        ]);
+        if (cost === 1)
+          expect(await trigger).toEqual([
+            { status: 'fulfilled', value: 'trigger' },
+          ]);
+        else
+          expect(await trigger).toMatchObject([
+            { status: 'rejected', reason: { code: 'COST_EXCEEDS_LIMIT' } },
+          ]);
+        // The reply discovering the raise still decides its own job in one attempt.
+        expect(
+          acquire.mock.calls.filter(([request]) =>
+            request.jobs.some((job) => job.scopes.account === 'Y'),
+          ),
+        ).toHaveLength(1);
+        expect(Date.now()).toBe(0);
+      } finally {
+        await waiting.close();
+        await updating.close();
+        await delayed;
+        await backing.close();
+      }
+    },
+  );
+
+  it.each([
     ['static', undefined],
     ['scoped', 'account'],
   ] as const)(

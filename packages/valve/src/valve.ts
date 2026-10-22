@@ -272,8 +272,14 @@ export function createValve(options: ValveOptions): Valve {
   }
   /** Cache limits carried by a managed admission reply. */
   function observed<R>(result: R, issued: number): R {
-    if (config.managed && result && typeof result === 'object')
-      accept((result as { limits?: LimitsSnapshot }).limits, issued);
+    if (
+      config.managed &&
+      result &&
+      typeof result === 'object' &&
+      accept((result as { limits?: LimitsSnapshot }).limits, issued)
+    )
+      // Preserve this reply's notification generation until it is handled.
+      queueMicrotask(relax);
     return result;
   }
   /** Re-evaluate every waiting job now that some capacity grew. */
@@ -331,6 +337,7 @@ export function createValve(options: ValveOptions): Valve {
       ? Math.min(store.subscribe ? 1000 : 50, retryAfterMs)
       : retryAfterMs;
   }
+  /** Remove a settled or rejected job's deadline, abort listener, and held-wait bookkeeping. */
   function cleanup(job: Job) {
     if (job.timer !== undefined) clearTimeout(job.timer);
     job.timer = undefined;
@@ -355,6 +362,7 @@ export function createValve(options: ValveOptions): Valve {
       if (job.location === 'queue' && (!inFlight || sent >= job.holdUntil!))
         missed(job);
   }
+  /** Resolve idle waiters and finish closing owned resources once all work has settled. */
   function finishIdle() {
     if (waiting.size || running || retrying) return;
     clearWake();
@@ -409,12 +417,14 @@ export function createValve(options: ValveOptions): Valve {
     if (!waiting.size) clearWake();
     finishIdle();
   }
+  /** Count and report a submission rejected before it becomes a queued job. */
   function refuse(error: unknown) {
     totals.rejected++;
     events.emit('reject', {
       code: (error as { code?: ValveErrorCode })?.code ?? 'INVALID_OPTIONS',
     });
   }
+  /** Count store failures while limiting store-error events to one per second. */
   function reportStore(error: unknown) {
     totals.storeErrors++;
     const now = Date.now();
@@ -508,6 +518,7 @@ export function createValve(options: ValveOptions): Valve {
       } else succeed(job, result);
     });
   }
+  /** Apply optional response feedback without converting observer failures into job failures. */
   function succeed(job: Job, result: unknown) {
     try {
       const response = job.options.observe?.(result);
@@ -1141,6 +1152,7 @@ export function createValve(options: ValveOptions): Valve {
         );
       });
   }
+  /** Pause locally immediately, then propagate the deadline through the shared store. */
   function sharedPause(ms: number, reason: PauseReason): Promise<void> {
     pausedUntil = Math.max(pausedUntil, Date.now() + ms);
     events.emit('pause', { durationMs: ms, reason });
@@ -1152,6 +1164,7 @@ export function createValve(options: ValveOptions): Valve {
       return Promise.reject(error);
     }
   }
+  /** Translate provider feedback or repeated 429 responses into a bounded shared pause. */
   function observe(response: ResponseLike): void {
     let signal;
     try {
@@ -1334,6 +1347,7 @@ export function createValve(options: ValveOptions): Valve {
     };
     return limited as unknown as F;
   }
+  /** Stop accepting work, optionally drain the queue, and await resource cleanup. */
   function close(closeOptions: { drain?: boolean } = {}): Promise<void> {
     if (closePromise) return closePromise;
     closed = true;

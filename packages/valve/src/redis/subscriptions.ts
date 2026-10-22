@@ -1,6 +1,7 @@
 // Multiplex listeners by id without taking ownership of the subscriber client.
 import type { StoreNotification } from '../store.js';
 import type { IoredisSubscriber, NodeRedisSubscriber } from './types.js';
+/** Multiplex shared-state notices on a user-owned Redis subscription connection. */
 export function subscriptions(
   subscriber: IoredisSubscriber | NodeRedisSubscriber,
   prefix: string,
@@ -13,6 +14,7 @@ export function subscriptions(
       off: () => Promise<unknown>;
     }
   >();
+  /** Decode recognized wire notices and dispatch them to the channel's listeners. */
   function deliver(channel: string, message: string) {
     const listeners = entries.get(channel)?.listeners;
     const limits = /^limits:(\d+\.\d+):([01])$/.exec(message);
