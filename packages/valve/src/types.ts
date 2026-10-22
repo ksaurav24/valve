@@ -1,5 +1,5 @@
 // Public queue, job, rule, and lifecycle types.
-import type { Store } from './store.js';
+import type { LimitsPatch, LimitsSnapshot, Store } from './store.js';
 import type { Feedback, ResponseLike } from './headers/types.js';
 import type { ValveErrorCode } from './errors.js';
 
@@ -153,11 +153,36 @@ export interface ValveOptions {
   /** What to do when the store fails. Default `"wait"`. */
   onStoreError?: StoreErrorPolicy;
   /**
+   * Whether rule limits can change at runtime. Default `"immutable"`: every
+   * worker sharing the id must use identical rules, and the store rejects any
+   * difference with `INVALID_OPTIONS`.
+   *
+   * `"managed"` stores authoritative limits in the store. Every rule must have
+   * a `name`. The `limit` and GCRA `burst` values here only seed an id the store
+   * does not know yet; afterwards the store's values apply to every worker and
+   * {@link Valve.updateLimits} changes them. Names, scopes, algorithms,
+   * intervals, and global concurrency stay fixed, as in immutable mode.
+   * Requires a store with managed support, such as `memoryStore` or `redisStore`.
+   */
+  limits?: 'immutable' | 'managed';
+  /**
    * Advanced. Max jobs asked of the store in one call. Higher values mean
    * fewer round trips under load but coarser fairness between processes.
    * Positive integer. Default `32`. Scoped configurations allow at most `128`.
    */
   batch?: number;
+}
+
+/** Options for {@link Valve.updateLimits}.
+ * @example const options: UpdateLimitsOptions = { expect: { throughput: { limit: 100 } } };
+ */
+export interface UpdateLimitsOptions {
+  /**
+   * Commit only if each listed field currently has this value, or already has
+   * its patched value, so retrying after an unknown outcome succeeds. Otherwise
+   * nothing changes and the promise rejects with `LIMITS_CONFLICT`.
+   */
+  expect?: LimitsPatch;
 }
 
 /** Options for a single job.
@@ -290,6 +315,8 @@ export interface ValveEventMap {
   'store-error': { readonly error: unknown; readonly policy: StoreErrorPolicy };
   idle: Record<string, never>;
   warning: { readonly message: string };
+  /** Managed limits this process has not seen before, from any store reply or notice. */
+  limits: LimitsSnapshot;
 }
 
 /**
@@ -389,6 +416,40 @@ export interface Valve extends AsyncDisposable {
    * await api.resume();
    */
   resume(): Promise<void>;
+
+  /**
+   * Reads the store's current managed limits. Registers this valve's rules
+   * first if the store has no limits for the id.
+   *
+   * @throws never synchronously. Rejects with `INVALID_OPTIONS` unless the valve
+   * uses `limits: "managed"`, or `STORE_UNAVAILABLE` when the store fails.
+   * @example
+   * const { rules } = await api.getLimits();
+   */
+  getLimits(): Promise<LimitsSnapshot>;
+
+  /**
+   * Atomically changes `limit` and GCRA `burst` of named rules for every
+   * worker sharing this id and store. Omitted rules and fields keep their
+   * values, so updates of different fields never overwrite each other. The same
+   * field is last write wins unless `expect` is given. Patches set absolute
+   * values; repeating one is harmless and a patch that changes nothing creates no
+   * new version. Running jobs are unaffected; queued jobs use the new limits at
+   * their next admission. Spent budget carries over: fixed windows keep their
+   * count, and GCRA keeps its outstanding cost units, which drain at the new rate.
+   *
+   * @throws never synchronously. Rejects with `INVALID_OPTIONS` for unknown
+   * rules or fields, values that are not positive integers, a burst on a
+   * fixed-window rule, or an immutable valve; `LIMITS_CONFLICT` when `expect`
+   * fails; or `STORE_UNAVAILABLE` when the store fails, in which case the
+   * update may or may not have been applied.
+   * @example
+   * await api.updateLimits({ throughput: { limit: 200, burst: 20 } });
+   */
+  updateLimits(
+    patch: LimitsPatch,
+    options?: UpdateLimitsOptions,
+  ): Promise<LimitsSnapshot>;
 
   /**
    * A snapshot for this process. Allocates a new object per call.
