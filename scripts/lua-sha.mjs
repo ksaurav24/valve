@@ -12,6 +12,7 @@ for (const name of [
   'resume',
   'release',
   'renew',
+  'managed',
 ]) {
   const source = luamin.minify(
     await readFile(new URL(`${name}.lua`, base), 'utf8'),

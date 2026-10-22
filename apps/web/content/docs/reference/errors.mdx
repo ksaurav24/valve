@@ -35,20 +35,27 @@ if (isValveError(error, 'QUEUE_FULL')) return res.status(503).end();
 
 ## Codes
 
-| Code                 | Raised by                                                | Meaning                                                                       |
-| -------------------- | -------------------------------------------------------- | ----------------------------------------------------------------------------- |
-| `INVALID_OPTIONS`    | `createValve`, `redisStore`, `run`, `pause`, `wrapFetch` | An option or argument is invalid. The message names it and suggests a fix.    |
-| `COST_EXCEEDS_LIMIT` | `run`, `wrap`, `wrapFetch`                               | The job's cost exceeds a rule's `burst` (GCRA) or `limit` (fixed window).     |
-| `QUEUE_FULL`         | `run`, `wrap`, `wrapFetch`                               | `maxQueue` jobs are already waiting.                                          |
-| `MAX_WAIT_EXCEEDED`  | `run`, `wrap`, `wrapFetch`                               | The job waited longer than `maxWait`.                                         |
-| `ABORTED`            | `run`, `wrapFetch`                                       | The signal aborted before the job started. `cause` is `signal.reason`.        |
-| `CLOSED`             | `run`, `wrap`, `wrapFetch`                               | The valve was closed before the job started.                                  |
-| `STORE_UNAVAILABLE`  | `run`, `wrap`, `wrapFetch`                               | The store failed and `onStoreError` is `'throw'`. `cause` is the store error. |
-| `LEASE_LOST`         | `run`, `wrap`, `wrapFetch`                               | A global concurrency lease expired or could not be renewed.                   |
+| Code                 | Raised by                                                        | Meaning                                                                   |
+| -------------------- | ---------------------------------------------------------------- | ------------------------------------------------------------------------- |
+| `INVALID_OPTIONS`    | `createValve`, `redisStore`, admission and managed-limit methods | An option, argument, managed structure, or limits patch is invalid.       |
+| `COST_EXCEEDS_LIMIT` | `run`, `wrap`, `wrapFetch`                                       | The job's cost exceeds a rule's `burst` (GCRA) or `limit` (fixed window). |
+| `QUEUE_FULL`         | `run`, `wrap`, `wrapFetch`                                       | `maxQueue` jobs are already waiting.                                      |
+| `MAX_WAIT_EXCEEDED`  | `run`, `wrap`, `wrapFetch`                                       | The job waited longer than `maxWait`.                                     |
+| `ABORTED`            | `run`, `wrapFetch`                                               | The signal aborted before the job started. `cause` is `signal.reason`.    |
+| `CLOSED`             | `run`, `wrap`, `wrapFetch`                                       | The valve was closed before the job started.                              |
+| `STORE_UNAVAILABLE`  | Admission with `'throw'`; `getLimits`, `updateLimits`            | The store failed. For an update, whether it committed can be unknown.     |
+| `LEASE_LOST`         | `run`, `wrap`, `wrapFetch`                                       | A global concurrency lease expired or could not be renewed.               |
+| `LIMITS_CONFLICT`    | `updateLimits`                                                   | An `expect` value did not match; no fields changed.                       |
 
 For how to respond to each code, see [Handle errors](/docs/guides/error-handling/).
 
-`INVALID_OPTIONS` also rejects jobs when Redis reports that their quota
-fingerprint does not match the pinned rate or global concurrency configuration.
-Its `cause` contains the store's mismatch error. This is a configuration failure under every
+`INVALID_OPTIONS` also rejects jobs when a store reports that their immutable
+policy or managed structure does not match the configuration pinned for the ID.
+There is no separate public `CONFIG_MISMATCH` code. The error message describes
+the incompatible configuration. This is a configuration failure under every
 `onStoreError` policy. See [Configuration drift](/docs/guides/share-a-quota/#configuration-drift).
+
+`getLimits()` and `updateLimits()` always report store failures as
+`STORE_UNAVAILABLE`; `onStoreError` does not make these control-plane calls
+fail open. Because a timed-out update may have committed, repeat the same
+absolute patch or read the snapshot and retry with `expect`.

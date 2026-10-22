@@ -8,7 +8,8 @@ export type ValveErrorCode =
   | 'ABORTED'
   | 'CLOSED'
   | 'STORE_UNAVAILABLE'
-  | 'LEASE_LOST';
+  | 'LEASE_LOST'
+  | 'LIMITS_CONFLICT';
 /** An error belonging to valve, with job errors passed through unchanged.
  * @example if (isValveError(error, 'QUEUE_FULL')) shedLoad();
  */

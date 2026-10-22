@@ -13,13 +13,24 @@ import { leaseManager } from './leases.js';
 import { memoryStore } from './memory-store.js';
 import { JobQueue } from './queue.js';
 import { normalize } from './rules.js';
-import type { AcquireResult, ScopedAcquireResult } from './store.js';
+import { capacity, checkPatch, compareVersions, relaxes } from './managed.js';
+import type {
+  AcquireResult,
+  LimitsPatch,
+  LimitsSnapshot,
+  ManagedAcquireResult,
+  ManagedScopedResult,
+  NormalizedRule,
+  ScopedAcquireResult,
+  Store,
+} from './store.js';
 import type {
   FetchLike,
   JobContext,
   PauseReason,
   RunOptions,
   Valve,
+  UpdateLimitsOptions,
   ValveOptions,
   WrapFetchOptions,
 } from './types.js';
@@ -53,8 +64,19 @@ interface Job {
  */
 export function createValve(options: ValveOptions): Valve {
   const config = normalize(options);
-  const { id, rules } = config;
+  const { id } = config;
+  // Managed valves replace their rules with each newer authoritative snapshot.
+  let rules: readonly NormalizedRule[] = config.rules;
   const store = options.store ?? memoryStore();
+  // Managed admissions use the store's managed capability, which shares the method names.
+  const gate = (config.managed ? store.managed : store) as Store;
+  let limits: LimitsSnapshot | undefined;
+  // Managed store calls issued, and the call that produced the cached limits.
+  let limitsIssued = 0;
+  let limitsAccepted = 0;
+  let limitsWatch: ReturnType<typeof setTimeout> | undefined;
+  // Without a subscriber, waits longer than this re-read the limits version.
+  const limitsPeriod = store.subscribe ? 10000 : 1000;
   const events = emitter();
   const queue = new JobQueue<Job>();
   const delayed = config.scoped ? new DelayedQueue<Job>() : undefined;
@@ -147,6 +169,153 @@ export function createValve(options: ValveOptions): Valve {
       },
       Math.min(2147483647, Math.max(1, Math.ceil(at - Date.now()))),
     );
+    if (config.managed) watchLimits(at);
+  }
+  /** Managed context sent with every store call, seeded by the newest observed limits. */
+  function context() {
+    return {
+      id,
+      rules,
+      ...(config.global
+        ? {
+            lease: {
+              limit: config.concurrency,
+              ttlMs: config.leaseTtl,
+              owner: `${owner}:${leaseSequence++}`,
+            },
+          }
+        : {}),
+      ...(limits ? { known: limits.version } : {}),
+    };
+  }
+  /**
+   * Cache a snapshot unless an older one arrives late. A snapshot from a later
+   * call is accepted even when its version is older, after a failover or restore.
+   * @returns Whether it raises any limit or burst over the previous cache.
+   */
+  function accept(next: LimitsSnapshot | undefined, issued: number) {
+    if (!next) return false;
+    if (
+      typeof next.version !== 'string' ||
+      !/^\d+\.\d+$/.test(next.version) ||
+      !Number.isSafeInteger(Number(next.version.split('.')[0])) ||
+      !Number.isSafeInteger(next.revision) ||
+      next.revision < 1 ||
+      Number(next.version.split('.')[1]) !== next.revision ||
+      !next.rules ||
+      typeof next.rules !== 'object' ||
+      Object.keys(next.rules).length !== rules.length ||
+      rules.some((rule) => {
+        const value = next.rules[rule.name!];
+        return (
+          !Object.hasOwn(next.rules, rule.name!) ||
+          !value ||
+          value.algorithm !== rule.algorithm ||
+          value.intervalMs !== rule.intervalMs ||
+          value.scope !== rule.scope ||
+          !Number.isSafeInteger(value.limit) ||
+          value.limit < 1 ||
+          !Number.isSafeInteger(value.burst) ||
+          value.burst < 1 ||
+          (rule.algorithm === 'fixed-window' && value.burst !== 1)
+        );
+      })
+    )
+      throw failure(
+        id,
+        'INVALID_OPTIONS',
+        'Store returned invalid managed limits.',
+      );
+    if (next.version === limits?.version) return false;
+    const previous = limits;
+    const order = previous
+      ? compareVersions(next.version, previous.version)
+      : 1;
+    if (order < 0 && issued <= limitsAccepted) return false;
+    const epoch = (version: string) => version.slice(0, version.indexOf('.'));
+    if (previous && epoch(previous.version) !== epoch(next.version))
+      events.emit('warning', {
+        message:
+          order < 0
+            ? 'Managed limits went back to an older version after a store failover or restore. Reapply recent updateLimits calls.'
+            : 'The store registered managed limits again after losing them, so earlier updates may be lost. Reapply them with updateLimits.',
+      });
+    else if (order < 0)
+      events.emit('warning', {
+        message:
+          'Managed limits went back to an older revision after a store failover or restore. Reapply recent updateLimits calls.',
+      });
+    else if (
+      !previous &&
+      config.rules.some(
+        (rule) =>
+          next.rules[rule.name!]?.limit !== rule.limit ||
+          next.rules[rule.name!]?.burst !== rule.burst,
+      )
+    )
+      events.emit('warning', {
+        message:
+          "The store has managed limits that differ from this valve's configured rules; the store's values apply.",
+      });
+    limits = next;
+    limitsAccepted = Math.max(limitsAccepted, issued);
+    rules = Object.freeze(
+      rules.map((rule) => {
+        const value = next.rules[rule.name!];
+        return value
+          ? Object.freeze({ ...rule, limit: value.limit, burst: value.burst })
+          : rule;
+      }),
+    );
+    events.emit('limits', next);
+    return !previous || relaxes(previous, next);
+  }
+  /** Cache limits carried by a managed admission reply. */
+  function observed<R>(result: R, issued: number): R {
+    if (
+      config.managed &&
+      result &&
+      typeof result === 'object' &&
+      accept((result as { limits?: LimitsSnapshot }).limits, issued)
+    )
+      // Preserve this reply's notification generation until it is handled.
+      queueMicrotask(relax);
+    return result;
+  }
+  /** Re-evaluate every waiting job now that some capacity grew. */
+  function relax() {
+    noticeVersion++;
+    delayed?.wake();
+    clearWake();
+    schedule();
+  }
+  /** Without reliable notices, re-read the limits version during long waits. */
+  function watchLimits(at: number) {
+    if (limitsWatch !== undefined || at - Date.now() <= limitsPeriod) return;
+    limitsWatch = setTimeout(() => {
+      limitsWatch = undefined;
+      if (!waiting.size || closingStore || pausedUntil > Date.now()) return;
+      const issued = ++limitsIssued;
+      void Promise.resolve()
+        .then(() => store.managed!.getLimits(context()))
+        .then((next) => {
+          if (accept(next, issued)) relax();
+          else if (waiting.size) watchLimits(wakeAt);
+        })
+        .catch((error) => {
+          reportStore(error);
+          if (waiting.size) watchLimits(wakeAt);
+        });
+    }, limitsPeriod);
+  }
+  /** Reject a job that exceeds a rule's current capacity and so can never start. */
+  function impossible(job: Job) {
+    const rule = rules.find((candidate) => job.cost > capacity(candidate));
+    rejectJob(
+      job,
+      'COST_EXCEEDS_LIMIT',
+      `job cost ${job.cost} is greater than the current ${rule?.algorithm === 'fixed-window' ? 'limit' : 'burst'}${rule ? ` ${capacity(rule)} of rule ${rule.name}` : ''} (managed limits ${limits?.version ?? 'unknown'}), so it can never start. Raise it with updateLimits or lower the cost.`,
+    );
   }
   /** Spread retries by up to 25ms, bounded by ten percent of the supplied delay. */
   function jitter(ms: number) {
@@ -168,6 +337,7 @@ export function createValve(options: ValveOptions): Valve {
       ? Math.min(store.subscribe ? 1000 : 50, retryAfterMs)
       : retryAfterMs;
   }
+  /** Remove a settled or rejected job's deadline, abort listener, and held-wait bookkeeping. */
   function cleanup(job: Job) {
     if (job.timer !== undefined) clearTimeout(job.timer);
     job.timer = undefined;
@@ -192,9 +362,12 @@ export function createValve(options: ValveOptions): Valve {
       if (job.location === 'queue' && (!inFlight || sent >= job.holdUntil!))
         missed(job);
   }
+  /** Resolve idle waiters and finish closing owned resources once all work has settled. */
   function finishIdle() {
     if (waiting.size || running || retrying) return;
     clearWake();
+    clearTimeout(limitsWatch);
+    limitsWatch = undefined;
     if (active) {
       active = false;
       events.emit('idle', {});
@@ -244,12 +417,14 @@ export function createValve(options: ValveOptions): Valve {
     if (!waiting.size) clearWake();
     finishIdle();
   }
+  /** Count and report a submission rejected before it becomes a queued job. */
   function refuse(error: unknown) {
     totals.rejected++;
     events.emit('reject', {
       code: (error as { code?: ValveErrorCode })?.code ?? 'INVALID_OPTIONS',
     });
   }
+  /** Count store failures while limiting store-error events to one per second. */
   function reportStore(error: unknown) {
     totals.storeErrors++;
     const now = Date.now();
@@ -343,6 +518,7 @@ export function createValve(options: ValveOptions): Valve {
       } else succeed(job, result);
     });
   }
+  /** Apply optional response feedback without converting observer failures into job failures. */
   function succeed(job: Job, result: unknown) {
     try {
       const response = job.options.observe?.(result);
@@ -364,14 +540,46 @@ export function createValve(options: ValveOptions): Valve {
   ) {
     const now = Date.now();
     if (
-      config.global &&
-      result.granted > 0 &&
-      (result.leases?.length !== result.granted ||
-        new Set(result.leases).size !== result.granted)
+      config.managed &&
+      (!result ||
+        !Number.isSafeInteger(result.granted) ||
+        result.granted < 0 ||
+        result.granted > heads.length ||
+        !Number.isSafeInteger(result.retryAfterMs) ||
+        result.retryAfterMs < 0 ||
+        !Number.isSafeInteger(result.pausedMs) ||
+        result.pausedMs < 0)
     ) {
       storeError(
         heads,
-        new Error('Store returned invalid global lease tokens'),
+        failure(
+          id,
+          'INVALID_OPTIONS',
+          'Store returned invalid managed grants.',
+        ),
+      );
+      return;
+    }
+    if (
+      config.global &&
+      result.granted > 0 &&
+      ((config.managed && !Array.isArray(result.leases)) ||
+        result.leases?.length !== result.granted ||
+        new Set(result.leases).size !== result.granted ||
+        (config.managed &&
+          result.leases.some(
+            (token) => typeof token !== 'string' || token.length === 0,
+          )))
+    ) {
+      storeError(
+        heads,
+        config.managed
+          ? failure(
+              id,
+              'INVALID_OPTIONS',
+              'Store returned invalid global lease tokens',
+            )
+          : new Error('Store returned invalid global lease tokens'),
       );
       return;
     }
@@ -401,9 +609,12 @@ export function createValve(options: ValveOptions): Valve {
           ? Math.min(contention + 1, 6)
           : contention;
     }
+    const cannot = (result as ManagedAcquireResult).impossible === true;
     for (let i = 0; i < heads.length; i++) {
       const job = heads[i]!;
-      if (i < result.granted) {
+      if (cannot && i === result.granted && version === noticeVersion)
+        impossible(job);
+      else if (i < result.granted) {
         if (leases) {
           job.lease = result.leases![i]!;
           if (now >= acquiredAt + config.leaseTtl) {
@@ -425,7 +636,12 @@ export function createValve(options: ValveOptions): Valve {
         start(job);
       } else enqueueAgain(job);
     }
-    if (result.granted < heads.length && version !== noticeVersion && leaseWait)
+    if (cannot) schedule();
+    else if (
+      result.granted < heads.length &&
+      version !== noticeVersion &&
+      leaseWait
+    )
       soon();
     else if (result.granted < heads.length)
       arm(
@@ -503,7 +719,13 @@ export function createValve(options: ValveOptions): Valve {
     ) {
       storeError(
         heads,
-        new Error('Store returned invalid scoped grants or lease tokens'),
+        config.managed
+          ? failure(
+              id,
+              'INVALID_OPTIONS',
+              'Store returned invalid scoped grants or lease tokens',
+            )
+          : new Error('Store returned invalid scoped grants or lease tokens'),
       );
       return;
     }
@@ -543,8 +765,14 @@ export function createValve(options: ValveOptions): Valve {
           ? Math.min(contention + 1, 6)
           : contention;
     }
-    for (const entry of result.blocked) {
+    for (const entry of (result as ManagedScopedResult).blocked) {
       const job = heads[entry.index]!;
+      if (
+        entry.impossible &&
+        version === noticeVersion &&
+        job.state === 'queued'
+      )
+        impossible(job);
       if (job.state !== 'queued' || missed(job)) continue;
       if (version !== noticeVersion) enqueueAgain(job);
       else {
@@ -667,34 +895,38 @@ export function createValve(options: ValveOptions): Valve {
     // Concurrency-only valves still consult the pause in their shared store.
     costs.length = 0;
     for (const job of live) costs.push(job.cost);
-    const request = {
-      id,
-      rules,
-      costs,
-      ...(config.global
-        ? {
-            lease: {
-              limit: config.concurrency,
-              ttlMs: config.leaseTtl,
-              owner: `${owner}:${leaseSequence++}`,
-            },
-          }
-        : {}),
-    };
+    const request = config.managed
+      ? { ...context(), costs }
+      : {
+          id,
+          rules,
+          costs,
+          ...(config.global
+            ? {
+                lease: {
+                  limit: config.concurrency,
+                  ttlMs: config.leaseTtl,
+                  owner: `${owner}:${leaseSequence++}`,
+                },
+              }
+            : {}),
+        };
     const acquiredAt = Date.now();
     const version = noticeVersion;
+    const issued = config.managed ? ++limitsIssued : 0;
     if (config.scoped) {
       const scopedRequest = {
+        ...(config.managed && limits ? { known: limits.version } : {}),
         id,
         rules,
         jobs: live.map((job) => ({ cost: job.cost, scopes: job.scopes! })),
         ...(request.lease ? { lease: request.lease } : {}),
       };
-      if (store.acquireScopedSync) {
+      if (gate.acquireScopedSync) {
         try {
           handleScoped(
             live,
-            store.acquireScopedSync(scopedRequest),
+            observed(gate.acquireScopedSync(scopedRequest), issued),
             acquiredAt,
             version,
           );
@@ -705,10 +937,19 @@ export function createValve(options: ValveOptions): Valve {
         inFlight = true;
         sent += live.length;
         try {
-          store.acquireScoped!(scopedRequest).then(
+          gate.acquireScoped!(scopedRequest).then(
             (value) => {
               admitted();
-              handleScoped(live, value, acquiredAt, version);
+              try {
+                handleScoped(
+                  live,
+                  observed(value, issued),
+                  acquiredAt,
+                  version,
+                );
+              } catch (error) {
+                storeError(live, error);
+              }
             },
             (error) => {
               admitted();
@@ -722,9 +963,14 @@ export function createValve(options: ValveOptions): Valve {
       }
       return;
     }
-    if (store.acquireSync) {
+    if (gate.acquireSync) {
       try {
-        handle(live, store.acquireSync(request), acquiredAt, version);
+        handle(
+          live,
+          observed(gate.acquireSync(request), issued),
+          acquiredAt,
+          version,
+        );
       } catch (error) {
         storeError(live, error);
       }
@@ -735,7 +981,7 @@ export function createValve(options: ValveOptions): Valve {
     const acquiredTime = config.global ? undefined : performance.now();
     let result: Promise<AcquireResult>;
     try {
-      result = store.acquire(request);
+      result = gate.acquire(request);
     } catch (error) {
       admitted();
       storeError(live, error);
@@ -744,7 +990,17 @@ export function createValve(options: ValveOptions): Valve {
     result.then(
       (value) => {
         admitted();
-        handle(live, value, acquiredAt, version, acquiredTime);
+        try {
+          handle(
+            live,
+            observed(value, issued),
+            acquiredAt,
+            version,
+            acquiredTime,
+          );
+        } catch (error) {
+          storeError(live, error);
+        }
       },
       (error) => {
         admitted();
@@ -787,15 +1043,18 @@ export function createValve(options: ValveOptions): Valve {
           jobOptions.maxWait === undefined
             ? config.maxWait
             : duration(jobOptions.maxWait, id, 'job maxWait');
-        for (const rule of rules) {
-          const capacity = rule.algorithm === 'gcra' ? rule.burst : rule.limit;
-          if (cost > capacity)
-            throw failure(
-              id,
-              'COST_EXCEEDS_LIMIT',
-              `job cost ${cost} is greater than ${rule.algorithm === 'gcra' ? 'burst' : 'limit'} ${capacity} of rule ${rule.key}, so it can never start. Set ${rule.algorithm === 'gcra' ? 'burst' : 'limit'} to at least ${cost} on that rule.`,
-            );
-        }
+        // Managed stores judge capacity against their authoritative limits.
+        if (!config.managed)
+          for (const rule of rules) {
+            const capacity =
+              rule.algorithm === 'gcra' ? rule.burst : rule.limit;
+            if (cost > capacity)
+              throw failure(
+                id,
+                'COST_EXCEEDS_LIMIT',
+                `job cost ${cost} is greater than ${rule.algorithm === 'gcra' ? 'burst' : 'limit'} ${capacity} of rule ${rule.key}, so it can never start. Set ${rule.algorithm === 'gcra' ? 'burst' : 'limit'} to at least ${cost} on that rule.`,
+              );
+          }
         if (jobOptions.signal?.aborted)
           throw failure(
             id,
@@ -878,6 +1137,22 @@ export function createValve(options: ValveOptions): Valve {
       }
     });
   }
+  /** Run a managed limits call, reporting store failures as STORE_UNAVAILABLE. */
+  function call<T>(operation: () => Promise<T>): Promise<T> {
+    return Promise.resolve()
+      .then(operation)
+      .catch((error: unknown) => {
+        if ((error as { name?: unknown })?.name === 'ValveError') throw error;
+        reportStore(error);
+        throw failure(
+          id,
+          'STORE_UNAVAILABLE',
+          'store failed during a managed limits call. If it timed out, an update may still apply. Read the current limits and use expect when retrying to avoid overwriting another writer.',
+          error,
+        );
+      });
+  }
+  /** Pause locally immediately, then propagate the deadline through the shared store. */
   function sharedPause(ms: number, reason: PauseReason): Promise<void> {
     pausedUntil = Math.max(pausedUntil, Date.now() + ms);
     events.emit('pause', { durationMs: ms, reason });
@@ -889,6 +1164,7 @@ export function createValve(options: ValveOptions): Valve {
       return Promise.reject(error);
     }
   }
+  /** Translate provider feedback or repeated 429 responses into a bounded shared pause. */
   function observe(response: ResponseLike): void {
     let signal;
     try {
@@ -1071,6 +1347,7 @@ export function createValve(options: ValveOptions): Valve {
     };
     return limited as unknown as F;
   }
+  /** Stop accepting work, optionally drain the queue, and await resource cleanup. */
   function close(closeOptions: { drain?: boolean } = {}): Promise<void> {
     if (closePromise) return closePromise;
     closed = true;
@@ -1092,6 +1369,19 @@ export function createValve(options: ValveOptions): Valve {
       notice,
     ) => {
       if (closed && closingStore) return;
+      if (notice.type === 'limits') {
+        // Only a raised limit or burst can admit sooner than existing retry hints.
+        if (
+          notice.relaxed &&
+          notice.version !== limits?.version &&
+          waiting.size
+        ) {
+          noticeVersion++;
+          delayed?.wake();
+          arm(Date.now() + Math.random() * 25);
+        }
+        return;
+      }
       noticeVersion++;
       if (notice.type === 'resume') delayed?.wake();
       if (notice.type === 'pause') {
@@ -1148,6 +1438,67 @@ export function createValve(options: ValveOptions): Valve {
         events.emit('resume', { reason: 'manual' });
         schedule();
       }),
+    getLimits: () => {
+      if (!config.managed)
+        return Promise.reject(
+          failure(
+            id,
+            'INVALID_OPTIONS',
+            'getLimits requires limits: "managed".',
+          ),
+        );
+      const issued = ++limitsIssued;
+      return call(() => store.managed!.getLimits(context())).then((next) => {
+        if (!next)
+          throw failure(
+            id,
+            'INVALID_OPTIONS',
+            'Store returned no managed limits.',
+          );
+        if (accept(next, issued)) relax();
+        return next;
+      });
+    },
+    updateLimits: (patch: LimitsPatch, updateOptions?: UpdateLimitsOptions) => {
+      try {
+        if (!config.managed)
+          throw failure(
+            id,
+            'INVALID_OPTIONS',
+            'updateLimits requires limits: "managed". Immutable limits change only through a coordinated migration.',
+          );
+        if (
+          updateOptions !== undefined &&
+          (!updateOptions ||
+            typeof updateOptions !== 'object' ||
+            Array.isArray(updateOptions))
+        )
+          invalid(
+            id,
+            'updateLimits options must be an object',
+            updateOptions,
+            'Pass { expect }',
+          );
+        checkPatch(id, rules, patch);
+        if (updateOptions?.expect !== undefined)
+          checkPatch(id, rules, updateOptions.expect, 'limits expect');
+      } catch (error) {
+        return Promise.reject(error);
+      }
+      const issued = ++limitsIssued;
+      return call(() =>
+        store.managed!.updateLimits({
+          ...context(),
+          patch,
+          ...(updateOptions?.expect === undefined
+            ? {}
+            : { expect: updateOptions.expect }),
+        }),
+      ).then((next) => {
+        if (accept(next, issued)) relax();
+        return next;
+      });
+    },
     stats: () => ({
       queued: waiting.size - reserved,
       running,

@@ -24,6 +24,66 @@ suite('Redis Cluster', () => {
     await io.quit();
     await node.quit();
   });
+  it.each([false, true])(
+    'updates managed budgets atomically on one slot (scoped=%s)',
+    async (scoped) => {
+      const id = `managed-cluster-${crypto.randomUUID()}`;
+      const rules = normalize({
+        id,
+        limits: 'managed',
+        rate: [
+          {
+            name: 'budget',
+            algorithm: 'fixed-window',
+            limit: 2,
+            interval: 60000,
+          },
+          {
+            name: 'r',
+            limit: 2,
+            burst: 2,
+            interval: 60000,
+            ...(scoped ? { scope: 'recipient' } : {}),
+          },
+        ],
+      }).rules;
+      const a = redisStore({ client: io });
+      const b = redisStore({ client: node });
+      const context = { id, rules };
+      const acquire = async () =>
+        scoped
+          ? (
+              await a.managed!.acquireScoped!({
+                ...context,
+                jobs: [{ cost: 1, scopes: { recipient: 'A' } }],
+              })
+            ).grantedIndexes.length
+          : (await a.managed!.acquire({ ...context, costs: [1] })).granted;
+      expect(await acquire()).toBe(1);
+      await b.managed!.updateLimits({
+        ...context,
+        patch: { budget: { limit: 1 }, r: { burst: 1 } },
+      });
+      expect(await acquire()).toBe(0);
+      const keys = [
+        'config',
+        'limits',
+        'pause',
+        'leases',
+        'events',
+        'r:named:budget',
+        scoped ? 's:named:r:A' : 'r:named:r',
+      ].map((key) => `valve:{${id}}:${key}`);
+      expect(
+        new Set(
+          await Promise.all(keys.map((key) => io.cluster('KEYSLOT', key))),
+        ).size,
+      ).toBe(1);
+      await io.del(...keys);
+      await a.close();
+      await b.close();
+    },
+  );
   it('acquires and shares pauses with ioredis and node-redis', async () => {
     const id = `cluster-${process.pid}`;
     const a = redisStore({ client: io });

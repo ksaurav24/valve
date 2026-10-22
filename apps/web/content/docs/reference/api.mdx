@@ -17,19 +17,20 @@ is invalid. At least one of `rate` or a finite `concurrency` is required.
 
 ### ValveOptions
 
-| Option         | Type                                  | Default                      | Description                                                                            |
-| -------------- | ------------------------------------- | ---------------------------- | -------------------------------------------------------------------------------------- |
-| `id`           | `string`                              | Required                     | Name of the shared budget. 1 to 200 characters, without `{` or `}`.                    |
-| `rate`         | `RateRule \| RateRule[]`              | None                         | One rule, or a non-empty array of rules.                                               |
-| `concurrency`  | `number \| ConcurrencyOptions`        | `Infinity`                   | A number limits this instance. The object form can select global scope.                |
-| `store`        | `Store`                               | A new private memory store   | Where the shared budget lives.                                                         |
-| `maxQueue`     | `number`                              | `Infinity`                   | Maximum jobs waiting in this process. Beyond it, `run` rejects with `QUEUE_FULL`.      |
-| `maxWait`      | `Duration`                            | No limit                     | Maximum time a job may wait before starting.                                           |
-| `feedback`     | `Feedback \| false`                   | `defaultFeedback`            | Reads provider responses. `false` disables header reading.                             |
-| `maxPause`     | `Duration`                            | `'15m'`                      | Cap on any one pause caused by feedback or backoff.                                    |
-| `backoff`      | `{ base?: Duration; max?: Duration }` | `{ base: '1s', max: '30s' }` | Exponential pause after a 429 with no usable header.                                   |
-| `onStoreError` | `'wait' \| 'throw' \| 'open'`         | `'wait'`                     | Behavior when the store fails. See [Store failures](/docs/guarantees/#store-failures). |
-| `batch`        | `number`                              | `32`                         | Maximum jobs requested from the store in one call.                                     |
+| Option         | Type                                  | Default                      | Description                                                                                                    |
+| -------------- | ------------------------------------- | ---------------------------- | -------------------------------------------------------------------------------------------------------------- |
+| `id`           | `string`                              | Required                     | Name of the shared budget. 1 to 200 characters, without `{` or `}`.                                            |
+| `rate`         | `RateRule \| RateRule[]`              | None                         | One rule, or a non-empty array of rules.                                                                       |
+| `concurrency`  | `number \| ConcurrencyOptions`        | `Infinity`                   | A number limits this instance. The object form can select global scope.                                        |
+| `store`        | `Store`                               | A new private memory store   | Where the shared budget lives.                                                                                 |
+| `maxQueue`     | `number`                              | `Infinity`                   | Maximum jobs waiting in this process. Beyond it, `run` rejects with `QUEUE_FULL`.                              |
+| `maxWait`      | `Duration`                            | No limit                     | Maximum time a job may wait before starting.                                                                   |
+| `feedback`     | `Feedback \| false`                   | `defaultFeedback`            | Reads provider responses. `false` disables header reading.                                                     |
+| `maxPause`     | `Duration`                            | `'15m'`                      | Cap on any one pause caused by feedback or backoff.                                                            |
+| `backoff`      | `{ base?: Duration; max?: Duration }` | `{ base: '1s', max: '30s' }` | Exponential pause after a 429 with no usable header.                                                           |
+| `onStoreError` | `'wait' \| 'throw' \| 'open'`         | `'wait'`                     | Behavior when the store fails. See [Store failures](/docs/guarantees/#store-failures).                         |
+| `limits`       | `'immutable' \| 'managed'`            | `'immutable'`                | Store-authoritative runtime values when managed. See [Update limits at runtime](/docs/guides/runtime-limits/). |
+| `batch`        | `number`                              | `32`                         | Maximum jobs requested from the store in one call.                                                             |
 
 ### RateRule
 
@@ -48,6 +49,11 @@ require names and select a job identity through `scope`. Both fields accept
 1-64 ASCII letters, digits, underscores or hyphens, beginning with a letter.
 See [Scoped rate limits](/docs/guides/scoped-rate-limits/). Scoped configurations
 support at most 16 rules and batch 128 (default 32).
+
+With `limits: 'managed'`, at least one rate rule is required and every rule
+must have a name. The configured `limit` and GCRA `burst` seed a new store
+registration; stored values are authoritative after registration. Rule names,
+scopes, algorithms, intervals, and global concurrency remain fixed.
 
 ### ConcurrencyOptions
 
@@ -180,6 +186,63 @@ resume(): Promise<void>
 ```
 
 Ends the current pause in every process sharing the valve.
+
+### getLimits
+
+```ts
+getLimits(): Promise<LimitsSnapshot>
+```
+
+Reads the store's authoritative managed limits, registering this valve's seeds
+if the store has no values for the ID. Rejects with `INVALID_OPTIONS` on an
+immutable valve and `STORE_UNAVAILABLE` on store failure.
+
+### updateLimits
+
+```ts
+updateLimits(
+  patch: LimitsPatch,
+  options?: { expect?: LimitsPatch },
+): Promise<LimitsSnapshot>
+```
+
+Atomically sets absolute `limit` and GCRA `burst` values by rule name. Omitted
+rules and fields stay unchanged. A no-op returns the same version. Without
+`expect`, the same field is last-writer-wins. Expected fields must equal the
+current value or already equal their patched value; otherwise nothing changes
+and the call rejects with `LIMITS_CONFLICT`.
+
+Validation rejects unknown rules or fields, values that are not positive safe
+integers, `burst` on fixed-window rules, and immutable valves with
+`INVALID_OPTIONS`. A store failure becomes `STORE_UNAVAILABLE`; its outcome can
+be unknown, and repeating the same absolute patch is safe. See
+[Update limits at runtime](/docs/guides/runtime-limits/) for debt, concurrency,
+scoped, and deployment semantics.
+
+### Managed limit types
+
+```ts
+type LimitsPatch = Readonly<
+  Record<string, { readonly limit?: number; readonly burst?: number }>
+>;
+
+interface LimitsSnapshot {
+  readonly version: string;
+  readonly revision: number;
+  readonly rules: Readonly<Record<string, LimitsRule>>;
+}
+
+interface LimitsRule {
+  readonly algorithm: 'gcra' | 'fixed-window';
+  readonly intervalMs: number;
+  readonly limit: number;
+  readonly burst: number;
+  readonly scope?: string;
+}
+```
+
+`version` is opaque. `revision` starts at 1 for a registration and can restart
+after store state loss. Fixed-window snapshots always report `burst: 1`.
 
 ### stats
 

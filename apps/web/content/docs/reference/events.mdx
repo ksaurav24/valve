@@ -13,14 +13,20 @@ off(); // Remove the listener.
 Events are local to the process. Listeners run synchronously. A listener that
 throws is reported as a `warning` event and does not affect the valve.
 
-| Event         | Payload                                        | Emitted when                                                                                 |
-| ------------- | ---------------------------------------------- | -------------------------------------------------------------------------------------------- |
-| `pause`       | `{ durationMs: number; reason: PauseReason }`  | This process starts or learns of a pause.                                                    |
-| `resume`      | `{ reason: 'manual' \| 'expired' }`            | A pause ends, through `resume()` or by expiring.                                             |
-| `reject`      | `{ code: ValveErrorCode }`                     | valve rejects a job with a `ValveError`.                                                     |
-| `store-error` | `{ error: unknown; policy: StoreErrorPolicy }` | A store call fails or times out.                                                             |
-| `idle`        | `{}`                                           | The last queued or running job settles.                                                      |
-| `warning`     | `{ message: string }`                          | A listener, feedback reader, or `observe` mapper threw, or a pause was capped by `maxPause`. |
+| Event         | Payload                                        | Emitted when                                                                                                   |
+| ------------- | ---------------------------------------------- | -------------------------------------------------------------------------------------------------------------- |
+| `pause`       | `{ durationMs: number; reason: PauseReason }`  | This process starts or learns of a pause.                                                                      |
+| `resume`      | `{ reason: 'manual' \| 'expired' }`            | A pause ends, through `resume()` or by expiring.                                                               |
+| `reject`      | `{ code: ValveErrorCode }`                     | valve rejects a job with a `ValveError`.                                                                       |
+| `store-error` | `{ error: unknown; policy: StoreErrorPolicy }` | A store call fails or times out.                                                                               |
+| `idle`        | `{}`                                           | The last queued or running job settles.                                                                        |
+| `warning`     | `{ message: string }`                          | A callback threw, a pause was capped, or managed limits show seed drift, re-registration, or version rollback. |
+| `limits`      | `LimitsSnapshot`                               | This process caches a managed-limit version it had not seen.                                                   |
+
+The `limits` event is local observation, not a global commit acknowledgement.
+It can follow `getLimits`, `updateLimits`, admission, polling, or a store notice.
+Snapshots are frozen. A no-op update creates no version and no notice. See
+[Update limits at runtime](/docs/guides/runtime-limits/#observe-and-propagate-changes).
 
 ## PauseReason
 

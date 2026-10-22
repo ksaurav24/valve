@@ -39,16 +39,22 @@ export function scopeSnapshot(
   return Object.freeze(copy);
 }
 
-const compiled = new WeakMap<
-  readonly NormalizedRule[],
-  {
-    dimensions: string[];
-    fingerprint: string;
-  }
->();
+/** Order-independent fingerprint of an immutable scoped policy, without lease settings. */
+export function scopedFingerprint(rules: readonly NormalizedRule[]) {
+  return `scoped-v1:${JSON.stringify(rules.map((r) => [r.key, r.scope ?? null, r.algorithm, r.intervalMs, r.limit, r.burst]).sort((a, b) => (String(a[0]) < String(b[0]) ? -1 : 1)))}`;
+}
 
-/** Validate a bounded admission and compile deduplicated keys plus per-job rule references. */
-export function prepareScoped(request: ScopedAcquireRequest) {
+type Compiled = { dimensions: string[]; fingerprint: string };
+const compiled = new WeakMap<readonly NormalizedRule[], Compiled>();
+const compiledManaged = new WeakMap<readonly NormalizedRule[], Compiled>();
+
+/**
+ * Validate a bounded admission and compile deduplicated keys plus per-job rule references.
+ * @param managed Check structure only: managed stores compare costs and numeric
+ * ranges against their authoritative limits, not the caller's cached values.
+ */
+export function prepareScoped(request: ScopedAcquireRequest, managed = false) {
+  const cache = managed ? compiledManaged : compiled;
   const bad = (message: string): never => {
     throw failure(request?.id, 'INVALID_OPTIONS', message);
   };
@@ -69,7 +75,7 @@ export function prepareScoped(request: ScopedAcquireRequest) {
     request.jobs.length > 128
   )
     bad('Scoped requests require 1-16 rules and 1-128 jobs.');
-  let policy = compiled.get(request.rules);
+  let policy = cache.get(request.rules);
   if (!policy) {
     const names = new Set<string>();
     const keys = new Set<string>();
@@ -85,7 +91,8 @@ export function prepareScoped(request: ScopedAcquireRequest) {
         r.limit < 1 ||
         !Number.isSafeInteger(r.burst) ||
         r.burst < 1 ||
-        (r.intervalMs / r.limit) * r.burst > Number.MAX_SAFE_INTEGER / 4
+        (!managed &&
+          (r.intervalMs / r.limit) * r.burst > Number.MAX_SAFE_INTEGER / 4)
       )
         bad('Invalid normalized scoped rule or numeric range.');
       for (const value of [r.name, r.scope])
@@ -115,11 +122,11 @@ export function prepareScoped(request: ScopedAcquireRequest) {
     if (!dimensions.size) bad('Scoped requests require scoped rules.');
     policy = {
       dimensions: [...dimensions],
-      fingerprint: `scoped-v1:${JSON.stringify(request.rules.map((r) => [r.key, r.scope ?? null, r.algorithm, r.intervalMs, r.limit, r.burst]).sort((a, b) => (String(a[0]) < String(b[0]) ? -1 : 1)))}`,
+      fingerprint: scopedFingerprint(request.rules),
     };
-    // Only immutable policies can safely reuse validation and their fingerprint.
+    // Only frozen rule arrays can safely reuse validation and their fingerprint.
     if (Object.isFrozen(request.rules) && request.rules.every(Object.isFrozen))
-      compiled.set(request.rules, policy);
+      cache.set(request.rules, policy);
   }
   const lease = request.lease;
   if (
@@ -142,7 +149,10 @@ export function prepareScoped(request: ScopedAcquireRequest) {
       bad('Scoped job cost must be a positive safe integer.');
     const scopes = scopeSnapshot(request.id, policy!.dimensions, job.scopes);
     const refs = request.rules.map((rule) => {
-      if (job.cost > (rule.algorithm === 'gcra' ? rule.burst : rule.limit))
+      if (
+        !managed &&
+        job.cost > (rule.algorithm === 'gcra' ? rule.burst : rule.limit)
+      )
         bad('Scoped job cost exceeds rule capacity.');
       const key =
         rule.scope === undefined

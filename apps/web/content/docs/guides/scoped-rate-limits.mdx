@@ -134,8 +134,9 @@ await api.close();
 Each dimension is independent: `contact-42` shares its recipient budget across
 all tenants. If recipients are tenant-local, supply a stable opaque ID for the
 **tenant-recipient pair** instead. Valve does not automatically combine scope
-values. Every identity within a rule has the same configured limit and burst;
-dynamically assigned limits per identity are unsupported. For different policy
+values. Every identity within a rule has the same limit and burst. Managed
+limits can change that shared value at runtime, but cannot assign different
+values per identity. For different policy
 tiers, use separately configured Valve IDs only when their budgets are genuinely
 independent, or enforce the shared parent quota outside those instances.
 
@@ -221,17 +222,27 @@ not per identity. There are no per-recipient subscriptions.
 Changing an identity value selects a different budget immediately; queued jobs
 keep their original copied identity. It does not change the configuration
 fingerprint. Renaming a rule or scope dimension, adding/removing a rule, or
-changing its algorithm, interval, limit, or burst changes the policy and requires
-the coordinated migration below. Keep identity mappings stable during deploys.
+changing its algorithm or interval changes the structure and requires the
+coordinated migration below. Immutable `limit` and `burst` changes do too. With
+`limits: 'managed'`, use `updateLimits` for numeric changes. Keep identity
+mappings stable during deploys.
 
-Redis checks an order-independent fingerprint of rule identities, dimensions,
-algorithms, limits, intervals, bursts, and global lease settings. Different
-policies under one ID reject with `INVALID_OPTIONS`, even with fail-open enabled.
+For immutable limits, Redis checks an order-independent fingerprint of rule
+identities, dimensions, algorithms, limits, intervals, bursts, and global lease
+settings. Managed limits pin the same structure but keep numeric values in the
+authoritative snapshot. Different structures under one ID reject with
+`INVALID_OPTIONS`, even with fail-open enabled.
 Reordering identical rules is safe. Adding scopes or changing names is a policy
 change: drain old workers and follow the
 [shared quota migration procedure](/docs/guides/share-a-quota/#configuration-drift).
 Do not reset the configuration key during a rolling deployment or change the
 namespace to bypass exhausted budgets.
+
+Managed scoped rate changes migrate identities lazily rather than scanning
+their keys. A GCRA identity touched before its old expiry preserves exact debt.
+After a rate decrease, an untouched identity can expire at its earlier old
+expiry and then be treated as recovered. See
+[Update scoped limits](/docs/guides/runtime-limits/#update-scoped-limits).
 
 Admission is atomic across the configured rules; provider delivery is not
 guaranteed. Network errors, crashes, and provider rejection can occur after

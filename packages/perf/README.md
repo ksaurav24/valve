@@ -4,6 +4,11 @@
 the `valvejs` runtime, is not published, and exercises built Valve artifacts only through public
 interfaces. The binding design and statistical rules live in [RFC.md](./RFC.md).
 
+The current workloads use immutable policies. Historical latency and throughput
+results do not establish the overhead of `limits: 'managed'`, runtime updates,
+subscriber wakeups, polling rechecks, or scoped lazy migration. Add dedicated
+workloads before making managed-limit performance claims.
+
 ## Start here
 
 Use Node 24 and pnpm 11.28.4 from the repository root:

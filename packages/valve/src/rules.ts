@@ -176,6 +176,33 @@ export function normalize(options: ValveOptions) {
       ...(rule.scope === undefined ? {} : { scope: rule.scope }),
     };
   });
+  const limits = options.limits ?? 'immutable';
+  if (limits !== 'immutable' && limits !== 'managed')
+    invalid(id, 'limits is unknown', limits, 'Use immutable or managed');
+  const managed = limits === 'managed';
+  if (managed && (!rules.length || rules.some((rule) => !rule.name)))
+    throw failure(
+      id,
+      'INVALID_OPTIONS',
+      'Managed limits require at least one rate rule, and every rule needs a name.',
+    );
+  const capability = options.store?.managed;
+  if (
+    managed &&
+    options.store &&
+    (!capability ||
+      capability.version !== 1 ||
+      typeof capability.acquire !== 'function' ||
+      typeof capability.getLimits !== 'function' ||
+      typeof capability.updateLimits !== 'function' ||
+      (rules.some((rule) => rule.scope !== undefined) &&
+        typeof capability.acquireScoped !== 'function'))
+  )
+    throw failure(
+      id,
+      'INVALID_OPTIONS',
+      'Managed limits require a store with managed support (store.managed version 1).',
+    );
   const scopes = [
     ...new Set(
       rules.flatMap((rule) => (rule.scope === undefined ? [] : [rule.scope])),
@@ -189,7 +216,7 @@ export function normalize(options: ValveOptions) {
       'Scoped admission supports at most 16 rules and batch 128.',
     );
   if (
-    scoped &&
+    (scoped || managed) &&
     rules.some(
       (rule) =>
         rule.intervalMs > Number.MAX_SAFE_INTEGER / 4 ||
@@ -200,10 +227,11 @@ export function normalize(options: ValveOptions) {
     throw failure(
       id,
       'INVALID_OPTIONS',
-      'Scoped rate durations exceed the safe numeric range.',
+      'Scoped or managed rate durations exceed the safe numeric range.',
     );
   if (
     scoped &&
+    !managed &&
     options.store &&
     typeof options.store.acquireScoped !== 'function'
   )
@@ -261,9 +289,11 @@ export function normalize(options: ValveOptions) {
     );
   return {
     id,
-    rules: scoped
-      ? Object.freeze(rules.map((rule) => Object.freeze(rule)))
-      : rules,
+    rules:
+      scoped || managed
+        ? Object.freeze(rules.map((rule) => Object.freeze(rule)))
+        : rules,
+    managed,
     scopes,
     scoped,
     concurrency,

@@ -39,6 +39,8 @@ plain version numbers through npm’s default channel.
   budget.
 - **Retries rate limit responses for idempotent methods.** `wrapFetch` retries
   a 429 after the shared pause ends, without losing its place in the queue.
+- **Updates named limits at runtime.** Managed rules preserve spent budget while
+  the store applies new `limit` and GCRA `burst` values to every worker.
 - **Stays small.** Zero runtime dependencies. ESM and CommonJS builds with
   full TypeScript declarations. Bring your own `ioredis` or `node-redis`
   client.

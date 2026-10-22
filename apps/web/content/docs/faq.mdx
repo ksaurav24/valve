@@ -6,7 +6,8 @@ description: Answers to common problems, from unexpected 429s to jobs that never
 ## I still get 429 responses
 
 - **Workers do not share a budget.** Check that every worker uses a Redis store
-  on the same server, with the same `prefix`, the same `id`, and the same rules.
+  on the same server, with the same `prefix` and `id`. Immutable workers need
+  identical rules; managed workers need identical structure and use stored values.
   Without `store`, each valve has its own private memory budget.
 - **The rule is looser than the real quota.** Provider quotas often depend on
   your plan. Lower the limit, or use `burst: 1` if you raised it.

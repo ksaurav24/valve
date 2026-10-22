@@ -120,8 +120,9 @@ slots before then. Keys can disappear after:
 - `FLUSHDB` or `FLUSHALL`.
 - A restart with persistence disabled, or a crash inside the persistence loss
   window.
-- Eviction under memory pressure. Every valve key has a TTL, so `volatile-*`
-  policies can evict it as well as `allkeys-*` policies.
+- Eviction under memory pressure. Rate, pause, and lease keys have TTLs, so
+  `volatile-*` policies can evict them; `allkeys-*` can also evict persistent
+  configuration and managed-limit metadata.
 - Failover. Replication is asynchronous, so a promoted replica can miss
   admissions the old primary acknowledged.
 
@@ -141,6 +142,12 @@ These measures make loss less likely. They cannot restore lost history. If
 exceeding an external quota is costly, treat the provider's own enforcement as
 the hard limit. See [Store state loss](/docs/guarantees/#store-state-loss) and
 [Redis eviction](https://redis.io/docs/latest/develop/reference/eviction/).
+
+For reliable managed limits, `maxmemory-policy noeviction` is required. A
+flush, restart outside the persistence window, eviction, or lagging-replica
+failover can reset both spent budget and the authoritative numeric values.
+Valves emit a warning when they observe a new registration epoch or a version
+moving backwards, but applications must reconcile and reapply desired values.
 
 ## Bring your own client
 
@@ -179,6 +186,20 @@ const store = redisStore({ adapter });
   detection require a non-evicting deployment, such as `maxmemory-policy noeviction`.
   An `allkeys-*` policy can evict this key and allow a different configuration to
   be pinned; eviction of rate or lease keys can also reset active budget state.
+
+With `limits: 'managed'`, one Lua operation registers or verifies the structural
+policy, reads the authoritative numeric values, checks admission, and writes
+rate state atomically. Configured `limit` and `burst` values are numeric seeds
+only when the ID is unregistered. Managed metadata stores a registration epoch,
+revision, structural marker, current values, and GCRA conversion frame. The
+first committed managed update replaces immutable compatibility with the
+managed structural marker, so old immutable workers fail closed.
+
+`updateLimits` runs in the same authoritative Lua script family. It validates
+compare-and-set expectations before mutation, preserves fixed-window counts and
+GCRA cost-unit debt, and publishes only committed non-no-op revisions. A Redis
+timeout still leaves the commit outcome unknown because the command can finish
+after the client stops waiting.
 
 When Redis reports an incompatible admission, it rejects with `INVALID_OPTIONS`
 rather than a transient store error. Jobs reject under every `onStoreError`

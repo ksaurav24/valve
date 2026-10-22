@@ -12,17 +12,17 @@ import type { Store } from 'valvejs';
 
 ## Interface
 
-| Member                      | Required | Description                                                                          |
-| --------------------------- | -------- | ------------------------------------------------------------------------------------ |
-| `kind`                      | Yes      | Short name used in messages, such as `'memory'` or `'redis'`.                        |
-| `acquire(request)`          | Yes      | Atomically checks the pause and every rule, then grants a prefix of `costs`.         |
-| `acquireSync?(request)`     | No       | Synchronous version. Used on the hot path when present.                              |
-| `pause(id, durationMs)`     | Yes      | Extends the pause to at least `durationMs` from now. Never shortens it.              |
-| `resume(id)`                | Yes      | Removes the pause.                                                                   |
-| `release?(id, leases)`      | Global   | Releases global concurrency slots when jobs settle.                                  |
-| `renew?(id, leases, ttlMs)` | Global   | Renews unexpired slots. Returns `false` if any was lost. Never revives expired ones. |
-| `subscribe?(id, listener)`  | No       | Notifies of pause, resume, and release. Returns an unsubscribe function.             |
-| `close()`                   | Yes      | Frees resources owned by the store. Never closes user-provided clients.              |
+| Member                      | Required | Description                                                                                     |
+| --------------------------- | -------- | ----------------------------------------------------------------------------------------------- |
+| `kind`                      | Yes      | Short name used in messages, such as `'memory'` or `'redis'`.                                   |
+| `acquire(request)`          | Yes      | Atomically checks the pause and every rule, then grants a prefix of `costs`.                    |
+| `acquireSync?(request)`     | No       | Synchronous version. Used on the hot path when present.                                         |
+| `pause(id, durationMs)`     | Yes      | Extends the pause to at least `durationMs` from now. Never shortens it.                         |
+| `resume(id)`                | Yes      | Removes the pause.                                                                              |
+| `release?(id, leases)`      | Global   | Releases global concurrency slots when jobs settle.                                             |
+| `renew?(id, leases, ttlMs)` | Global   | Renews unexpired slots. Returns `false` if any was lost. Never revives expired ones.            |
+| `subscribe?(id, listener)`  | No       | Notifies of pause, resume, release, and managed-limit commits. Returns an unsubscribe function. |
+| `close()`                   | Yes      | Frees resources owned by the store. Never closes user-provided clients.                         |
 
 `release` and `renew` are required for `concurrency: { scope: 'global' }`.
 
@@ -118,3 +118,55 @@ synchronous optimization with the same semantics. Do not implement scoped
 admission as repeated calls to `acquire`: separate reservations cannot enforce
 all-or-none spending. See [Scoped rate limits](/docs/guides/scoped-rate-limits/)
 for identity requirements and operational limits.
+
+## Managed limits capability
+
+Set `store.managed` only when the store implements the complete version 1
+contract. Partial implementations are unsupported.
+
+```ts
+interface ManagedStore {
+  readonly version: 1;
+  acquire(request: ManagedAcquireRequest): Promise<ManagedAcquireResult>;
+  acquireSync?(request: ManagedAcquireRequest): ManagedAcquireResult;
+  acquireScoped?(request: ManagedScopedRequest): Promise<ManagedScopedResult>;
+  acquireScopedSync?(request: ManagedScopedRequest): ManagedScopedResult;
+  getLimits(context: ManagedContext): Promise<LimitsSnapshot>;
+  updateLimits(request: ManagedUpdateRequest): Promise<LimitsSnapshot>;
+}
+```
+
+`limits: 'managed'` requires `acquire`, `getLimits`, and `updateLimits`.
+Managed scoped configurations also require `acquireScoped`; synchronous methods
+are optional hot-path optimizations.
+
+The request's normalized rule values are registration seeds, not admission
+authority. Atomically register absent state or verify existing state, then read
+the stored limits and decide admission against those values in the same
+transaction. Pin names, scopes, algorithms, intervals, the static/scoped shape,
+and global lease configuration. Accept different numeric `limit` and `burst`
+seeds after registration, but return `INVALID_OPTIONS` for structural mismatch
+or incompatible immutable state before mutating anything.
+
+Preserve fixed-window counts and alignment across updates. For GCRA, preserve
+debt in cost units while changing its drain rate; a burst update changes the
+capacity threshold without erasing debt. Validate patches and expectations
+atomically, create no revision for a no-op, and return `LIMITS_CONFLICT` without
+changes when an expectation fails. A snapshot version must distinguish both a
+new registration epoch and every committed revision.
+
+Managed results can include a `limits` snapshot when its version differs from
+the request's `known` token. Static results set `impossible` only when the first
+ungranted job exceeds current capacity. Scoped blocked entries set
+`impossible` per job. A pause or full global lease set takes precedence over
+that classification.
+
+After a commit, publish `{ type: 'limits', version, relaxed }`, where `relaxed`
+is true when any `limit` or `burst` increased. Notices are wake-up hints only;
+correctness must not depend on delivery. Valve periodically calls `getLimits`
+during long waits even without a subscriber.
+
+Scoped GCRA state may require lazy per-identity migration rather than a scan.
+If a slower rate cannot extend the expiry of untouched live identities, document
+the early-expiry bound described in the
+[runtime limits guide](/docs/guides/runtime-limits/#update-scoped-limits).

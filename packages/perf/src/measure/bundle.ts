@@ -5,8 +5,9 @@ import { gzipSync } from 'node:zlib';
 import type { BuildIdentity } from '../core/types.ts';
 
 export const SIZE_BUDGETS = {
-  core: 12750,
-  redis: 6300,
+  // Managed admission and migration are included even for immutable consumers.
+  core: 17500,
+  redis: 12000,
   headers: 2048,
 } as const;
 export const BUNDLE_SETTINGS =

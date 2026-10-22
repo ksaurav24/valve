@@ -18,11 +18,13 @@ Check the [changelog](/changelog/) for version history and
 ## Included
 
 - `createValve` with `run`, `wrap`, `wrapFetch`, `observe`, `pause`, `resume`,
-  `stats`, `on`, `idle`, and `close`.
+  managed `getLimits` and `updateLimits`, `stats`, `on`, `idle`, and `close`.
 - GCRA and fixed-window rate rules, with several rules checked atomically
   on the store's clock.
 - Memory and Redis/Valkey stores. An optional subscriber wakes queues on
   shared pause, resume, and concurrency-slot release notifications.
+- Store-authoritative managed `limit` and GCRA `burst` updates for named static
+  and scoped rules, with compare-and-set expectations and limits events.
 - Local concurrency and global concurrency through renewable leases.
 - Local priorities, job cost, `maxQueue`, `maxWait`, and `AbortSignal`
   cancellation.
@@ -68,9 +70,9 @@ for the measurement settings, regression controls, and build-time tradeoffs.
 - Syncing a provider's reported `remaining` count into the shared budget.
   Feedback produces pauses; it does not replace the configured rate rules.
 - Cross-process fairness or queue ordering.
-- Runtime changes to rate rules. Use a
-  [coordinated policy migration](/docs/guides/share-a-quota/#changing-a-shared-quota);
-  a new instance with the same Valve ID must use the pinned policy.
+- Runtime structural changes to rule names, scopes, algorithms, or intervals.
+  Managed limits can update `limit` and GCRA `burst`; other changes use a
+  [coordinated policy migration](/docs/guides/share-a-quota/#changing-a-shared-quota).
 
 ## Known limitations
 
