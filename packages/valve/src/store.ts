@@ -90,7 +90,7 @@ export interface Store {
     leases: readonly string[],
     ttlMs: number,
   ): Promise<boolean>;
-  /** Subscribe to shared pause, resume, and slot-release notices. Returns an unsubscribe function. */
+  /** Subscribe to shared pause, resume, slot-release, and managed-limit notices. Returns an unsubscribe function. */
   subscribe?(
     id: string,
     listener: (notice: StoreNotification) => void,

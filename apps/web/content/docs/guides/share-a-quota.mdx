@@ -36,7 +36,9 @@ export const store = redisStore({ client: redis });
 ### Create the valve with the provider's quota
 
 For a credential-wide quota, use one id per credential. Every worker must use
-the same id, the same rules, and the same Redis server, database, and `prefix`.
+the same id and Redis server, database, and `prefix`. Immutable workers must use
+identical rules. Managed workers must use the same rule structure; their stored
+numeric limits are authoritative.
 If the provider has independent endpoint, resource, or model quotas, choose
 separate IDs for those scopes. See [Choose provider quota scopes](/docs/guides/provider-quota-scopes/).
 
@@ -102,15 +104,18 @@ redisStore({ client: redis, prefix: `valve:${process.env.NODE_ENV}` });
 
 ## Configuration drift
 
-The first store admission pins a versioned configuration fingerprint at
+The first store admission pins a versioned configuration at
 `PREFIX:{ID}:config`. Every later admission checks it atomically before spending
 rate budget or creating leases, including while the quota is paused.
 
-The fingerprint covers names and scope dimensions when configured, plus each
-normalized rule's algorithm, interval, limit, and
-burst, plus global concurrency scope, limit, and lease TTL. Rule order and
-equivalent durations such as `'1s'` and `1000` match. Local concurrency, queue
-settings, and lease owners can differ between workers.
+In the default `limits: 'immutable'` mode, the fingerprint covers names and
+scope dimensions when configured, plus each normalized rule's algorithm,
+interval, limit, and burst, plus global concurrency scope, limit, and lease TTL.
+With `limits: 'managed'`, the store instead pins the structural fields and makes
+the stored `limit` and GCRA `burst` authoritative. Different numeric seeds then
+do not mismatch. Rule order and equivalent durations such as `'1s'` and `1000`
+match. Local concurrency, queue settings, and lease owners can differ between
+workers.
 
 When Redis reports a mismatch, the incompatible worker's jobs reject with
 `INVALID_OPTIONS`; its callbacks do not run. This applies to all `onStoreError`
@@ -136,8 +141,10 @@ state; `volatile-*` policies protect the config key but can evict those TTL keys
 
 ### Changing a shared quota
 
-Intentional changes to rate rules or global concurrency require a coordinated
-migration. Before resetting the fingerprint:
+Intentional changes to immutable rules, managed structure, or global
+concurrency require a coordinated migration. Managed `limit` and GCRA `burst`
+changes use [`updateLimits`](/docs/guides/runtime-limits/) instead and must not
+reset Redis state. Before resetting the fingerprint:
 
 1. Stop producers and drain **every** worker using this Redis database, prefix,
    and id with `await valve.close({ drain: true })`. Disable restarts of old
@@ -182,17 +189,20 @@ limit: 1, interval: '6s' }` requires `scopes: { recipient: stableId }` on every
 - **Remove a rule:** remove its identity from callers only if no remaining rule
   uses that dimension. Wait for the old quota to recover before starting the
   reduced policy; removing a rule does not cancel provider restrictions.
-- **Change an algorithm, interval, limit, or burst:** use the same migration,
-  even for a limit increase. Valve cannot infer whether the provider permits
-  reinterpreting existing debt or counts under the new settings.
+- **Change an algorithm or interval:** use the same migration. Under immutable
+  limits, changing `limit` or `burst` also requires it. Under managed limits,
+  call `updateLimits` so fixed-window counts and GCRA cost-unit debt carry over.
 
-Routine rolling deployments with an unchanged normalized policy retain their
-budgets. Mixed-policy rolling deployments are unsupported: new workers receive
-fingerprint conflicts until the coordinated cutover. If uninterrupted processing
-is required during a policy change, use external coordination that enforces the
-common provider budget. Do not delete the fingerprint or switch IDs while old
-workers are still admitting jobs. Normal inactive-scope expiry needs no migration
-or administrative deletion.
+Routine rolling deployments with an unchanged immutable policy or unchanged
+managed structure retain their budgets. A managed worker can adopt an existing
+immutable policy only when its complete rules match and no managed update has
+committed. Drain every immutable worker before the first update; afterwards
+immutable admissions reject with `INVALID_OPTIONS`. Other mixed-policy rolling
+deployments are unsupported. If uninterrupted processing is required during a
+structural change, use external coordination that enforces the common provider
+budget. Do not delete the fingerprint or switch IDs while old workers are still
+admitting jobs. Normal inactive-scope expiry needs no migration or
+administrative deletion.
 
 ### Upgrading older Valve workers
 

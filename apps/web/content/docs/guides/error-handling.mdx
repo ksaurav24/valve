@@ -34,16 +34,17 @@ underlying error, `cause`.
 
 ## What to do for each code
 
-| Code                 | Why it happened                                            | What to do                                                        |
-| -------------------- | ---------------------------------------------------------- | ----------------------------------------------------------------- |
-| `INVALID_OPTIONS`    | An option or argument failed validation.                   | Fix the configuration. The message names the option.              |
-| `COST_EXCEEDS_LIMIT` | The job's cost is larger than a rule's `burst` or `limit`. | Lower the cost or raise `burst`. The job could never start.       |
-| `QUEUE_FULL`         | `maxQueue` jobs are already waiting.                       | Shed load, return 429 or 503 to your caller, or raise `maxQueue`. |
-| `MAX_WAIT_EXCEEDED`  | The job waited longer than `maxWait`.                      | Fail fast to your caller, or retry later.                         |
-| `ABORTED`            | The job's signal aborted before it started.                | Usually nothing. `cause` holds `signal.reason`.                   |
-| `CLOSED`             | The valve was closed before the job started.               | Expected during shutdown.                                         |
-| `STORE_UNAVAILABLE`  | The store failed and `onStoreError` is `'throw'`.          | Retry later, or switch to the default `'wait'` policy.            |
-| `LEASE_LOST`         | A global concurrency lease could not be renewed.           | Treat the job's outcome as unknown. Make the work idempotent.     |
+| Code                 | Why it happened                                                     | What to do                                                            |
+| -------------------- | ------------------------------------------------------------------- | --------------------------------------------------------------------- |
+| `INVALID_OPTIONS`    | An option or argument failed validation.                            | Fix the configuration. The message names the option.                  |
+| `COST_EXCEEDS_LIMIT` | The job's cost is larger than a rule's `burst` or `limit`.          | Lower the cost or raise `burst`. The job could never start.           |
+| `QUEUE_FULL`         | `maxQueue` jobs are already waiting.                                | Shed load, return 429 or 503 to your caller, or raise `maxQueue`.     |
+| `MAX_WAIT_EXCEEDED`  | The job waited longer than `maxWait`.                               | Fail fast to your caller, or retry later.                             |
+| `ABORTED`            | The job's signal aborted before it started.                         | Usually nothing. `cause` holds `signal.reason`.                       |
+| `CLOSED`             | The valve was closed before the job started.                        | Expected during shutdown.                                             |
+| `STORE_UNAVAILABLE`  | Admission failed under `'throw'`, or a managed control call failed. | Retry or read the current snapshot; an update outcome can be unknown. |
+| `LEASE_LOST`         | A global concurrency lease could not be renewed.                    | Treat the job's outcome as unknown. Make the work idempotent.         |
+| `LIMITS_CONFLICT`    | A managed update's `expect` value did not match.                    | Read the current snapshot and retry only after reconciling it.        |
 
 ## Store outages
 
@@ -69,6 +70,11 @@ as an outage. Restore matching settings or follow
 [Changing a shared quota](/docs/guides/share-a-quota/#changing-a-shared-quota).
 An outage or timeout can hide the mismatch response. With `'open'`, those jobs
 run without shared admission checks, as they do during any other store outage.
+
+Managed `getLimits()` and `updateLimits()` do not use `onStoreError`; a store
+failure rejects them with `STORE_UNAVAILABLE`. A timed-out update can still
+commit. Repeat the same absolute patch safely, or read the current snapshot and
+use `expect` to avoid overwriting another writer.
 
 ## Errors in callbacks
 

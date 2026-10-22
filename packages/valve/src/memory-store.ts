@@ -11,6 +11,7 @@ import {
   managedBatch,
   marker,
   pin,
+  precise,
   register,
   snapshot,
   theta,
@@ -279,32 +280,7 @@ export function memoryStore(options: MemoryStoreOptions = {}): Store {
     if (entries.size) scopedStates.set(request.id, entries);
     if (slots.size) leases.set(request.id, slots);
     else leases.delete(request.id);
-    // Sweep a bounded number across all quota domains, including inactive ones.
-    {
-      sweep ??= scopedEntries();
-      for (
-        let visited = 0;
-        visited < Math.max(32, plan.keys.length * 2);
-        visited++
-      ) {
-        const next = sweep.next();
-        if (next.done) {
-          sweep = undefined;
-          break;
-        }
-        const [domain, entries, key] = next.value;
-        if ((entries.get(key)?.expires ?? 0) <= now) entries.delete(key);
-        if (!entries.size) {
-          scopedStates.delete(domain);
-          if (
-            !leases.has(domain) &&
-            !pauses.has(domain) &&
-            !managed.has(domain)
-          )
-            policies.delete(domain);
-        }
-      }
-    }
+    sweepScoped(plan.keys.length, now);
     return {
       grantedIndexes,
       blocked,
@@ -312,11 +288,34 @@ export function memoryStore(options: MemoryStoreOptions = {}): Store {
       ...(request.lease ? { leases: tokens } : {}),
     };
   }
+  /** Sweep a bounded number across quota domains, including inactive ones. */
+  function sweepScoped(keyCount: number, now: number) {
+    sweep ??= scopedEntries();
+    for (let visited = 0; visited < Math.max(32, keyCount * 2); visited++) {
+      const next = sweep.next();
+      if (next.done) {
+        sweep = undefined;
+        break;
+      }
+      const [domain, entries, key] = next.value;
+      if ((entries.get(key)?.expires ?? 0) <= now) entries.delete(key);
+      if (!entries.size) {
+        scopedStates.delete(domain);
+        if (!leases.has(domain) && !pauses.has(domain) && !managed.has(domain))
+          policies.delete(domain);
+      }
+    }
+  }
   /**
    * Resolve the managed limits for a request, registering, adopting, or restoring
    * its pin, and reject structural or immutable conflicts before any write.
    */
-  function resolve(context: ManagedContext, scoped: boolean, now: number) {
+  function resolve(
+    context: ManagedContext,
+    scoped: boolean,
+    now: number,
+    commit = true,
+  ) {
     const id = context.id;
     const own = scoped ? policies : staticIds;
     if ((scoped ? staticIds : policies).has(id))
@@ -357,9 +356,16 @@ export function memoryStore(options: MemoryStoreOptions = {}): Store {
           context.rules.map((rule) => [rule.name!, register(rule)]),
         ),
       };
-      managed.set(id, state);
     }
-    if (current === undefined) own.set(id, state.updated ? mark : state.pin);
+    if ([...state.rules.values()].some((frame) => !precise(frame, now)))
+      throw failure(
+        id,
+        'INVALID_OPTIONS',
+        'Managed GCRA limits exceed the safe numeric precision. Use a lower rate or a coordinated migration.',
+      );
+    if (commit) managed.set(id, state);
+    if (commit && current === undefined)
+      own.set(id, state.updated ? mark : state.pin);
     return state;
   }
   function version(state: { epoch: number; revision: number }) {
@@ -402,6 +408,12 @@ export function memoryStore(options: MemoryStoreOptions = {}): Store {
     const now = clock();
     const state = resolve(request, true, now);
     const frames = plan.rules.map((rule) => state.rules.get(rule.name!)!);
+    if (frames.some((frame) => !precise(frame, now)))
+      throw failure(
+        request.id,
+        'INVALID_OPTIONS',
+        'Managed GCRA limits exceed the safe numeric precision. Use a lower rate or a coordinated migration.',
+      );
     const entries =
       scopedStates.get(request.id) ?? new Map<string, RuleState>();
     const current = plan.keys.map((key) => {
@@ -482,6 +494,7 @@ export function memoryStore(options: MemoryStoreOptions = {}): Store {
     if (entries.size) scopedStates.set(request.id, entries);
     if (slots.size) leases.set(request.id, slots);
     else leases.delete(request.id);
+    sweepScoped(plan.keys.length, now);
     return {
       grantedIndexes,
       blocked,
@@ -504,8 +517,12 @@ export function memoryStore(options: MemoryStoreOptions = {}): Store {
             'limits expect',
           );
     const now = clock();
-    const state = resolve(request, scoped, now);
+    const state = resolve(request, scoped, now, false);
     const result = applyPatch(request.id, state.rules, patch, expect, now);
+    managed.set(request.id, state);
+    const own = scoped ? policies : staticIds;
+    if (!own.has(request.id))
+      own.set(request.id, state.updated ? state.structure : state.pin);
     if (result.changed) {
       state.revision++;
       state.updated = true;

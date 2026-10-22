@@ -111,7 +111,9 @@ Verification on Node 24.21.0 and pnpm 11.28.4:
   checks and 13 micro tasks, including the individual header readers.
 - `scoped-1792395638310-6a3a3b1f` passed 162 scoped scenarios and 12 contention scenarios
   across both artifacts and memory/Redis 7.4/Valkey 8, at the original 100 iterations.
-  Policies are immutable, matching `createValve`, without importing private helpers.
+  Policies are immutable, matching the default `createValve` mode, without
+  importing private helpers. These results do not measure managed-limit
+  admission, update propagation, polling, or scoped lazy migration.
 - `c1-1792395634531-8e4e7410` passed memory/Redis/Valkey deadline rejection. `perf-ownership-final-node24` completed
   all 34 selected smoke cells with safety PASS and exit 0.
 

@@ -194,13 +194,39 @@ export function createValve(options: ValveOptions): Valve {
    * @returns Whether it raises any limit or burst over the previous cache.
    */
   function accept(next: LimitsSnapshot | undefined, issued: number) {
+    if (!next) return false;
     if (
-      !next ||
       typeof next.version !== 'string' ||
+      !/^\d+\.\d+$/.test(next.version) ||
+      !Number.isSafeInteger(Number(next.version.split('.')[0])) ||
+      !Number.isSafeInteger(next.revision) ||
+      next.revision < 1 ||
+      Number(next.version.split('.')[1]) !== next.revision ||
       !next.rules ||
-      next.version === limits?.version
+      typeof next.rules !== 'object' ||
+      Object.keys(next.rules).length !== rules.length ||
+      rules.some((rule) => {
+        const value = next.rules[rule.name!];
+        return (
+          !Object.hasOwn(next.rules, rule.name!) ||
+          !value ||
+          value.algorithm !== rule.algorithm ||
+          value.intervalMs !== rule.intervalMs ||
+          value.scope !== rule.scope ||
+          !Number.isSafeInteger(value.limit) ||
+          value.limit < 1 ||
+          !Number.isSafeInteger(value.burst) ||
+          value.burst < 1 ||
+          (rule.algorithm === 'fixed-window' && value.burst !== 1)
+        );
+      })
     )
-      return false;
+      throw failure(
+        id,
+        'INVALID_OPTIONS',
+        'Store returned invalid managed limits.',
+      );
+    if (next.version === limits?.version) return false;
     const previous = limits;
     const order = previous
       ? compareVersions(next.version, previous.version)
@@ -264,16 +290,16 @@ export function createValve(options: ValveOptions): Valve {
       limitsWatch = undefined;
       if (!waiting.size || closingStore || pausedUntil > Date.now()) return;
       const issued = ++limitsIssued;
-      void store.managed!.getLimits(context()).then(
-        (next) => {
+      void Promise.resolve()
+        .then(() => store.managed!.getLimits(context()))
+        .then((next) => {
           if (accept(next, issued)) relax();
           else if (waiting.size) watchLimits(wakeAt);
-        },
-        (error) => {
+        })
+        .catch((error) => {
           reportStore(error);
           if (waiting.size) watchLimits(wakeAt);
-        },
-      );
+        });
     }, limitsPeriod);
   }
   /** Reject a job that exceeds a rule's current capacity and so can never start. */
@@ -503,14 +529,46 @@ export function createValve(options: ValveOptions): Valve {
   ) {
     const now = Date.now();
     if (
-      config.global &&
-      result.granted > 0 &&
-      (result.leases?.length !== result.granted ||
-        new Set(result.leases).size !== result.granted)
+      config.managed &&
+      (!result ||
+        !Number.isSafeInteger(result.granted) ||
+        result.granted < 0 ||
+        result.granted > heads.length ||
+        !Number.isSafeInteger(result.retryAfterMs) ||
+        result.retryAfterMs < 0 ||
+        !Number.isSafeInteger(result.pausedMs) ||
+        result.pausedMs < 0)
     ) {
       storeError(
         heads,
-        new Error('Store returned invalid global lease tokens'),
+        failure(
+          id,
+          'INVALID_OPTIONS',
+          'Store returned invalid managed grants.',
+        ),
+      );
+      return;
+    }
+    if (
+      config.global &&
+      result.granted > 0 &&
+      ((config.managed && !Array.isArray(result.leases)) ||
+        result.leases?.length !== result.granted ||
+        new Set(result.leases).size !== result.granted ||
+        (config.managed &&
+          result.leases.some(
+            (token) => typeof token !== 'string' || token.length === 0,
+          )))
+    ) {
+      storeError(
+        heads,
+        config.managed
+          ? failure(
+              id,
+              'INVALID_OPTIONS',
+              'Store returned invalid global lease tokens',
+            )
+          : new Error('Store returned invalid global lease tokens'),
       );
       return;
     }
@@ -543,7 +601,8 @@ export function createValve(options: ValveOptions): Valve {
     const cannot = (result as ManagedAcquireResult).impossible === true;
     for (let i = 0; i < heads.length; i++) {
       const job = heads[i]!;
-      if (cannot && i === result.granted) impossible(job);
+      if (cannot && i === result.granted && version === noticeVersion)
+        impossible(job);
       else if (i < result.granted) {
         if (leases) {
           job.lease = result.leases![i]!;
@@ -649,7 +708,13 @@ export function createValve(options: ValveOptions): Valve {
     ) {
       storeError(
         heads,
-        new Error('Store returned invalid scoped grants or lease tokens'),
+        config.managed
+          ? failure(
+              id,
+              'INVALID_OPTIONS',
+              'Store returned invalid scoped grants or lease tokens',
+            )
+          : new Error('Store returned invalid scoped grants or lease tokens'),
       );
       return;
     }
@@ -691,7 +756,12 @@ export function createValve(options: ValveOptions): Valve {
     }
     for (const entry of (result as ManagedScopedResult).blocked) {
       const job = heads[entry.index]!;
-      if (entry.impossible && job.state === 'queued') impossible(job);
+      if (
+        entry.impossible &&
+        version === noticeVersion &&
+        job.state === 'queued'
+      )
+        impossible(job);
       if (job.state !== 'queued' || missed(job)) continue;
       if (version !== noticeVersion) enqueueAgain(job);
       else {
@@ -859,7 +929,16 @@ export function createValve(options: ValveOptions): Valve {
           gate.acquireScoped!(scopedRequest).then(
             (value) => {
               admitted();
-              handleScoped(live, observed(value, issued), acquiredAt, version);
+              try {
+                handleScoped(
+                  live,
+                  observed(value, issued),
+                  acquiredAt,
+                  version,
+                );
+              } catch (error) {
+                storeError(live, error);
+              }
             },
             (error) => {
               admitted();
@@ -900,13 +979,17 @@ export function createValve(options: ValveOptions): Valve {
     result.then(
       (value) => {
         admitted();
-        handle(
-          live,
-          observed(value, issued),
-          acquiredAt,
-          version,
-          acquiredTime,
-        );
+        try {
+          handle(
+            live,
+            observed(value, issued),
+            acquiredAt,
+            version,
+            acquiredTime,
+          );
+        } catch (error) {
+          storeError(live, error);
+        }
       },
       (error) => {
         admitted();
@@ -1053,7 +1136,7 @@ export function createValve(options: ValveOptions): Valve {
         throw failure(
           id,
           'STORE_UNAVAILABLE',
-          'store failed during a managed limits call. If it timed out, an update may still apply; repeating the same patch is safe.',
+          'store failed during a managed limits call. If it timed out, an update may still apply. Read the current limits and use expect when retrying to avoid overwriting another writer.',
           error,
         );
       });
@@ -1352,7 +1435,13 @@ export function createValve(options: ValveOptions): Valve {
         );
       const issued = ++limitsIssued;
       return call(() => store.managed!.getLimits(context())).then((next) => {
-        accept(next, issued);
+        if (!next)
+          throw failure(
+            id,
+            'INVALID_OPTIONS',
+            'Store returned no managed limits.',
+          );
+        if (accept(next, issued)) relax();
         return next;
       });
     },
@@ -1366,7 +1455,9 @@ export function createValve(options: ValveOptions): Valve {
           );
         if (
           updateOptions !== undefined &&
-          (!updateOptions || typeof updateOptions !== 'object')
+          (!updateOptions ||
+            typeof updateOptions !== 'object' ||
+            Array.isArray(updateOptions))
         )
           invalid(
             id,

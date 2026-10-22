@@ -122,14 +122,21 @@ names, and scoped rules also include the job identity. State keys alone do not
 make a policy change compatible: Redis checks a persistent fingerprint of the
 complete policy before every admission.
 
-Changing a name, scope dimension, algorithm, interval, limit, burst, or global
-lease setting rejects incompatible workers with `INVALID_OPTIONS`. Adding or
-removing a rule also changes the fingerprint. Reordering identical rules or
-using equivalent duration syntax is safe during a rolling deployment.
+In the default immutable mode, changing a name, scope dimension, algorithm,
+interval, limit, burst, or global lease setting rejects incompatible workers
+with `INVALID_OPTIONS`. Adding or removing a rule also changes the fingerprint.
+Reordering identical rules or using equivalent duration syntax is safe during a
+rolling deployment.
 
-For policy changes, stop and drain old workers, allow existing budgets and the
-provider quota to recover, then reset only the fingerprint and deploy one
-consistent policy. Follow the practical
+With `limits: 'managed'`, named rules keep the same structure while
+`updateLimits` changes `limit` and GCRA `burst` without resetting fixed-window
+counts or GCRA cost-unit debt. It does not change algorithms, intervals, scopes,
+names, or global concurrency. See
+[Update limits at runtime](/docs/guides/runtime-limits/).
+
+For immutable policy changes and managed structural changes, stop and drain old
+workers, allow existing budgets and the provider quota to recover, then reset
+only the fingerprint and deploy one consistent policy. Follow the practical
 [quota migration procedure](/docs/guides/share-a-quota/#changing-a-shared-quota).
 Do not delete active rate keys or introduce a fresh namespace to bypass spent
 quota.

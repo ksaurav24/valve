@@ -42,8 +42,9 @@ interface and never owns its connection. Disable command-client offline queues
 (`enableOfflineQueue: false` for ioredis, `disableOfflineQueue: true` for
 node-redis) to reject commands issued while disconnected. Store timeouts do not
 cancel commands already sent; see [timeouts and reconnection](https://valvejs.vercel.app/docs/reference/redis-store/#timeouts-and-reconnection).
-Each worker uses the same server,
-prefix, id, and rules. The library has zero runtime and peer dependencies.
+Each worker uses the same server, prefix, and id. Immutable workers use the
+same complete rules; managed workers use the same structure and stored numeric
+values. The library has zero runtime and peer dependencies.
 
 `wrapFetch` retries rate limit responses for GET, HEAD, OPTIONS, PUT and
 DELETE by default. POST and PATCH require `retryUnsafeMethods: true` after
@@ -60,6 +61,7 @@ shared cooldowns; `retries: 0` disables automatic retries.
 - Supports GCRA pacing, explicit fixed windows, and several rules checked together.
 - Spends shared and per-recipient or per-tenant budgets atomically; eligible
   identities proceed while others wait.
+- Updates named rule limits at runtime without resetting spent budget.
 - Provides ESM and CommonJS entry points with TypeScript declarations.
 
 ## Choose the right tool
@@ -113,6 +115,32 @@ Blocked recipients let other eligible jobs proceed. Supply opaque application
 IDs, not phone numbers or secrets. Feedback and pauses remain Valve-wide.
 See [Scoped rate limits](https://valvejs.vercel.app/docs/guides/scoped-rate-limits/)
 for wrappers, store requirements, deployment safety, and limits.
+
+## Runtime limit updates
+
+Opt in with named rules and `limits: 'managed'`. Configured numeric values seed
+only a new ID; the store is authoritative afterwards.
+
+```ts
+const api = createValve({
+  id: 'partner:credential-42',
+  limits: 'managed',
+  rate: { name: 'throughput', limit: 100, interval: '1s', burst: 10 },
+  store,
+});
+
+const current = await api.getLimits();
+await api.updateLimits(
+  { throughput: { limit: 200, burst: 20 } },
+  { expect: { throughput: { limit: current.rules.throughput.limit } } },
+);
+```
+
+Updates preserve fixed-window counts and GCRA cost-unit debt. Names, scopes,
+algorithms, intervals, and global concurrency remain fixed. Drain immutable
+workers before the first managed update, and use Redis with
+`maxmemory-policy noeviction`. See
+[Update limits at runtime](https://valvejs.vercel.app/docs/guides/runtime-limits/).
 
 ## Documentation and development
 

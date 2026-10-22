@@ -9,13 +9,13 @@ in-process and can share limits through Redis. The main differences:
 - valve describes limits as **rate rules** (`limit` per `interval`) instead of
   `minTime` and reservoirs.
 - valve reads **provider rate limit headers** and pauses every worker.
-- valve uses **your** Redis client, and each worker passes its own
-  configuration. Redis stores a compatibility fingerprint and rejects workers
-  with different policies; it does not distribute policy updates.
+- valve uses **your** Redis client, and each worker passes its own structure.
+  Immutable rules must match completely. Managed named rules can read and
+  update authoritative numeric limits in Redis.
 - Crashed workers' **global concurrency slots** expire automatically through
   leases, without per-job `expiration`.
-- valve has no callback API, no `Group` class, and no runtime
-  `updateSettings`.
+- valve has no callback API, no `Group` class, and no general runtime
+  `updateSettings`; managed limits update only `limit` and GCRA `burst`.
 
 There is no compatibility layer. Translate pacing and quota policies explicitly;
 reservoir reset times and chained reservations can change behavior.
@@ -80,7 +80,7 @@ See [Methods](#methods).
 ### Move Redis configuration into your code
 
 Create the Redis client yourself and pass it to `redisStore`. Make sure every
-worker uses the same id and the same rules.
+worker uses the same ID and immutable rules, or the same managed structure.
 
 </Step>
 <Step>
@@ -167,22 +167,22 @@ rate: { limit: 2, interval: '1s', burst: 40 }
 
 ## Methods
 
-| Bottleneck                               | valve                                                              |
-| ---------------------------------------- | ------------------------------------------------------------------ |
-| `schedule(fn, ...args)`                  | `run(() => fn(...args))`                                           |
-| `schedule(options, fn, ...args)`         | `run(() => fn(...args), options)`                                  |
-| `wrap(fn)`                               | `wrap(fn)`                                                         |
-| `wrapped.withOptions(options, ...args)`  | `run(() => fn(...args), options)`, or a second `wrap(fn, options)` |
-| `submit(fn, ...args, callback)`          | No callback API. Use `run`, or `util.callbackify`.                 |
-| `stop({ dropWaitingJobs: true })`        | `close()`                                                          |
-| `stop({ dropWaitingJobs: false })`       | `close({ drain: true })`                                           |
-| `counts()`, `queued()`, `running()`      | `stats()`                                                          |
-| `empty()`                                | `stats().queued === 0`                                             |
-| `on('idle')` or awaiting idle            | `idle()`, or `on('idle')`                                          |
-| `updateSettings(options)`                | No runtime policy mutation. Coordinate a quota migration.          |
-| `incrementReservoir`, `currentReservoir` | No equivalent.                                                     |
-| `chain(limiter)`                         | Use one atomic policy with scoped rules; see below.                |
-| `jobStatus(id)`, `jobs(status)`          | No equivalent.                                                     |
+| Bottleneck                               | valve                                                                  |
+| ---------------------------------------- | ---------------------------------------------------------------------- |
+| `schedule(fn, ...args)`                  | `run(() => fn(...args))`                                               |
+| `schedule(options, fn, ...args)`         | `run(() => fn(...args), options)`                                      |
+| `wrap(fn)`                               | `wrap(fn)`                                                             |
+| `wrapped.withOptions(options, ...args)`  | `run(() => fn(...args), options)`, or a second `wrap(fn, options)`     |
+| `submit(fn, ...args, callback)`          | No callback API. Use `run`, or `util.callbackify`.                     |
+| `stop({ dropWaitingJobs: true })`        | `close()`                                                              |
+| `stop({ dropWaitingJobs: false })`       | `close({ drain: true })`                                               |
+| `counts()`, `queued()`, `running()`      | `stats()`                                                              |
+| `empty()`                                | `stats().queued === 0`                                                 |
+| `on('idle')` or awaiting idle            | `idle()`, or `on('idle')`                                              |
+| `updateSettings(options)`                | `updateLimits` for managed numeric values; migrate structural changes. |
+| `incrementReservoir`, `currentReservoir` | No equivalent.                                                         |
+| `chain(limiter)`                         | Use one atomic policy with scoped rules; see below.                    |
+| `jobStatus(id)`, `jobs(status)`          | No equivalent.                                                         |
 
 <Callout type="warn" title="run passes a context, not your arguments">
   `run(fn)` calls `fn({ signal })`. Do not pass a function that expects its own
@@ -255,8 +255,8 @@ independent reservations and does **not** provide this guarantee.
 
 The tradeoffs are explicit:
 
-- Every job must supply every configured identity. Rules are static; scoped
-  identities cannot select dynamically different limits or omit rules.
+- Every job must supply every configured identity. Rule structure is static;
+  managed numeric values apply uniformly to all identities in that rule.
 - All keys in an atomic Redis operation must share a Cluster slot. A hot
   business cannot spread its atomic budget over several shards.
 - Scope dimensions select rate counters, not independent concurrency limits
@@ -338,7 +338,7 @@ const apiFetch = api.wrapFetch(fetch, { retries: 2 });
 
 | Bottleneck behavior                                       | valve behavior                                                           |
 | --------------------------------------------------------- | ------------------------------------------------------------------------ |
-| The first limiter stores its settings in Redis.           | Each worker passes its own rules. Keep them identical.                   |
+| The first limiter stores its settings in Redis.           | Immutable rules match; managed workers share stored numeric values.      |
 | `maxConcurrent` is cluster-wide.                          | `concurrency: n` is per process. Use `scope: 'global'` for cluster-wide. |
 | Set `expiration` so crashed workers release slots.        | Leases expire after `leaseTtl` automatically.                            |
 | Priorities, queue order, and `highWater` are per limiter. | Same. Queues are local.                                                  |

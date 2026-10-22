@@ -1,0 +1,269 @@
+---
+title: Update limits at runtime
+description: Change named rule limits safely across workers without resetting spent budget.
+---
+
+Use managed limits when a provider changes an existing quota while your workers
+are running. The store becomes authoritative for each named rule's `limit` and
+GCRA `burst`; rule names, scopes, algorithms, intervals, and global concurrency
+remain fixed.
+
+Managed limits are opt-in. The default `limits: 'immutable'` behavior is
+unchanged and still requires identical complete rules on every worker.
+
+## Configure managed limits
+
+Every managed rule needs a unique `name`. The `limit` and `burst` supplied to
+`createValve` are registration seeds: the first worker for a new ID installs
+them. Once the ID exists, stored values win, even when another worker starts
+with different numeric seeds.
+
+```ts title="limits.ts"
+import { createValve } from 'valvejs';
+import { redisStore } from 'valvejs/redis';
+
+const api = createValve({
+  id: 'partner:credential-42',
+  limits: 'managed',
+  rate: [
+    { name: 'second', limit: 100, interval: '1s', burst: 10 },
+    {
+      name: 'day',
+      limit: 100_000,
+      interval: '24h',
+      algorithm: 'fixed-window',
+    },
+  ],
+  store: redisStore({ client: redis, subscriber }),
+});
+```
+
+All workers sharing the ID must still use the same rule names, scopes,
+algorithms, intervals, and global concurrency settings. Different managed
+`limit` and `burst` seeds are accepted; the worker emits a `warning` when its
+first stored snapshot differs from them.
+
+The built-in memory and Redis stores support managed limits. A custom store
+must implement the complete [`store.managed` version 1 capability](/docs/reference/custom-stores/#managed-limits-capability).
+
+## Read and update limits
+
+`getLimits()` reads the authoritative snapshot and registers the configured
+seeds first if the store has no managed limits for this ID.
+
+```ts
+const before = await api.getLimits();
+console.log(before.version, before.rules.second.limit);
+
+const after = await api.updateLimits({
+  second: { limit: 200, burst: 20 },
+  day: { limit: 120_000 },
+});
+```
+
+Patches contain absolute values, not increments. Omitted rules and fields keep
+their current values. A patch that changes nothing returns the current snapshot
+without advancing its version and emits no notice.
+
+Only `limit` and GCRA `burst` can change. Unknown rules or fields, non-positive
+or non-safe-integer values, `burst` on a fixed-window rule, and calls on an
+immutable valve reject with `INVALID_OPTIONS` before a store call.
+
+Snapshots are frozen and have this shape:
+
+```ts
+interface LimitsSnapshot {
+  readonly version: string; // Opaque registration epoch and revision.
+  readonly revision: number; // Starts at 1 for each registration epoch.
+  readonly rules: Readonly<
+    Record<
+      string,
+      {
+        readonly algorithm: 'gcra' | 'fixed-window';
+        readonly intervalMs: number;
+        readonly limit: number;
+        readonly burst: number; // Always 1 for fixed-window rules.
+        readonly scope?: string;
+      }
+    >
+  >;
+}
+```
+
+Treat `version` as an opaque comparison token. Do not sort or parse it.
+`revision` can restart after store state loss or failover.
+
+## Prevent lost updates with expect
+
+Without `expect`, writes to the same field are last-writer-wins. Updates to
+different fields do not overwrite one another because patches are partial.
+
+Use `expect` for compare-and-set behavior:
+
+```ts
+const current = await api.getLimits();
+
+const next = await api.updateLimits(
+  { second: { limit: 250 } },
+  { expect: { second: { limit: current.rules.second.limit } } },
+);
+```
+
+Each expected field must equal its current value or already equal the patched
+value. The second condition makes the same update safe to repeat after an
+unknown outcome. Otherwise nothing changes and the call rejects with
+`LIMITS_CONFLICT`. Read a fresh snapshot, decide whether the competing value is
+acceptable, and retry with a new expectation.
+
+A store timeout rejects with `STORE_UNAVAILABLE`, but the update may have
+committed. Repeating the same absolute patch is a no-op if those values still
+apply. If another writer changed the same field in between, an unconditional
+retry overwrites it. Use `expect` when that would be incorrect.
+
+## Understand admission after an update
+
+The store reads the committed limits inside the same atomic operation that
+checks and spends budget. Redis performs this in the authoritative Lua script;
+workers never enforce their cached numeric seeds. Before the first update,
+managed admission uses the same rate math as immutable admission.
+
+Managed GCRA checks that its virtual-time coordinates can still represent
+individual cost units. Extremely large rates, bursts, or accumulated frame
+coordinates reject with `INVALID_OPTIONS` before spending budget. This check
+also runs during updates and admission; use a lower rate or a coordinated
+migration if it triggers. It never falls back to unrestricted admission under
+`onStoreError: 'open'`.
+
+Updates do not revoke work that is already granted or running. Queued work uses
+the new values at its next store admission. New values also do not impose a
+retroactive bound on starts admitted under an older value.
+
+- A fixed window keeps its current window alignment and spent count. Lowering
+  the limit below that count blocks further starts until the next window.
+- GCRA keeps outstanding debt in cost units and drains it at the new rate.
+  For example, after taking 10 units at 10/s with `burst: 10`, changing to 20/s
+  permits the next unit after 50 ms; changing to 1/s permits it after 1 second.
+  Changing `burst` changes capacity, not existing debt.
+- A job whose cost exceeds the current GCRA `burst` or fixed-window `limit`
+  rejects at admission with `COST_EXCEEDS_LIMIT`. This check uses the store's
+  current values, so submission-time cache state is not authoritative. An
+  active shared pause or a full global lease set can block the job before this
+  classification.
+
+For an unscoped queue, only the first ungranted job is classified as impossible
+in each store batch; later jobs return to the queue for a later admission.
+
+## Update scoped limits
+
+The same patch changes the value for every identity under a scoped rule:
+
+```ts
+const messages = createValve({
+  id: 'messages:business-42',
+  limits: 'managed',
+  rate: [
+    { name: 'shared', limit: 80, interval: '1s', burst: 8 },
+    {
+      name: 'recipient',
+      scope: 'recipient',
+      limit: 1,
+      interval: '6s',
+    },
+  ],
+  store,
+});
+
+await messages.updateLimits({ recipient: { limit: 2 } });
+await messages.run(() => sendMessage(), {
+  scopes: { recipient: 'contact-42' },
+});
+```
+
+Scoped Redis counters migrate lazily; Valve does not scan every identity when a
+rate changes. After a rate decrease, an identity touched before its old GCRA key
+expiry has its expiry extended and keeps exact debt. An identity with no
+admission attempt before that old expiry is treated as fully recovered at that
+time, which can be earlier than recovery under the new slower rate. This is the
+bounded cold-identity limitation of managed scoped decreases. Fixed-window
+counts and alignment are preserved.
+
+The forgiven debt is smaller than the burst in effect at that identity's last
+grant, and no larger than the rule's largest historical burst. A window that
+starts after the last update still obeys the new GCRA bound of
+`limit + burst - 1` cost units; a window that straddles an update can include
+work admitted under the earlier values. Scheduler lag can also make an
+otherwise active identity miss its old expiry.
+
+## Observe and propagate changes
+
+Listen for `limits` to observe a snapshot version that this process had not
+seen:
+
+```ts
+api.on('limits', (snapshot) => {
+  logger.info(
+    { version: snapshot.version, rules: snapshot.rules },
+    'limits changed',
+  );
+});
+
+api.on('warning', ({ message }) => logger.warn(message));
+```
+
+The updating process wakes its own queue. A store notice for a relaxing change
+(a `limit` or `burst` increase) wakes other waiting valves with up to 25 ms of
+jitter; restrictive changes do not need an early wake because every eventual
+admission reads authoritative values. Notifications are only wake-up hints.
+
+As a backstop, a valve with a wait farther away than 1 second re-reads limits
+when the store has no subscriber. With a subscriber, that interval is 10
+seconds. A newly observed relaxation re-evaluates waiting jobs. There is no
+subscriber per scoped identity.
+
+Warnings also report a first-snapshot seed difference, a new registration epoch
+after state loss, or a version that moved backwards after failover or restore.
+On either state-loss warning, reconcile the snapshot and reapply the intended
+values with `expect`; do not assume an earlier update survived.
+
+## Deploy managed limits safely
+
+Immutable and managed workers can temporarily share an ID only while the
+stored policy has never received a managed update and their complete rules are
+identical. A managed worker adopts that existing state without resetting spent
+budget. Different immutable numeric values still reject immediately.
+
+This temporary coexistence relies on the pinned-configuration guard, present in
+plain Valve releases from `0.4.0` onward. Upgrade unguarded older binaries before
+adoption; they cannot be relied on to fail closed after a managed update.
+
+Before the **first** managed update, stop and drain every immutable worker for
+the ID. That first committed update pins the managed structural policy; any
+remaining immutable worker then rejects admissions with `INVALID_OPTIONS`.
+Changing names, scopes, algorithms, intervals, the static/scoped shape, or
+global concurrency still requires the coordinated
+[quota migration procedure](/docs/guides/share-a-quota/#changing-a-shared-quota).
+
+Never delete Redis keys to apply a runtime update. Use `updateLimits` so spent
+fixed-window counts and GCRA debt carry forward.
+
+## Plan for Redis state loss
+
+Managed metadata and rate history must survive together. Use a dedicated
+Redis/Valkey deployment with `maxmemory-policy noeviction`, persistence, memory
+headroom, and failover monitoring. Eviction, flushes, restarts outside the
+persistence window, or promotion of a lagging replica can reset the registration
+epoch and numeric limits as well as spent budget. Valve warns when it observes
+the new epoch or a backwards version, but it cannot restore lost state.
+
+See [Redis durability](/docs/reference/redis-store/#durability) for the limits
+of persistence and replication.
+
+## Performance considerations
+
+Managed admission resolves the authoritative snapshot and rate frame inside
+each atomic store decision. Updates and reads are control-plane operations, but
+the managed check is also present on the admission hot path. Notifications and
+polling can add rechecks when queues wait. Benchmark your own Redis latency,
+rule count, batch size, scoped identity distribution, and update frequency;
+the checked-in historical benchmark results cover immutable policies and do not
+establish managed-limit overhead or throughput.

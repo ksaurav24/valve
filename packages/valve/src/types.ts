@@ -33,7 +33,7 @@ export type Duration =
  * neighboring windows can together admit up to `2 * limit` in a span of
  * `interval`.
  *
- * Two rules in one valve may not share the same `algorithm` and `interval`.
+ * Unnamed rules in one valve may not share the same `algorithm` and `interval`.
  *
  * @example
  * // HubSpot private app on Professional: 190 requests per 10 seconds
@@ -315,7 +315,7 @@ export interface ValveEventMap {
   'store-error': { readonly error: unknown; readonly policy: StoreErrorPolicy };
   idle: Record<string, never>;
   warning: { readonly message: string };
-  /** Managed limits this process has not seen before, from any store reply or notice. */
+  /** Managed limits this process has not seen before, observed in a store reply. */
   limits: LimitsSnapshot;
 }
 
@@ -433,14 +433,15 @@ export interface Valve extends AsyncDisposable {
    * worker sharing this id and store. Omitted rules and fields keep their
    * values, so updates of different fields never overwrite each other. The same
    * field is last write wins unless `expect` is given. Patches set absolute
-   * values; repeating one is harmless and a patch that changes nothing creates no
-   * new version. Running jobs are unaffected; queued jobs use the new limits at
+   * values. A patch that changes nothing creates no new version. A retry can
+   * overwrite an intervening same-field update; use `expect` when that matters.
+   * Running jobs are unaffected; queued jobs use the new limits at
    * their next admission. Spent budget carries over: fixed windows keep their
    * count, and GCRA keeps its outstanding cost units, which drain at the new rate.
    *
    * @throws never synchronously. Rejects with `INVALID_OPTIONS` for unknown
    * rules or fields, values that are not positive integers, a burst on a
-   * fixed-window rule, or an immutable valve; `LIMITS_CONFLICT` when `expect`
+   * fixed-window rule, unsafe numeric precision, or an immutable valve; `LIMITS_CONFLICT` when `expect`
    * fails; or `STORE_UNAVAILABLE` when the store fails, in which case the
    * update may or may not have been applied.
    * @example

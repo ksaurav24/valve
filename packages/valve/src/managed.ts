@@ -30,6 +30,8 @@ export interface FrameRule {
   /** Real time and theta at the last rate change. */
   c: number;
   th: number;
+  /** Low-order remainder retained when rebasing a large virtual coordinate. */
+  tr: number;
   /** Step at registration. Fixed for the life of the frame. */
   readonly sr: number;
   /** End of the window in which scoped keys may expire too early after a decrease. */
@@ -40,7 +42,35 @@ export interface FrameRule {
 
 /** The current virtual time of a GCRA rule. */
 export function theta(rule: FrameRule, now: number): number {
-  return rule.th + (now - rule.c) * (rule.sr / (rule.intervalMs / rule.limit));
+  return (
+    rule.th +
+    (rule.tr + (now - rule.c) * (rule.sr / (rule.intervalMs / rule.limit)))
+  );
+}
+
+/** Compensated addition prevents repeated small rebases from forgiving debt. */
+function rebase(rule: FrameRule, now: number) {
+  const delta = (now - rule.c) * (rule.sr / (rule.intervalMs / rule.limit));
+  const sum = rule.th + delta;
+  const part = sum - rule.th;
+  const remainder = rule.th - (sum - part) + (delta - part) + rule.tr;
+  const next = sum + remainder;
+  rule.tr = remainder - (next - sum);
+  rule.th = next;
+  rule.c = now;
+}
+
+/** Keep virtual coordinates precise enough to record individual cost units. */
+export function precise(
+  rule: FrameRule,
+  now: number,
+  limit = rule.limit,
+  burst = rule.burst,
+) {
+  if (rule.algorithm !== 'gcra') return true;
+  const t = theta(rule, now);
+  const extent = Math.abs(t) + rule.sr * Math.max(rule.ub, burst, limit);
+  return Number.isFinite(extent) && extent * Number.EPSILON <= rule.sr / 1024;
 }
 
 /** Converts virtual milliseconds to real milliseconds at the current rate. */
@@ -51,7 +81,10 @@ export function ratio(rule: FrameRule): number {
 /** Whether no rate change has rebased the frame, so real and virtual time coincide. */
 export function identity(rule: FrameRule): boolean {
   return (
-    rule.c === 0 && rule.th === 0 && rule.intervalMs / rule.limit === rule.sr
+    rule.c === 0 &&
+    rule.th === 0 &&
+    rule.tr === 0 &&
+    rule.intervalMs / rule.limit === rule.sr
   );
 }
 
@@ -73,6 +106,7 @@ export function register(rule: NormalizedRule): FrameRule {
     burst: rule.burst,
     c: 0,
     th: 0,
+    tr: 0,
     sr: rule.intervalMs / rule.limit,
     sw: 0,
     ub: rule.burst,
@@ -181,7 +215,9 @@ export function applyPatch(
     const step = rule.intervalMs / limit;
     if (
       rule.algorithm === 'gcra' &&
-      (rule.sr * burst > MAX || step * Math.max(rule.ub, burst) > MAX)
+      (rule.sr * burst > MAX ||
+        step * Math.max(rule.ub, burst) > MAX ||
+        !precise(rule, now, limit, burst))
     )
       throw failure(
         id,
@@ -199,8 +235,7 @@ export function applyPatch(
     const before = rule.intervalMs / rule.limit;
     const after = rule.intervalMs / limit;
     if (rule.algorithm === 'gcra' && after !== before) {
-      rule.th = theta(rule, now);
-      rule.c = now;
+      rebase(rule, now);
       rule.ub = Math.max(rule.ub, burst);
       if (after > before) rule.sw = Math.max(rule.sw, now + rule.ub * after);
     }
@@ -273,6 +308,13 @@ export function managedBatch(
   states: RuleState[],
   now: number,
 ) {
+  // Validate the whole batch before changing even its copied rule states.
+  if (rules.some((rule) => !precise(rule, now)))
+    throw failure(
+      'managed',
+      'INVALID_OPTIONS',
+      'Managed GCRA limits exceed the safe numeric precision. Use a lower rate or a coordinated migration.',
+    );
   const thetas = rules.map((rule, i) => {
     if (rule.algorithm !== 'gcra') return 0;
     const t = theta(rule, now);

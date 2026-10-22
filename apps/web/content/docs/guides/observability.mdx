@@ -23,6 +23,9 @@ crm.on('store-error', ({ error, policy }) =>
 );
 crm.on('reject', ({ code }) => metrics.increment('valve.rejected', { code }));
 crm.on('warning', ({ message }) => logger.warn(message));
+crm.on('limits', ({ version, rules }) =>
+  logger.info({ version, rules }, 'managed limits observed'),
+);
 
 // Later:
 off();
@@ -38,6 +41,11 @@ The `pause` reason tells you where the pause came from:
 | `'store'`    | A pause written by another process, seen in the store. |
 
 See the [events reference](/docs/reference/events/) for every payload.
+
+For managed valves, alert on warnings about a new registration epoch or a
+version moving backwards. They indicate that failover, restore, or state loss
+may have discarded updates. The `limits` event means only that this process
+observed a version it had not seen; it is not a fleet-wide acknowledgement.
 
 ## Export queue metrics
 

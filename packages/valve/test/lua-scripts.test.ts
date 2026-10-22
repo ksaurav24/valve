@@ -12,12 +12,13 @@ describe('generated Lua', () => {
     'RESUME',
     'RELEASE',
     'RENEW',
+    'MANAGED',
   ] as const)('%s has a digest of its shipped source', (name) => {
     expect(createHash('sha1').update(scripts[name]).digest('hex')).toBe(
       scripts[`${name}_SHA`],
     );
   });
-  it.each(['ACQUIRE', 'SCOPED', 'RENEW'] as const)(
+  it.each(['ACQUIRE', 'SCOPED', 'RENEW', 'MANAGED'] as const)(
     '%s keeps the production clock in the minified parity harness',
     (name) => {
       const source = withLuaClock(scripts[name]);

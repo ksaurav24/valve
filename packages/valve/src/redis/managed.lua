@@ -25,10 +25,10 @@ for i = 1, nr do
   local base = 5 + (i - 1) * 6
   local r = { name = ARGV[base + 1], algo = ARGV[base + 2] == 'gcra' and 0 or 1, I = tonumber(ARGV[base + 3]),
     seedL = tonumber(ARGV[base + 4]), seedB = tonumber(ARGV[base + 5]), scoped = ARGV[base + 6] == '1' }
-  if not r.I or not integer(r.seedL, 1, MAX) or not integer(r.seedB, 1, MAX) or byName[r.name] then
+  if not r.I or r.I < 1 or r.I > QUARTER or not integer(r.seedL, 1, MAX) or not integer(r.seedB, 1, MAX) or (r.algo == 1 and r.seedB ~= 1) or byName[r.name] then
     return status('INVALID_OPTIONS', 'Invalid managed rule.')
   end
-  rules[i] = r; byName[r.name] = r; names[i] = r.name
+  rules[i] = r; byName[r.name] = r; names[i] = 'n:' .. r.name
 end
 local nextArg = 5 + nr * 6 + 1
 
@@ -44,18 +44,20 @@ if meta[1] then
   if meta[4] ~= marker then return mismatch end
   if config and config ~= marker and not (config == meta[5] and meta[6] == '0') then return mismatch end
   epoch, revision, updated, storedPin = meta[2], tonumber(meta[3]), meta[6] == '1', meta[5]
-  if not epoch or not integer(revision, 1, MAX) then return status('INVALID_OPTIONS', 'Managed limits are corrupt.') end
+  if not epoch or not string.match(epoch, '^%d+$') or not integer(tonumber(epoch), 0, MAX) or not integer(revision, 1, MAX) or not storedPin or (meta[6] ~= '0' and meta[6] ~= '1') then return status('INVALID_OPTIONS', 'Managed limits are corrupt.') end
   for i, r in ipairs(rules) do
     local packed = meta[6 + i]
     if not packed then return status('INVALID_OPTIONS', 'Managed limits are corrupt.') end
     local f = {}
     for v in string.gmatch(packed, '%S+') do f[#f + 1] = tonumber(v) end
-    if #f ~= 9 then return status('INVALID_OPTIONS', 'Managed limits are corrupt.') end
+    if #f ~= 10 then return status('INVALID_OPTIONS', 'Managed limits are corrupt.') end
     for _, v in ipairs(f) do if v ~= v or v == math.huge or v == -math.huge then return status('INVALID_OPTIONS', 'Managed limits are corrupt.') end end
-    if f[1] ~= r.algo or f[2] ~= r.I or not integer(f[3], 1, MAX) or not integer(f[4], 1, MAX) or f[7] <= 0 or f[9] < f[4] then
+    if f[1] ~= r.algo or f[2] ~= r.I or not integer(f[3], 1, MAX) or not integer(f[4], 1, MAX) or f[5] < 0 or f[5] > MAX or f[7] < 1 / MAX or f[7] > QUARTER or f[8] < 0 or f[8] > MAX or not integer(f[9], f[4], MAX) or (r.algo == 1 and (f[4] ~= 1 or f[5] ~= 0 or f[6] ~= 0 or f[8] ~= 0 or f[9] ~= 1)) then
       return status('INVALID_OPTIONS', 'Managed limits are corrupt.')
     end
-    r.L, r.b, r.c, r.th, r.sr, r.sw, r.ub = f[3], f[4], f[5], f[6], f[7], f[8], f[9]
+    if r.algo == 1 and f[10] ~= 0 then return status('INVALID_OPTIONS', 'Managed limits are corrupt.') end
+    if math.abs(f[10]) > math.abs(f[6]) * 2.220446049250313e-16 then return status('INVALID_OPTIONS', 'Managed limits are corrupt.') end
+    r.L, r.b, r.c, r.th, r.sr, r.sw, r.ub, r.tr = f[3], f[4], f[5], f[6], f[7], f[8], f[9], f[10]
   end
   if not config then writePin = updated and marker or storedPin end
 else
@@ -66,19 +68,54 @@ else
   updated = config == marker
   storedPin = pin
   for _, r in ipairs(rules) do
-    r.L, r.b, r.c, r.th, r.sr, r.sw, r.ub = r.seedL, r.seedB, 0, 0, r.I / r.seedL, 0, r.seedB
+    r.L, r.b, r.c, r.th, r.sr, r.sw, r.ub, r.tr = r.seedL, r.seedB, 0, 0, r.I / r.seedL, 0, r.seedB, 0
   end
   if not config then writePin = pin end
 end
 
-local function theta(r) return r.th + (now - r.c) * (r.sr / (r.I / r.L)) end
+-- Keep each compensated operation separate: luamin may reassociate nested sums.
+local function advance(r)
+  local step = r.I / r.L
+  local slope = r.sr / step
+  local elapsed = now - r.c
+  return elapsed * slope
+end
+local function theta(r)
+  local delta = advance(r)
+  local offset = r.tr + delta
+  return r.th + offset
+end
+local function rebase(r)
+  local delta = advance(r)
+  local sum = r.th + delta
+  local part = sum - r.th
+  local recovered = sum - part
+  local left = r.th - recovered
+  local right = delta - part
+  local error = left + right
+  local remainder = error + r.tr
+  local next = sum + remainder
+  local rounded = next - sum
+  r.tr = remainder - rounded
+  r.th = next; r.c = now
+end
 local function ratio(r) return r.I / r.L / r.sr end
-local function identity(r) return r.c == 0 and r.th == 0 and r.I / r.L == r.sr end
+local function identity(r) return r.c == 0 and r.th == 0 and r.tr == 0 and r.I / r.L == r.sr end
+local function precise(r, L, b)
+  if r.algo ~= 0 then return true end
+  local extent = math.abs(theta(r)) + r.sr * math.max(r.ub, b or r.b, L or r.L)
+  return extent < math.huge and extent * 2.220446049250313e-16 <= r.sr / 1024
+end
+for _, r in ipairs(rules) do
+  if r.algo == 0 and (r.sr * r.b > QUARTER or (r.I / r.L) * r.ub > QUARTER or not precise(r)) then
+    return status('INVALID_OPTIONS', 'Managed GCRA limits exceed the safe numeric precision. Use a lower rate or a coordinated migration.')
+  end
+end
 local function cap(r) return r.algo == 0 and r.b or r.L end
-local function pack(r) return table.concat({ r.algo, fmt(r.I), fmt(r.L), fmt(r.b), fmt(r.c), fmt(r.th), fmt(r.sr), fmt(r.sw), fmt(r.ub) }, ' ') end
-local function version() return epoch .. '.' .. revision end
+local function pack(r) return table.concat({ r.algo, fmt(r.I), fmt(r.L), fmt(r.b), fmt(r.c), fmt(r.th), fmt(r.sr), fmt(r.sw), fmt(r.ub), fmt(r.tr) }, ' ') end
+local function version() return epoch .. '.' .. fmt(revision) end
 local function snapshot()
-  local out = { version(), tostring(revision) }
+  local out = { version(), fmt(revision) }
   for _, r in ipairs(rules) do
     out[#out + 1] = r.name; out[#out + 1] = fmt(r.L); out[#out + 1] = fmt(r.b)
   end
@@ -100,14 +137,14 @@ local function readState(key, r)
   local v = redis.pcall('HMGET', key, 'w', 'n')
   if type(v) == 'table' and v.err then return nil end
   local w, n = tonumber(v[1] or 0), tonumber(v[2] or 0)
-  if not w or not n or w < 0 or n < 0 or w ~= math.floor(w) or n ~= math.floor(n) then return nil end
+  if not integer(w, 0, MAX) or not integer(n, 0, MAX) then return nil end
   return { a = w, b = n, live = v[1] ~= false }
 end
 local corrupt = status('INVALID_OPTIONS', 'Stored rate state has an invalid type or value.')
 local function commitLimits()
   if register then
-    local fields = { 'v', '1', 'e', epoch, 'r', tostring(revision), 's', marker, 'p', storedPin, 'u', updated and '1' or '0' }
-    for _, r in ipairs(rules) do fields[#fields + 1] = r.name; fields[#fields + 1] = pack(r) end
+    local fields = { 'v', '1', 'e', epoch, 'r', fmt(revision), 's', marker, 'p', storedPin, 'u', updated and '1' or '0' }
+    for _, r in ipairs(rules) do fields[#fields + 1] = 'n:' .. r.name; fields[#fields + 1] = pack(r) end
     redis.call('HSET', KEYS[2], unpack(fields))
   end
   if writePin then redis.call('SET', KEYS[1], writePin) end
@@ -151,7 +188,7 @@ if op == 'u' then
     local v = patch[r.name]
     if v then
       local L, b = v.limit or r.L, v.burst or r.b
-      if r.algo == 0 and (r.sr * b > QUARTER or (r.I / L) * math.max(r.ub, b) > QUARTER) then
+      if r.algo == 0 and (r.sr * b > QUARTER or (r.I / L) * math.max(r.ub, b) > QUARTER or not precise(r, L, b)) then
         return status('INVALID_OPTIONS', 'limits patch for ' .. r.name .. ' exceeds the safe numeric range.')
       end
       if L ~= r.L or b ~= r.b then planned[#planned + 1] = { r, L, b } end
@@ -159,6 +196,7 @@ if op == 'u' then
   end
   -- Read bounded unscoped GCRA state whose expiry follows the rate.
   local refresh = {}
+  if #planned > 0 and revision == MAX then return status('INVALID_OPTIONS', 'Managed limits revision is exhausted. Use a coordinated migration.') end
   if #planned > 0 then
     local k = 5
     for _, r in ipairs(rules) do
@@ -179,7 +217,7 @@ if op == 'u' then
     local before, after = r.I / r.L, r.I / L
     r.ub = math.max(r.ub, b)
     if r.algo == 0 and after ~= before then
-      r.th = theta(r); r.c = now
+      rebase(r)
       if after > before then r.sw = math.max(r.sw, now + r.ub * after) end
     end
     r.L, r.b = L, b
@@ -187,8 +225,8 @@ if op == 'u' then
   commitLimits()
   if #planned > 0 then
     revision = revision + 1
-    local fields = { 'r', tostring(revision), 'u', '1' }
-    for _, e in ipairs(planned) do fields[#fields + 1] = e[1].name; fields[#fields + 1] = pack(e[1]) end
+    local fields = { 'r', fmt(revision), 'u', '1' }
+    for _, e in ipairs(planned) do fields[#fields + 1] = 'n:' .. e[1].name; fields[#fields + 1] = pack(e[1]) end
     redis.call('HSET', KEYS[2], unpack(fields))
     redis.call('SET', KEYS[1], marker)
     for _, e in ipairs(refresh) do

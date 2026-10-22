@@ -216,8 +216,9 @@ export function redisStore(options: RedisStoreOptions): Store {
   function decode(
     context: ManagedContext,
     raw: unknown,
+    unchanged = false,
   ): LimitsSnapshot | undefined {
-    if (Array.isArray(raw) && raw.length === 0) return undefined;
+    if (unchanged && Array.isArray(raw) && raw.length === 0) return undefined;
     const bad = () =>
       failure(
         context.id,
@@ -228,7 +229,11 @@ export function redisStore(options: RedisStoreOptions): Store {
       !Array.isArray(raw) ||
       raw.length !== 2 + context.rules.length * 3 ||
       typeof raw[0] !== 'string' ||
-      !/^\d+\.\d+$/.test(raw[0])
+      !/^\d+\.\d+$/.test(raw[0]) ||
+      !Number.isSafeInteger(Number(raw[0].split('.')[0])) ||
+      !Number.isSafeInteger(Number(raw[1])) ||
+      Number(raw[1]) < 1 ||
+      Number(raw[0].split('.')[1]) !== Number(raw[1])
     )
       throw bad();
     const rules: Record<string, LimitsSnapshot['rules'][string]> = {};
@@ -281,6 +286,9 @@ export function redisStore(options: RedisStoreOptions): Store {
       if (
         !Array.isArray(raw) ||
         raw.length !== 7 ||
+        Number(raw[0]) > request.costs.length ||
+        ![0, 1].includes(raw[4]) ||
+        ![0, 1].includes(raw[5]) ||
         raw
           .slice(0, 3)
           .some(
@@ -288,16 +296,20 @@ export function redisStore(options: RedisStoreOptions): Store {
               !Number.isSafeInteger(Number(value)) || Number(value) < 0,
           ) ||
         !Array.isArray(raw[3]) ||
+        (!request.lease && raw[3].length !== 0) ||
         (request.lease &&
           (raw[3].length !== Number(raw[0]) ||
-            raw[3].some((token: unknown) => typeof token !== 'string')))
+            new Set(raw[3]).size !== raw[3].length ||
+            raw[3].some(
+              (token: unknown) => typeof token !== 'string' || !token.length,
+            )))
       )
         throw failure(
           request.id,
           'INVALID_OPTIONS',
           'Redis returned an invalid managed acquire result.',
         );
-      const limits = decode(request, raw[6]);
+      const limits = decode(request, raw[6], true);
       return {
         granted: Number(raw[0]),
         retryAfterMs: Number(raw[1]),
@@ -341,7 +353,44 @@ export function redisStore(options: RedisStoreOptions): Store {
         [number, string][],
         number,
       ];
-      const limits = decode(request, raw[4]);
+      const seen = new Set<number>();
+      const validIndex = (value: number) =>
+        Number.isSafeInteger(value) &&
+        value >= 0 &&
+        value < request.jobs.length &&
+        !seen.has(value) &&
+        !!seen.add(value);
+      if (
+        !granted.every(validIndex) ||
+        !blocked.every(
+          (entry) =>
+            Array.isArray(entry) &&
+            entry.length === 4 &&
+            validIndex(entry[0]) &&
+            Number.isSafeInteger(entry[1]) &&
+            entry[1] > 0 &&
+            [0, 1].includes(entry[2]) &&
+            [0, 1].includes(entry[3]),
+        ) ||
+        seen.size !== request.jobs.length ||
+        tokens.length !== (request.lease ? granted.length : 0) ||
+        !tokens.every(
+          (entry) =>
+            Array.isArray(entry) &&
+            entry.length === 2 &&
+            granted.includes(entry[0]) &&
+            typeof entry[1] === 'string' &&
+            entry[1].length > 0,
+        ) ||
+        new Set(tokens.map((entry) => entry[0])).size !== tokens.length ||
+        new Set(tokens.map((entry) => entry[1])).size !== tokens.length
+      )
+        throw failure(
+          request.id,
+          'INVALID_OPTIONS',
+          'Redis returned invalid managed scoped grants or lease tokens.',
+        );
+      const limits = decode(request, raw[4], true);
       return {
         ...(Number(pausedMs) ? { pausedMs: Number(pausedMs) } : {}),
         grantedIndexes: granted,

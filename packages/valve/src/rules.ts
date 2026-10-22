@@ -216,7 +216,7 @@ export function normalize(options: ValveOptions) {
       'Scoped admission supports at most 16 rules and batch 128.',
     );
   if (
-    scoped &&
+    (scoped || managed) &&
     rules.some(
       (rule) =>
         rule.intervalMs > Number.MAX_SAFE_INTEGER / 4 ||
@@ -227,7 +227,7 @@ export function normalize(options: ValveOptions) {
     throw failure(
       id,
       'INVALID_OPTIONS',
-      'Scoped rate durations exceed the safe numeric range.',
+      'Scoped or managed rate durations exceed the safe numeric range.',
     );
   if (
     scoped &&

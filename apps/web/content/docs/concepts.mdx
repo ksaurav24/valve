@@ -33,9 +33,10 @@ It checks and updates them atomically on its own clock.
 
 When you omit `store`, each valve gets its own private memory store.
 
-Two valves share a budget only when they use the same store, the same id,
-and the same rule configuration. With Redis, "the same store" means the same
-server and the same key `prefix`.
+Two valves share a budget only when they use the same store and id. Immutable
+valves also need the same complete rule configuration. Managed valves need the
+same rule structure and read authoritative numeric values from the store. With
+Redis, "the same store" means the same server and key `prefix`.
 
 ## Rules
 
@@ -74,6 +75,10 @@ one call (up to `batch` jobs, default 32). The store atomically:
 The valve starts the granted jobs and sleeps until the store says more budget
 will be available. A pub/sub subscriber, if configured, wakes it early when
 another process pauses, resumes, or releases a slot.
+
+With [managed limits](/docs/guides/runtime-limits/), the atomic admission also
+reads the store's current `limit` and `burst`. Cached snapshots and configured
+numeric seeds never override the committed values.
 
 ## Pauses and feedback
 

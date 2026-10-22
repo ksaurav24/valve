@@ -19,6 +19,19 @@ requests reach the provider, or how the provider counts.
 Fixed windows can admit up to `2 × limit` units near an adjacent-window
 boundary.
 
+### Runtime updates
+
+The bounds above use the authoritative value at each atomic admission. Managed
+updates do not revoke prior grants or impose a new bound retroactively on starts
+admitted under an older value. Queued jobs use the current store values at their
+next admission.
+
+Fixed-window updates preserve the current count and alignment. GCRA updates
+preserve outstanding debt in cost units and drain it at the new rate; changing
+`burst` changes the threshold without clearing debt. Scoped GCRA rate decreases
+have a documented cold-identity early-expiry bound because identities migrate
+lazily. See [Update limits at runtime](/docs/guides/runtime-limits/).
+
 ### Timing
 
 Timers can fire late. Under GCRA with `burst: 1`, the next start follows the
@@ -112,11 +125,14 @@ follow the store's retry hint.
 Rate bounds hold only while the store keeps its state. If Redis loses valve's
 keys (a flush, a restart without persistence, eviction, or failover to a replica
 that missed recent writes), the rate budget starts fresh and the shared pause
-ends. The provider's window has not reset, so valve can admit more than its
-limit before that window ends.
+ends. Managed registrations can also reset to their configured numeric seeds.
+The provider's window has not reset, so valve can admit more than its limit
+before that window ends.
 
-valve cannot detect lost rate history. A Redis that has lost keys answers
-normally, so no `onStoreError` mode applies. Lost global leases are detected at
+valve cannot detect lost rate history. Managed valves can warn when they observe
+a new registration epoch or backwards version, but that does not recover the
+lost history or updates. A Redis that has lost keys answers normally, so no
+`onStoreError` mode applies. Lost global leases are detected at
 the next renewal, which rejects their jobs with `LEASE_LOST`. Until then, new
 jobs can take the freed slots. See [Durability](/docs/reference/redis-store/#durability)
 for settings that reduce exposure. When exceeding an external quota is costly,
