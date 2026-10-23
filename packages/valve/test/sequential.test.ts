@@ -440,6 +440,23 @@ describe('runSequential', () => {
     ).resolves.toBe(shared.signal);
   });
 
+  it('uses the stages validated at call time, ignoring later mutation', async () => {
+    const outer = valve({ id: 'snapshot-outer', concurrency: 1 });
+    const inner = valve({ id: 'snapshot-inner', rate: minute });
+    const gate = deferred();
+    const holder = outer.run(() => gate.promise);
+    const options = { cost: 1 };
+    const stages = [{ valve: outer }, { valve: inner, options }];
+    const result = runSequential(stages, () => 'ran');
+    // A repeated id swapped in after validation would wait on its own slot.
+    stages[1] = { valve: outer, options };
+    options.cost = 5;
+    gate.release();
+    await holder;
+    await expect(result).resolves.toBe('ran');
+    await expect(spent(inner)).resolves.toBe(true);
+  });
+
   it('propagates a later stage store failure after the earlier stage admitted', async () => {
     const a = valve({ id: 'store-a', rate: minute });
     const broken = memoryStore();

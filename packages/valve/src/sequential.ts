@@ -80,7 +80,9 @@ export function runSequential<R>(
         fn,
         'Pass a function to run after every stage admits',
       );
+    // Snapshot stages so later caller mutation cannot bypass validation.
     const ids = new Set<string>();
+    const list: { valve: Valve; own: RunOptions<Awaited<R>> }[] = [];
     for (const stage of stages) {
       const valve = (stage as SequentialStage | undefined)?.valve;
       if (typeof valve?.run !== 'function')
@@ -101,6 +103,10 @@ export function runSequential<R>(
           'Use one stage with a higher cost to charge one budget more',
         );
       ids.add(valve.id);
+      // Untyped callers cannot add a stage signal of their own.
+      const own: RunOptions<Awaited<R>> = { ...stage.options };
+      delete own.signal;
+      list.push({ valve, own });
     }
     // Each stage gets its outer job's signal: the shared signal, or a lease
     // signal derived from it that also aborts if an outer global lease is lost.
@@ -108,13 +114,12 @@ export function runSequential<R>(
       index: number,
       signal: AbortSignal | undefined,
     ): Promise<Awaited<R>> => {
-      const { valve, options: own } = stages[index]!;
-      // Untyped callers cannot add a stage signal of their own.
-      const runOptions: RunOptions<Awaited<R>> = { ...own };
-      delete runOptions.signal;
-      if (signal) runOptions.signal = signal;
-      if (index === stages.length - 1) return valve.run(fn, runOptions);
-      return valve.run(
+      const { valve, own } = list[index]!;
+      const runOptions: RunOptions<Awaited<R>> = signal
+        ? { ...own, signal }
+        : own;
+      if (index === list.length - 1) return valve.run(fn, runOptions);
+      return valve.run<Promise<Awaited<R>>>(
         (ctx: JobContext) => enter(index + 1, ctx.signal),
         runOptions,
       );
