@@ -1,6 +1,11 @@
 // Public inference and structural client compatibility under strict TypeScript.
 import { expectTypeOf, test } from 'vitest';
-import { createValve, memoryStore, isValveError } from '../src/index.js';
+import {
+  createValve,
+  memoryStore,
+  isValveError,
+  runSequential,
+} from '../src/index.js';
 import type {
   Store,
   JobContext,
@@ -16,6 +21,8 @@ import type {
   ValveError,
   ResponseLike,
   UpdateLimitsOptions,
+  RunSequentialOptions,
+  SequentialStage,
 } from '../src/index.js';
 import { redisStore } from '../src/redis/index.js';
 import { Redis } from 'ioredis';
@@ -171,4 +178,41 @@ test('custom managed store capability has typed contexts and results', () => {
     },
   };
   expectTypeOf(capability.version).toEqualTypeOf<1>();
+});
+test('runSequential infers results and keeps options per stage', () => {
+  const a = createValve({ id: 'types-seq-a', concurrency: 1 });
+  const b = createValve({ id: 'types-seq-b', concurrency: 1 });
+  expectTypeOf(runSequential([{ valve: a }], () => 42)).toEqualTypeOf<
+    Promise<number>
+  >();
+  expectTypeOf(
+    runSequential(
+      [{ valve: a, options: { cost: 2 } }, { valve: b }],
+      async ({ signal }) => ({ aborted: signal?.aborted }),
+      { signal: new AbortController().signal },
+    ),
+  ).toEqualTypeOf<Promise<{ aborted: boolean | undefined }>>();
+  void runSequential(
+    [
+      {
+        valve: a,
+        options: {
+          observe: (result) => {
+            expectTypeOf(result).toEqualTypeOf<ResponseLike>();
+            return result;
+          },
+        },
+      },
+    ],
+    async (): Promise<ResponseLike> => ({ status: 200, headers: {} }),
+  );
+  const stages: SequentialStage[] = [{ valve: a }, { valve: b }];
+  expectTypeOf(runSequential(stages, () => 'x')).toEqualTypeOf<
+    Promise<string>
+  >();
+  // @ts-expect-error The shared signal is not a per-stage option.
+  void runSequential([{ valve: a, options: { signal: undefined } }], () => 1);
+  const options: RunSequentialOptions = {};
+  // @ts-expect-error Stages need a valve.
+  void runSequential([{ options: {} }], () => 1, options);
 });
