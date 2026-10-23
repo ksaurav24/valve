@@ -168,6 +168,7 @@ interface Waiter {
   key: string;
   // Options resolved while waiting, used if this call creates the valve.
   config: Config | undefined;
+  check: () => boolean;
   ready: (entry: Entry) => void;
   fail: (error: unknown) => void;
 }
@@ -276,6 +277,30 @@ export function createValveGroup<K extends string = string>(
     valve.on(event, (payload) => emit(event, payload, key));
   }
   const closed = () => failure(id, 'CLOSED', 'group is closed.');
+  function check() {
+    if (closePromise) throw closed();
+    if (resolving)
+      throw failure(
+        id,
+        'INVALID_OPTIONS',
+        'Configuration must not call this group.',
+      );
+  }
+  /** Snapshot caller configuration before waiting; getters cannot reenter. */
+  function read<T>(fn: () => T): T {
+    check();
+    resolving = true;
+    try {
+      return fn();
+    } finally {
+      resolving = false;
+    }
+  }
+  function copyScopes<T>(scopes: T): T {
+    return scopes && typeof scopes === 'object' && !Array.isArray(scopes)
+      ? { ...scopes }
+      : scopes;
+  }
   /**
    * Read and copy the key's options once. Calls to this group while it runs, or
    * while createValve reads the copy, would duplicate a key or overrun maxSize.
@@ -411,7 +436,7 @@ export function createValveGroup<K extends string = string>(
   /** Retry waiting calls in call order, never letting a key's later call pass an earlier one. */
   function admit() {
     for (const waiter of [...waiters]) {
-      if (!waiters.has(waiter)) continue;
+      if (!waiters.has(waiter) || !waiter.check()) continue;
       let entry;
       try {
         entry = claim(waiter.key as K, waiter.config);
@@ -457,13 +482,7 @@ export function createValveGroup<K extends string = string>(
     wait?: { signal?: AbortSignal | undefined; maxWait?: Duration | undefined },
   ): Promise<Awaited<R>> {
     try {
-      if (closePromise) throw closed();
-      if (resolving)
-        throw failure(
-          id,
-          'INVALID_OPTIONS',
-          'resolve must not call this group.',
-        );
+      check();
       const entry = entries.get(key);
       const queued = waiters.size
         ? [...waiters].find((call) => call.key === key)
@@ -478,8 +497,6 @@ export function createValveGroup<K extends string = string>(
           : duration(wait.maxWait, child, 'job maxWait');
       const ready = queued ? undefined : claim(key);
       if (ready) return settle(ready, operation, undefined);
-      if (waiters.size >= maxPending)
-        throw failure(id, 'QUEUE_FULL', `maxPending ${maxPending} reached.`);
       const config = entries.has(key)
         ? undefined
         : (queued?.config ?? configure(key));
@@ -500,6 +517,10 @@ export function createValveGroup<K extends string = string>(
           `maxWait ${limit}ms exceeded waiting for room.`,
         );
       if (signal?.aborted) throw aborted();
+      // Check after reading all caller properties, just before registration.
+      check();
+      if (waiters.size >= maxPending)
+        throw failure(id, 'QUEUE_FULL', `maxPending ${maxPending} reached.`);
       const deadline = limit === undefined ? undefined : Date.now() + limit;
       return new Promise((done, fail) => {
         let timer: ReturnType<typeof setTimeout> | undefined;
@@ -511,6 +532,11 @@ export function createValveGroup<K extends string = string>(
         const waiter: Waiter = {
           key,
           config,
+          check: () => {
+            if (deadline === undefined || Date.now() < deadline) return true;
+            waiter.fail(expired());
+            return false;
+          },
           ready: (pinned) => {
             leave();
             const rest =
@@ -541,11 +567,16 @@ export function createValveGroup<K extends string = string>(
     }
   }
   /** Queue a job; time spent waiting for room counts toward its maxWait. */
-  function submit<R>(
+  async function submit<R>(
     key: K,
     fn: (ctx: JobContext) => R,
     runOptions: RunOptions<Awaited<R>> = {},
   ) {
+    runOptions = read(() => {
+      const copy = { ...runOptions };
+      if (copy.scopes !== undefined) copy.scopes = copyScopes(copy.scopes);
+      return copy;
+    });
     return use(
       key,
       (valve, rest) =>
@@ -567,19 +598,32 @@ export function createValveGroup<K extends string = string>(
         (...args) =>
           submit(key, () => fn(...args), runOptions),
       wrapFetch: ((fetchImpl, fetchOptions) =>
-        (...args: never[]) => {
-          const [request, init] = args as unknown as [
-            { signal?: AbortSignal } | undefined,
-            { signal?: AbortSignal } | undefined,
-          ];
+        async (...args: never[]) => {
+          const config = read(() => {
+            const options = { ...fetchOptions };
+            for (const field of ['cost', 'priority', 'scopes'] as const) {
+              const value = options[field];
+              if (typeof value === 'function')
+                Object.assign(options, { [field]: value(...args) });
+            }
+            if (options.scopes !== undefined)
+              options.scopes = copyScopes(options.scopes);
+            const [request, init] = args as unknown as [
+              { signal?: AbortSignal } | undefined,
+              { signal?: AbortSignal } | undefined,
+            ];
+            const copy = init ? { ...init } : init;
+            if (copy) (args as unknown[])[1] = copy;
+            return { options, signal: copy?.signal ?? request?.signal };
+          });
           // maxWait bounds every attempt, including retries after a shared
           // pause, so a wait for room can exhaust it but never shortens it.
           return use<unknown>(
             key,
-            (valve) => valve.wrapFetch(fetchImpl, fetchOptions)(...args),
+            (valve) => valve.wrapFetch(fetchImpl, config.options)(...args),
             {
-              signal: init?.signal ?? request?.signal,
-              maxWait: fetchOptions?.maxWait,
+              signal: config.signal,
+              maxWait: config.options.maxWait,
             },
           );
         }) as Valve['wrapFetch'],

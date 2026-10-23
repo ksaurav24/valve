@@ -344,7 +344,7 @@ type ValveGroupKeyOptions = Omit<ValveOptions, 'id' | 'store'> & {
 
 All other Valve options apply per child. A resolver result containing `id`,
 `store`, or a promise is rejected with `INVALID_OPTIONS`, as is a call to the
-same group from inside the resolver. Options are copied when resolved;
+same group from inside the resolver, option getters, or fetch option resolvers. Options are copied when resolved;
 later mutations do not affect the child. Resolution may precede waiting for
 room so the default `maxWait` can expire during that wait. Concurrent calls
 waiting for a key share the snapshot; canceled calls create no child. Rules must match across

@@ -70,7 +70,8 @@ It may run before room is available to obtain the default `maxWait`, even if
 the call later aborts or expires without creating a child. Concurrent calls
 waiting for the same key share that configuration snapshot. A promise, or a result containing `id` or `store`,
 is rejected with `INVALID_OPTIONS`. So is any call to the same group made
-from inside `resolve`. Options are copied when resolved; mutating the returned
+from inside `resolve`, option getters, or fetch option resolvers. These must
+return configuration without calling back into the group. Options are copied when resolved; mutating the returned
 object later has no effect. Load tier configuration before using the
 group and keep rule structure consistent across workers.
 
@@ -96,7 +97,9 @@ Call this helper with an open group. Members expose `key`, `id`,
 `run`, `wrap`, `wrapFetch`, `observe`, `pause`, `resume`, `getLimits`,
 `updateLimits`, and `stats()`. They are not raw child Valve handles. Each call
 pins its child until that call settles. After eviction, the next call
-transparently creates a new child. `stats()` returns `undefined` when no local
+transparently creates a new child. Submission snapshots run options and scope
+identities before waiting for room. Fetch option resolvers run once per call
+before that wait; retries keep the resolved identities. `stats()` returns `undefined` when no local
 child exists and does not create one.
 
 ## Share provider credential budgets with Redis
