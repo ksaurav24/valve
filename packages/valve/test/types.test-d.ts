@@ -23,8 +23,17 @@ import type {
   UpdateLimitsOptions,
   RunSequentialOptions,
   SequentialStage,
+  ValveStats,
 } from '../src/index.js';
 import { redisStore } from '../src/redis/index.js';
+import { createValveGroup } from '../src/group/index.js';
+import type {
+  ValveGroup,
+  ValveGroupKeyOptions,
+  ValveGroupMember,
+  ValveGroupOptions,
+  ValveGroupStats,
+} from '../src/group/index.js';
 import { Redis } from 'ioredis';
 import { createClient } from 'redis';
 test('run and wrap preserve awaited return types', () => {
@@ -217,4 +226,46 @@ test('runSequential infers results and keeps options per stage', () => {
   const options: RunSequentialOptions = {};
   // @ts-expect-error Stages need a valve.
   void runSequential([{ options: {} }], () => 1, options);
+});
+test('groups infer keys, preserve run types, and hide child handles', async () => {
+  type Tenant = `tenant-${number}`;
+  const tenants = createValveGroup({
+    id: 'crm:tenants',
+    resolve: (tenant: Tenant) => ({
+      rate: { name: 'tenant', limit: tenant.length, interval: '1s' },
+      limits: 'managed',
+    }),
+  });
+  expectTypeOf(tenants).toEqualTypeOf<ValveGroup<Tenant>>();
+  expectTypeOf(
+    tenants.run('tenant-1', () => Promise.resolve(42), { priority: 5 }),
+  ).toEqualTypeOf<Promise<number>>();
+  // @ts-expect-error keys must match the resolver's key type
+  void tenants.run('other', () => 1);
+  const member = tenants.get('tenant-2');
+  expectTypeOf(member).toEqualTypeOf<ValveGroupMember<Tenant>>();
+  expectTypeOf(member.key).toEqualTypeOf<Tenant>();
+  expectTypeOf(member.stats()).toEqualTypeOf<ValveStats | undefined>();
+  expectTypeOf(member.updateLimits({ tenant: { limit: 5 } })).toEqualTypeOf<
+    Promise<LimitsSnapshot>
+  >();
+  expectTypeOf(member.wrap((id: string) => id.length)).toEqualTypeOf<
+    (id: string) => Promise<number>
+  >();
+  // @ts-expect-error members cannot close the group's child valve
+  void member.close();
+  expectTypeOf(tenants.stats()).toEqualTypeOf<ValveGroupStats>();
+  tenants.on('pause', (event, key) => {
+    expectTypeOf(event.durationMs).toEqualTypeOf<number>();
+    expectTypeOf(key).toEqualTypeOf<Tenant>();
+  });
+  createValveGroup({
+    id: 'g',
+    // @ts-expect-error the group derives the id and shares its store
+    resolve: () => ({ id: 'x', concurrency: 1 }),
+  });
+  const options: ValveGroupKeyOptions = { concurrency: 1 };
+  const typed: ValveGroupOptions = { id: 'g', resolve: () => options };
+  expectTypeOf(createValveGroup(typed)).toEqualTypeOf<ValveGroup<string>>();
+  await tenants.close({ drain: true });
 });
