@@ -21,8 +21,10 @@ export interface SequentialStage<T = unknown> {
  */
 export interface RunSequentialOptions {
   /**
-   * Passed to every stage's `run` and to `fn`. Cancels whichever stage is
-   * waiting. Admissions already granted by earlier stages stay spent.
+   * Cancels whichever stage is waiting. Later stages and `fn` receive the
+   * signal of the job that admitted them, which aborts with this one and,
+   * for a global stage, when its lease is lost. Admissions already granted by
+   * earlier stages stay spent.
    */
   readonly signal?: AbortSignal;
 }
@@ -41,7 +43,7 @@ export interface RunSequentialOptions {
  * Never closes a stage valve or its store.
  *
  * @param stages Valves outermost first, each with its own options.
- * @param fn Runs once every stage admits. Receives the shared signal.
+ * @param fn Runs once every stage admits. Receives the innermost job's signal.
  * @param options Signal shared by every stage.
  * @returns Resolves or rejects with whatever `fn` resolves or rejects with.
  * @throws never synchronously. Rejects with `INVALID_OPTIONS` for no stages,
@@ -88,8 +90,9 @@ export function runSequential<R>(
           valve,
           'Pass { valve, options } for every stage',
         );
-      // A nested job waiting on its own id waits on budget, concurrency, or
-      // leases its outer job holds, and charges one budget twice.
+      // With a shared store, a nested job on its own id waits on budget,
+      // concurrency, or leases its outer job holds, and charges one budget
+      // twice. Ids are rejected even across stores, conservatively.
       if (ids.has(valve.id))
         invalid(
           valve.id,
@@ -99,16 +102,23 @@ export function runSequential<R>(
         );
       ids.add(valve.id);
     }
-    const signal = options?.signal;
-    const enter = (index: number): Promise<Awaited<R>> => {
+    // Each stage gets its outer job's signal: the shared signal, or a lease
+    // signal derived from it that also aborts if an outer global lease is lost.
+    const enter = (
+      index: number,
+      signal: AbortSignal | undefined,
+    ): Promise<Awaited<R>> => {
       const { valve, options: own } = stages[index]!;
-      // Only the shared signal applies, even if untyped callers pass another.
+      // Untyped callers cannot add a stage signal of their own.
       const runOptions: RunOptions<Awaited<R>> = { ...own };
       delete runOptions.signal;
       if (signal) runOptions.signal = signal;
       if (index === stages.length - 1) return valve.run(fn, runOptions);
-      return valve.run(() => enter(index + 1), runOptions);
+      return valve.run(
+        (ctx: JobContext) => enter(index + 1, ctx.signal),
+        runOptions,
+      );
     };
-    resolve(enter(0));
+    resolve(enter(0, options?.signal));
   });
 }

@@ -314,9 +314,9 @@ rejects, times out, is aborted, or is closed, and nothing is refunded. See
 
 ### RunSequentialOptions
 
-| Option   | Type          | Description                                                         |
-| -------- | ------------- | ------------------------------------------------------------------- |
-| `signal` | `AbortSignal` | Passed to every stage's `run` and to `fn` through its `JobContext`. |
+| Option   | Type          | Description                                                                                                                                    |
+| -------- | ------------- | ---------------------------------------------------------------------------------------------------------------------------------------------- |
+| `signal` | `AbortSignal` | Cancels whichever stage is waiting. Later stages and `fn` get the admitting job's signal, which aborts with this one or on a lost outer lease. |
 
 ### Rejections
 

@@ -141,5 +141,6 @@ recipient quota, use [scoped rate limits](/docs/guides/scoped-rate-limits/) unde
 one Valve ID. Supply identities on each job to spend all applicable budgets
 atomically. Chaining separate valves, including with `runSequential`, reserves
 their budgets independently and can leave one reservation waiting on another.
-See [Compose valves](/docs/guides/compose-valves/) for when that is intended. Feedback still applies to the
-whole Valve ID; Valve does not automatically identify a response's quota scope.
+See [Compose valves](/docs/guides/compose-valves/) for when that is intended.
+Feedback still applies to the whole Valve ID; Valve does not automatically
+identify a response's quota scope.

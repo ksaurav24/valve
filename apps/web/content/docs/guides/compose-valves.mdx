@@ -84,7 +84,10 @@ async function handle(tenant: string, signal: AbortSignal) {
 Each stage receives only its own `options`: `scopes`, `cost`, `priority`,
 `maxWait`, and `observe`. Nothing is copied between stages, so a `cost` or
 `priority` on one stage does not affect another. The `signal` in the third
-argument is passed to every stage and to `fn` through its job context.
+argument cancels whichever stage is waiting. Each later stage, and `fn`
+through its job context, receives the signal of the job that admitted it. That
+signal aborts with the shared one and, for a
+[global](/docs/guides/global-concurrency/) stage, also when its lease is lost.
 
 `runSequential` never throws synchronously. It rejects with `INVALID_OPTIONS`,
 before any stage admits, when:
@@ -99,10 +102,12 @@ A single stage is allowed and behaves like `valve.run`.
 
 ### Why stage IDs must differ
 
-Nesting one ID inside itself waits on budget, concurrency, and leases that the
-outer job holds. A single-slot valve nested in itself deadlocks, and a rate
-budget is charged twice. To charge one budget more, use one stage with a higher
-`cost`.
+When two stages with one ID share a store, the inner job waits on budget,
+concurrency, and leases that the outer job holds. A single-slot valve nested in
+itself deadlocks, and a rate budget is charged twice. Two instances with one ID
+and separate stores would be independent, but are rejected too, because the
+same ID for two budgets is almost always a mistake. To charge one budget more,
+use one stage with a higher `cost`.
 
 ## See that earlier admissions stay spent
 
@@ -259,6 +264,11 @@ occupied for the whole wait. This has two effects:
   global valves this can span processes. Always nest the same valves in the
   same order everywhere.
 
+If an outer global lease is lost, for example because renewal fails during a
+store outage, a later stage that is still waiting is aborted and the sequence
+rejects with `LEASE_LOST`. A running `fn` is not interrupted: pass its job
+signal to your client so it stops.
+
 ## Cancellation and deadlines
 
 Each stage has its own queue, priority, `maxQueue`, and `maxWait`. There is no
@@ -321,7 +331,7 @@ Different valve IDs are independent budgets, even on one Redis or Valkey store
 or one connection. Sharing a connection does not make the stages atomic. With a
 store, budgets are shared across processes. Queues are local to each process,
 so waiting, priorities, and `maxQueue` apply per process. Only budgets, pauses,
-and global leases are distributed.
+managed limits, and global leases are distributed.
 
 ```ts
 import { Redis } from 'ioredis';

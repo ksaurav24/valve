@@ -6,7 +6,7 @@ import {
   memoryStore,
   runSequential,
 } from '../src/index.js';
-import type { Valve } from '../src/index.js';
+import type { Store, Valve } from '../src/index.js';
 
 const minute = { limit: 1, interval: '1m', algorithm: 'fixed-window' } as const;
 const opened: Valve[] = [];
@@ -354,6 +354,38 @@ describe('runSequential', () => {
     await store.close();
   });
 
+  it('cancels later stages when an outer global lease is lost', async () => {
+    vi.useFakeTimers();
+    try {
+      const backing = memoryStore();
+      const store: Store = {
+        ...backing,
+        renew: () => Promise.reject(new Error('offline')),
+      };
+      const a = valve({
+        id: 'lost-a',
+        concurrency: { limit: 1, scope: 'global', leaseTtl: 90 },
+        store,
+      });
+      const b = valve({ id: 'lost-b', concurrency: 1 });
+      const gate = deferred();
+      const blocker = b.run(() => gate.promise);
+      const fn = vi.fn();
+      const pending = runSequential([{ valve: a }, { valve: b }], fn);
+      const settled = pending.catch((error: unknown) => error);
+      await vi.advanceTimersByTimeAsync(0);
+      expect(b.stats().queued).toBe(1);
+      await vi.advanceTimersByTimeAsync(100);
+      expect(b.stats().queued).toBe(0);
+      expect(await settled).toMatchObject({ code: 'LEASE_LOST' });
+      gate.release();
+      await blocker;
+      expect(fn).not.toHaveBeenCalled();
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
   it('shows why one id is rejected: manual nesting waits on its own slot', async () => {
     const a = valve({ id: 'self', concurrency: 1 });
     const inner = vi.fn();
@@ -380,10 +412,11 @@ describe('runSequential', () => {
     );
     expect(observe).toHaveBeenCalledExactlyOnceWith(limited);
     expect(pauses.a).not.toHaveBeenCalled();
-    expect(pauses.b).toHaveBeenCalledExactlyOnceWith({
-      durationMs: 60000,
-      reason: 'feedback',
-    });
+    // The store may echo the same pause back with reason 'store'.
+    const feedback = pauses.b.mock.calls.filter(
+      ([event]) => event.reason === 'feedback',
+    );
+    expect(feedback).toHaveLength(1);
     expect(a.stats().pausedUntil).toBeNull();
     expect(b.stats().totals.retried).toBe(0);
   });

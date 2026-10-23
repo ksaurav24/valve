@@ -111,8 +111,9 @@ suite('runSequential on Redis/Valkey', () => {
     const a = valve({ id: `feedback-a-${randomUUID()}`, concurrency: 1 });
     const b = valve({ id: `feedback-b-${randomUUID()}`, concurrency: 1 });
     const pauses = { a: 0, b: 0 };
-    a.on('pause', () => pauses.a++);
-    b.on('pause', () => pauses.b++);
+    // Count feedback only; the store may echo a pause with reason 'store'.
+    a.on('pause', (e) => void (e.reason === 'feedback' && pauses.a++));
+    b.on('pause', (e) => void (e.reason === 'feedback' && pauses.b++));
     let observed = 0;
     await runSequential(
       [
