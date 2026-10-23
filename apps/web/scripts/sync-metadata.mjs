@@ -1,4 +1,5 @@
 import { mkdir, readFile, writeFile } from 'node:fs/promises';
+import { waitForNpmRelease } from '../../../scripts/wait-for-npm-release.mjs';
 import { downloadsEndpoint, parseDownloads } from '../lib/npm-downloads.mjs';
 import {
   mergeMetadata,
@@ -9,10 +10,15 @@ import {
 } from './merge-metadata.mjs';
 
 // Fetches npm and GitHub data for the static build. Network and API failures
-// never fail the build: each field falls back to the committed snapshot.
+// fall back to the snapshot, except when it would hide a known published version.
 // Pass --write-snapshot to explicitly refresh the committed fallback snapshot.
 const repo = 'ksaurav24/valve';
 const pkg = 'valvejs';
+const { version } = JSON.parse(
+  await readFile(
+    new URL('../../../packages/valve/package.json', import.meta.url),
+  ),
+);
 const snapshotFile = new URL('../content/data/metadata.json', import.meta.url);
 const outputFile = new URL('../.generated/metadata.json', import.meta.url);
 
@@ -50,7 +56,7 @@ async function readSnapshot() {
 }
 
 const api = `https://api.github.com/repos/${repo}`;
-const [snapshot, npm, downloads, repository, contributors, releases] =
+const [snapshot, initialNpm, downloads, repository, contributors, releases] =
   await Promise.all([
     readSnapshot(),
     load(
@@ -65,6 +71,22 @@ const [snapshot, npm, downloads, repository, contributors, releases] =
     load(`${api}/contributors?per_page=100`, github, parseContributors),
     load(`${api}/releases?per_page=100`, github, parseReleases),
   ]);
+
+let npm = initialNpm;
+const snapshotHasVersion = Object.hasOwn(snapshot.npm?.versions ?? {}, version);
+const releaseTags = [`v${version}`, `${pkg}@${version}`, version];
+const published =
+  snapshotHasVersion ||
+  (releases.ok && releases.value.some((r) => releaseTags.includes(r.tag)));
+if (published && (!npm.ok || !Object.hasOwn(npm.value.versions, version))) {
+  // Vercel may reach a different registry cache than the publishing runner.
+  npm = snapshotHasVersion
+    ? { ok: false, reason: `registry has not exposed ${version}` }
+    : {
+        ok: true,
+        value: parsePackument(await waitForNpmRelease({ name: pkg, version })),
+      };
+}
 
 const { data, status } = mergeMetadata(snapshot, {
   npm,

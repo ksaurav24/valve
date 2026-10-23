@@ -96,6 +96,11 @@ previously installed `valvejs@beta` should switch to `npm install valvejs`.
 After publication, verify the npm version and `latest` tag, run
 `pnpm --filter @valve/web sync:snapshot`, and commit the refreshed website
 fallback metadata. Rebuild the website so `/releases` includes the new version.
+The release workflow waits for npm's full public metadata to include the version,
+publication time, and `latest` tag before calling `VERCEL_DEPLOY_HOOK`. A missing
+hook or a release that remains invisible after the retry budget fails the website
+rebuild job. The website also waits when GitHub confirms a release that its npm
+cache has not exposed yet, unless the committed snapshot already contains it.
 
 The npm trusted publisher must be configured for `valvejs`, the GitHub repository
 `ksaurav24/valve`, and the workflow filename `version.yml`.
