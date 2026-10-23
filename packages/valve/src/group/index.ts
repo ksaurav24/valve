@@ -45,12 +45,15 @@ export interface ValveGroupOptions<K extends string = string> {
    * `limits: "managed"`, its `limit` and `burst` only seed a key the store does
    * not know yet, so stored limits and updates survive eviction. Options are
    * read when the valve is created; later changes to the object have no effect.
+   * Calls to this group from inside `resolve` reject with `INVALID_OPTIONS`.
    */
   resolve: (key: K) => ValveGroupKeyOptions;
   /**
    * Max valves this process keeps, busy or idle. When full, the least recently
    * used idle valve is closed to make room. If every valve is busy, the call
-   * that needs a new one rejects with `QUEUE_FULL`. Positive integer. Default `1000`.
+   * that needs a new one rejects with `QUEUE_FULL`. A call waiting for an evicted
+   * valve to close keeps its `signal`, and the wait counts toward its `maxWait`.
+   * Positive integer. Default `1000`.
    */
   maxSize?: number;
   /**
@@ -144,12 +147,20 @@ export interface ValveGroup<K extends string = string> extends AsyncDisposable {
   close(options?: { drain?: boolean }): Promise<void>;
 }
 
+type Operation<R> = (
+  valve: Valve,
+  waited: number,
+  maxWait: number | undefined,
+) => R;
+
 interface Entry {
   key: string;
   valve: Valve;
   refs: number;
   used: number;
   closing?: Promise<void>;
+  // The key's default maxWait in ms, which includes time spent waiting for room.
+  maxWait: number | undefined;
 }
 
 /** Create independent valves keyed by tenant, credential, endpoint or model.
@@ -192,6 +203,7 @@ export function createValveGroup<K extends string = string>(
     );
   const maxSize = integer(options.maxSize ?? 1000, id, 'maxSize');
   const ttl = duration(options.idleTtl ?? '10m', id, 'idleTtl');
+  const owned = !options.store;
   const store = options.store ?? memoryStore();
   // Insertion order is last release order, so the first idle entry is least recently used.
   const entries = new Map<string, Entry>();
@@ -206,6 +218,7 @@ export function createValveGroup<K extends string = string>(
   let drained: (() => void) | undefined;
   let sweepTimer: ReturnType<typeof setTimeout> | undefined;
   let closePromise: Promise<void> | undefined;
+  let resolving = false;
 
   /** Valve id for a key; encoding keeps `:` out of keys, so ids never collide. */
   function childId(key: unknown) {
@@ -244,7 +257,14 @@ export function createValveGroup<K extends string = string>(
   }
   function create(key: K) {
     const child = childId(key);
-    const resolved = resolve(key);
+    let resolved;
+    resolving = true;
+    try {
+      resolved = resolve(key);
+    } finally {
+      resolving = false;
+    }
+    if (closePromise) throw failure(id, 'CLOSED', 'group is closed.');
     if (
       !resolved ||
       typeof resolved !== 'object' ||
@@ -260,7 +280,14 @@ export function createValveGroup<K extends string = string>(
       );
     const valve = createValve({ ...resolved, id: child, store });
     for (const event of listeners.keys()) forward(key, valve, event);
-    const entry: Entry = { key, valve, refs: 0, used: 0 };
+    const entry: Entry = {
+      key,
+      valve,
+      refs: 0,
+      used: 0,
+      maxWait:
+        resolved.maxWait === undefined ? undefined : duration(resolved.maxWait),
+    };
     entries.set(key, entry);
     return entry;
   }
@@ -323,6 +350,13 @@ export function createValveGroup<K extends string = string>(
    */
   function acquire(key: K, turn?: boolean): Entry | Promise<Entry> {
     if (closePromise) throw failure(id, 'CLOSED', 'group is closed.');
+    // Creating inside resolve could duplicate a key or overrun maxSize.
+    if (resolving)
+      throw failure(
+        id,
+        'INVALID_OPTIONS',
+        'resolve must not call its own group. Return options only.',
+      );
     const entry = entries.get(key);
     // A call whose turn came never waits behind the calls queued after it.
     const queued = turn ? undefined : waits.get(key);
@@ -352,10 +386,10 @@ export function createValveGroup<K extends string = string>(
     return next;
   }
   /** Run one operation on the key's pinned valve and unpin it once it settles. */
-  function settle<R>(entry: Entry, operation: (valve: Valve) => R) {
+  function settle<R>(entry: Entry, operation: Operation<R>, waited: number) {
     let result;
     try {
-      result = Promise.resolve(operation(entry.valve));
+      result = Promise.resolve(operation(entry.valve, waited, entry.maxWait));
     } catch (error) {
       result = Promise.reject(error);
     }
@@ -370,7 +404,15 @@ export function createValveGroup<K extends string = string>(
       },
     );
   }
-  function use<R>(key: K, operation: (valve: Valve) => R): Promise<Awaited<R>> {
+  /**
+   * Run an operation on the key's valve. A call that must wait for room still
+   * honors its signal and maxWait, since the valve has not seen the job yet.
+   */
+  function use<R>(
+    key: K,
+    operation: Operation<R>,
+    wait?: { signal?: AbortSignal | undefined; maxWait?: Duration | undefined },
+  ): Promise<Awaited<R>> {
     let ready;
     try {
       ready = acquire(key);
@@ -378,26 +420,104 @@ export function createValveGroup<K extends string = string>(
       return Promise.reject(error);
     }
     // Valve methods never run jobs synchronously, so a ready valve is called directly.
-    return (
-      'then' in ready
-        ? ready.then((pinned) => settle(pinned, operation))
-        : settle(ready, operation)
-    ) as Promise<Awaited<R>>;
+    if (!('then' in ready))
+      return settle(ready, operation, 0) as Promise<Awaited<R>>;
+    const waiting = ready;
+    const started = Date.now();
+    return new Promise((done, fail) => {
+      const signal = wait?.signal;
+      let timer: ReturnType<typeof setTimeout> | undefined;
+      let gone = false;
+      const stop = (error?: unknown) => {
+        if (gone) return true;
+        gone = true;
+        clearTimeout(timer);
+        signal?.removeEventListener('abort', abort);
+        if (error) fail(error);
+        return false;
+      };
+      const abort = () =>
+        stop(
+          failure(
+            childId(key),
+            'ABORTED',
+            'job was aborted before starting.',
+            signal!.reason,
+          ),
+        );
+      waiting.then(
+        (pinned) => {
+          if (stop()) release(pinned);
+          else settle(pinned, operation, Date.now() - started).then(done, fail);
+        },
+        (error: unknown) => stop(error),
+      );
+      if (signal?.aborted) return void abort();
+      signal?.addEventListener('abort', abort, { once: true });
+      if (wait?.maxWait !== undefined) {
+        const limit = duration(wait.maxWait, childId(key), 'maxWait');
+        timer = setTimeout(
+          () =>
+            stop(
+              failure(
+                childId(key),
+                'MAX_WAIT_EXCEEDED',
+                `job waited longer than maxWait ${limit}ms for room in the group.`,
+              ),
+            ),
+          Math.min(2147483647, limit),
+        );
+      }
+    });
+  }
+  /** Queue a job; time spent waiting for room counts toward its maxWait. */
+  function submit<R>(
+    key: K,
+    fn: (ctx: JobContext) => R,
+    runOptions: RunOptions<Awaited<R>> = {},
+  ) {
+    return use(
+      key,
+      (valve, waited, fallback) => {
+        const limit =
+          runOptions.maxWait === undefined
+            ? fallback
+            : duration(runOptions.maxWait);
+        if (!waited || limit === undefined) return valve.run(fn, runOptions);
+        if (waited >= limit)
+          throw failure(
+            valve.id,
+            'MAX_WAIT_EXCEEDED',
+            `job waited longer than maxWait ${limit}ms for room in the group.`,
+          );
+        return valve.run(fn, { ...runOptions, maxWait: limit - waited });
+      },
+      runOptions,
+    );
   }
   function get(key: K): ValveGroupMember<K> {
     const child = childId(key);
     return {
       key,
       id: child,
-      run: (fn, runOptions) => use(key, (valve) => valve.run(fn, runOptions)),
+      run: (fn, runOptions) => submit(key, fn, runOptions),
       wrap:
         (fn, runOptions) =>
         (...args) =>
-          use(key, (valve) => valve.run(() => fn(...args), runOptions)),
+          submit(key, () => fn(...args), runOptions),
       wrapFetch: ((fetchImpl, fetchOptions) =>
         (...args: never[]) =>
-          use(key, (valve) =>
-            valve.wrapFetch(fetchImpl, fetchOptions)(...args),
+          use<unknown>(
+            key,
+            (valve) => valve.wrapFetch(fetchImpl, fetchOptions)(...args),
+            {
+              signal: (
+                (args[1] ?? args[0]) as { signal?: AbortSignal } | undefined
+              )?.signal,
+              ...(fetchOptions?.maxWait === undefined
+                ? {}
+                : { maxWait: fetchOptions.maxWait }),
+            },
           )) as Valve['wrapFetch'],
       observe: (response) => {
         use(key, (valve) => valve.observe(response)).catch((error) =>
@@ -416,24 +536,27 @@ export function createValveGroup<K extends string = string>(
     if (closePromise) return closePromise;
     clearTimeout(sweepTimer);
     const drain = !!closeOptions.drain;
-    closePromise = Promise.all(
-      [...entries.values()].map(
-        (entry) => (entry.closing ??= entry.valve.close({ drain })),
-      ),
-    )
+    // Mark the group closed before child listeners can call back into it.
+    closePromise = Promise.resolve()
+      .then(() =>
+        Promise.all(
+          [...entries.values()].map(
+            (entry) => (entry.closing ??= entry.valve.close({ drain })),
+          ),
+        ),
+      )
       .then(() =>
         pending ? new Promise<void>((done) => (drained = done)) : undefined,
       )
       .then(() => {
         entries.clear();
-        return options.store ? undefined : store.close();
+        return owned ? store.close() : undefined;
       });
     return closePromise;
   }
   return {
     id,
-    run: (key, fn, runOptions) =>
-      use(key, (valve) => valve.run(fn, runOptions)),
+    run: submit,
     get,
     on: (event, listener) => {
       let set = listeners.get(event);

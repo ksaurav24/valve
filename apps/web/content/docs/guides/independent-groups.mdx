@@ -67,8 +67,9 @@ entry within its 17.5 KB gzip budget.
 `resolve(key)` returns `ValveOptions` without `id` or `store`. It runs
 synchronously once per local child creation: on first use and again after
 eviction, never per job. A promise, or a result containing `id` or `store`,
-is rejected with `INVALID_OPTIONS`. Options are read at creation; mutating the
-returned object later has no effect. Load tier configuration before using the
+is rejected with `INVALID_OPTIONS`. So is any call to the same group made
+from inside `resolve`. Options are read at creation; mutating the returned
+object later has no effect. Load tier configuration before using the
 group and keep rule structure consistent across workers.
 
 Without `store`, the group creates one private memory store shared by its
@@ -259,6 +260,9 @@ keyed hash rather than a plain hash. Changing the mapping creates new budgets.
 is a positive integer and is never exceeded. At capacity, the least recently
 used idle child is closed to make room. Children with calls in progress,
 queued or running jobs, or a local paused estimate are not evicted.
+
+A call that waits for an evicted child to close keeps its abort `signal`, and
+the wait counts toward its `maxWait` (the run option, or the key's default).
 
 If no child can be evicted, a call needing a new child rejects with
 `QUEUE_FULL`. This is group capacity backpressure, separate from `maxQueue`,

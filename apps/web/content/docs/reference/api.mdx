@@ -335,11 +335,15 @@ or group namespaces. `crm:tenants` plus `tenant-42` preserves the hand-built ID
 ### ValveGroupKeyOptions
 
 ```ts
-type ValveGroupKeyOptions = Omit<ValveOptions, 'id' | 'store'>;
+type ValveGroupKeyOptions = Omit<ValveOptions, 'id' | 'store'> & {
+  id?: never;
+  store?: never;
+};
 ```
 
 All other Valve options apply per child. A resolver result containing `id`,
-`store`, or a promise is rejected with `INVALID_OPTIONS`. Options are read at
+`store`, or a promise is rejected with `INVALID_OPTIONS`, as is a call to the
+same group from inside the resolver. Options are read at
 creation; later mutations do not affect the child. Rules must match across
 workers for a key. In managed mode, numeric seeds only register unknown keys;
 stored limits remain authoritative after eviction. Immutable policy mismatches
@@ -373,7 +377,9 @@ and future children and returns an unsubscribe function.
 At capacity, the least recently used idle child is closed to make room.
 Children with calls in progress, queued or running work, or a local paused
 estimate are never evicted. If none can be evicted, a call needing a new child
-rejects with `QUEUE_FULL`. This is distinct from per-child `maxQueue`.
+rejects with `QUEUE_FULL`. This is distinct from per-child `maxQueue`. A call
+waiting for an evicted child to close keeps its `signal`, and the wait counts
+toward its `maxWait`.
 `maxSize` is never exceeded. Idle cleanup uses a single unref'd timer.
 Eviction removes local children only; store budgets, pauses, cooldowns, and
 managed limits survive under normal store retention. Local counters and backoff
