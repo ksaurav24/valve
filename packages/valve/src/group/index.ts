@@ -298,9 +298,13 @@ export function createValveGroup<K extends string = string>(
     }
   }
   /** Read the documented dictionary fields, including prototype accessors. */
-  function copyOptions<T extends object>(
+  function copyOptions<
+    T extends object,
+    const Keys extends readonly (keyof T)[],
+  >(
     options: T,
-    keys: readonly (keyof T)[],
+    keys: Keys &
+      (Exclude<keyof T, Keys[number]> extends never ? unknown : never),
   ): T {
     if (
       !options ||
@@ -342,18 +346,21 @@ export function createValveGroup<K extends string = string>(
           resolved,
           'The group derives the id and shares its store',
         );
-      const copy = copyOptions(resolved, [
-        'rate',
-        'concurrency',
-        'maxQueue',
-        'maxWait',
-        'feedback',
-        'maxPause',
-        'backoff',
-        'onStoreError',
-        'limits',
-        'batch',
-      ]);
+      const copy = copyOptions(
+        resolved as Omit<ValveGroupKeyOptions, 'id' | 'store'>,
+        [
+          'rate',
+          'concurrency',
+          'maxQueue',
+          'maxWait',
+          'feedback',
+          'maxPause',
+          'backoff',
+          'onStoreError',
+          'limits',
+          'batch',
+        ],
+      );
       // Snapshot nested configuration before a wait can expose it to mutation.
       const rule = (value: RateRule) =>
         copyOptions(value, [
