@@ -101,11 +101,12 @@ describe('group acquisition snapshots', () => {
     try {
       const pending: Promise<unknown>[] = [];
       let reads = 0;
+      const signal = new AbortController().signal;
       const options = {
-        get signal(): undefined {
+        get signal(): AbortSignal {
           if (++reads < 32)
             pending.push(outcome(test.group.run('b', () => 1, options)));
-          return undefined;
+          return signal;
         },
       };
       pending.push(outcome(test.group.run('b', () => 1, options)));
