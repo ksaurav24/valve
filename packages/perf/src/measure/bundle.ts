@@ -99,21 +99,23 @@ export async function bundleFootprint(
 }
 
 /** Missing or invalid entries fail closed, as do entries over the existing ceiling. */
-export function sizeChecks(rows: BundleRow[]) {
-  return Object.entries(SIZE_BUDGETS).map(([entry, budget]) => {
-    const matches = rows.filter(
-      (r) => r.input === 'src' && r.name === `entry/${entry}`,
-    );
-    const bytes = matches[0]?.gzipBytes;
-    return {
-      entry,
-      budget,
-      bytes,
-      pass:
-        matches.length === 1 &&
-        Number.isSafeInteger(bytes) &&
-        bytes! > 0 &&
-        bytes! <= budget,
-    };
-  });
+export function sizeChecks(rows: BundleRow[], groupExpected = true) {
+  return Object.entries(SIZE_BUDGETS)
+    .filter(([entry]) => entry !== 'group' || groupExpected)
+    .map(([entry, budget]) => {
+      const matches = rows.filter(
+        (r) => r.input === 'src' && r.name === `entry/${entry}`,
+      );
+      const bytes = matches[0]?.gzipBytes;
+      return {
+        entry,
+        budget,
+        bytes,
+        pass:
+          matches.length === 1 &&
+          Number.isSafeInteger(bytes) &&
+          bytes! > 0 &&
+          bytes! <= budget,
+      };
+    });
 }

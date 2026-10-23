@@ -47,6 +47,12 @@ describe('perf-owned artifact measurements', () => {
       modules: {},
     })) as BundleRow[];
     expect(sizeChecks(rows).every((c) => c.pass)).toBe(true);
+    const legacy = rows.filter((row) => row.name !== 'entry/group');
+    expect(sizeChecks(legacy, false)).toHaveLength(3);
+    expect(sizeChecks(legacy, false).every((check) => check.pass)).toBe(true);
+    expect(
+      sizeChecks(legacy).find((check) => check.entry === 'group')?.pass,
+    ).toBe(false);
     expect(sizeChecks(rows.slice(1))[0]!.pass).toBe(false);
     expect(sizeChecks([...rows, rows[0]!])[0]!.pass).toBe(false);
     for (const size of [NaN, Infinity, 0, -1, SIZE_BUDGETS.core + 1])

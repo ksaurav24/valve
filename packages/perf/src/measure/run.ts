@@ -87,7 +87,11 @@ export async function measure(
   if (tier === 'footprint') {
     for (const [arm, build] of Object.entries(builds)) {
       const rows = await bundleFootprint(build);
-      const checks = sizeChecks(rows);
+      // Current builds must include group; older baselines may predate the entry.
+      const checks = sizeChecks(
+        rows,
+        arm === 'current' || rows.some((row) => row.name === 'entry/group'),
+      );
       record({ arm, rows, checks });
       for (const row of rows)
         log(`${arm} ${row.input} ${row.name}: ${row.gzipBytes} bytes gzip`);
