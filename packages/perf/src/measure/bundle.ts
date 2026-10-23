@@ -12,7 +12,8 @@ export const SIZE_BUDGETS = {
   redis: 12000,
   headers: 2048,
   // Opt-in subpath; bundles createValve and memoryStore, so it sits above core.
-  group: 19000,
+  // Submission snapshots and bounded acquisition cleanup have their own budget.
+  group: 19500,
 } as const;
 export const BUNDLE_SETTINGS =
   'browser, esm, es2022, bundle, minify, gzip default level';

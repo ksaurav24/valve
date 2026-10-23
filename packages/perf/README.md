@@ -177,3 +177,14 @@ possible without presenting them as unrestricted high-rate stress.
 
 The full smoke profile includes deadline exposure. Any deadline violation fails and stops the
 run. PR CI runs memory/Redis/Valkey smoke, real-store integration, and the C1 regression command.
+
+### Independent group bundle budget
+
+The opt-in `valvejs/group` entry has a 19,500-byte gzip source budget. It bundles
+`createValve` and the shared memory store plus the group lifecycle. The original
+19,000-byte allocation left six bytes after bounded acquisition cleanup. Adding
+submission-time scope snapshots, guarded option reads, and expiry checks before
+child construction requires about 200 more bytes. This separate budget decision
+preserves those correctness guarantees and leaves modest room for maintenance.
+The core budget remains 17,500 bytes; core, Redis, and headers sizes are unchanged.
+This is a new subpath budget, not a relaxation of an existing core release limit.
