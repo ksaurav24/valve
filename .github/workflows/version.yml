@@ -139,20 +139,30 @@ jobs:
           create-github-releases: true
           push-git-tags: true
 
-  # The website reads npm and GitHub at build time, so a rebuild is the only
-  # metadata sync a release needs. Skipped until the hook secret exists.
+  # Publishing can finish before npm's public metadata exposes the release.
   rebuild-website:
     if: needs.publish.outputs.published == 'true'
     needs: publish
     runs-on: ubuntu-latest
-    permissions: {}
+    timeout-minutes: 20
+    permissions:
+      contents: read
     steps:
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6
+        with:
+          node-version-file: .node-version
+          package-manager-cache: false
+      - name: Wait for npm release visibility
+        run: node scripts/wait-for-npm-release.mjs
       - name: Trigger website deploy hook
         env:
           DEPLOY_HOOK: ${{ secrets.VERCEL_DEPLOY_HOOK }}
         run: |
           if [ -z "$DEPLOY_HOOK" ]; then
-            echo 'VERCEL_DEPLOY_HOOK is not set; skipping the website rebuild.'
-            exit 0
+            echo '::error::VERCEL_DEPLOY_HOOK is not set; the website cannot be rebuilt.'
+            exit 1
           fi
           curl --fail --silent --show-error -X POST "$DEPLOY_HOOK"

@@ -1,6 +1,6 @@
 {
   "npm": {
-    "latest": "0.5.0",
+    "latest": "0.6.0",
     "versions": {
       "0.0.0-stage": "2026-10-15T16:16:33.272Z",
       "0.3.0-beta.0": "2026-10-15T16:17:30.302Z",
@@ -8,10 +8,13 @@
       "0.4.0-beta.0": "2026-10-15T21:33:58.657Z",
       "0.4.0": "2026-10-15T22:19:50.461Z",
       "0.4.1": "2026-10-16T06:38:55.156Z",
-      "0.5.0": "2026-10-17T04:19:12.204Z"
+      "0.5.0": "2026-10-17T04:19:12.204Z",
+      "0.5.1": "2026-10-17T11:06:24.763Z",
+      "0.5.2": "2026-10-19T05:10:21.209Z",
+      "0.6.0": "2026-10-22T14:07:32.648Z"
     }
   },
-  "downloads": null,
+  "downloads": 595,
   "repo": {
     "stars": 3,
     "forks": 0
@@ -21,10 +24,31 @@
       "login": "ksaurav24",
       "avatar": "https://avatars.githubusercontent.com/u/138647854?v=4",
       "url": "https://github.com/ksaurav24",
-      "contributions": 40
+      "contributions": 47
     }
   ],
   "releases": [
+    {
+      "tag": "valvejs@0.6.0",
+      "name": "valvejs@0.6.0",
+      "url": "https://github.com/ksaurav24/valve/releases/tag/valvejs%400.6.0",
+      "publishedAt": "2026-10-22T14:03:25Z",
+      "prerelease": false
+    },
+    {
+      "tag": "valvejs@0.5.2",
+      "name": "valvejs@0.5.2",
+      "url": "https://github.com/ksaurav24/valve/releases/tag/valvejs%400.5.2",
+      "publishedAt": "2026-10-19T05:08:45Z",
+      "prerelease": false
+    },
+    {
+      "tag": "valvejs@0.5.1",
+      "name": "valvejs@0.5.1",
+      "url": "https://github.com/ksaurav24/valve/releases/tag/valvejs%400.5.1",
+      "publishedAt": "2026-10-17T11:05:30Z",
+      "prerelease": false
+    },
     {
       "tag": "valvejs@0.5.0",
       "name": "valvejs@0.5.0",
