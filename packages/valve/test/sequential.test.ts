@@ -442,19 +442,31 @@ describe('runSequential', () => {
 
   it('uses the stages validated at call time, ignoring later mutation', async () => {
     const outer = valve({ id: 'snapshot-outer', concurrency: 1 });
-    const inner = valve({ id: 'snapshot-inner', rate: minute });
+    const inner = valve({
+      id: 'snapshot-inner',
+      rate: { ...minute, name: 'tenant', scope: 'tenant' },
+    });
     const gate = deferred();
     const holder = outer.run(() => gate.promise);
-    const options = { cost: 1 };
+    const options = { cost: 1, scopes: { tenant: 't1' } };
     const stages = [{ valve: outer }, { valve: inner, options }];
     const result = runSequential(stages, () => 'ran');
     // A repeated id swapped in after validation would wait on its own slot.
     stages[1] = { valve: outer, options };
     options.cost = 5;
+    options.scopes.tenant = 't2';
     gate.release();
     await holder;
     await expect(result).resolves.toBe('ran');
-    await expect(spent(inner)).resolves.toBe(true);
+    const tenant = (name: string) =>
+      inner
+        .run(() => 'admitted', { maxWait: 0, scopes: { tenant: name } })
+        .then(
+          () => false,
+          (error: unknown) => isValveError(error, 'MAX_WAIT_EXCEEDED'),
+        );
+    await expect(tenant('t1')).resolves.toBe(true);
+    await expect(tenant('t2')).resolves.toBe(false);
   });
 
   it('propagates a later stage store failure after the earlier stage admitted', async () => {

@@ -106,6 +106,7 @@ export function runSequential<R>(
       // Untyped callers cannot add a stage signal of their own.
       const own: RunOptions<Awaited<R>> = { ...stage.options };
       delete own.signal;
+      if (own.scopes) own.scopes = { ...own.scopes };
       list.push({ valve, own });
     }
     // Each stage gets its outer job's signal: the shared signal, or a lease
