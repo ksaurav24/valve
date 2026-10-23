@@ -289,6 +289,10 @@ async function tryTenant(tenants: ValveGroup, tenant: string) {
 }
 ```
 
+`maxPending` defaults to `1000` and bounds calls waiting for a closing child
+to free room. Overflow rejects with `QUEUE_FULL`, separately from each child's
+`maxQueue`. Aborted or expired calls immediately leave this queue.
+
 `idleTtl` defaults to `'10m'`, measured after the last call settles. Paused
 children or children with work stay longer. Cleanup uses one unref'd timer.
 Eviction frees local memory only: budgets, pauses, managed limits, and shared

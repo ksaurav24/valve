@@ -102,6 +102,10 @@ describe('createValveGroup identity', () => {
       expect(() => createValveGroup({ id: 'g', resolve, maxSize })).toThrow(
         /maxSize/,
       );
+    for (const maxPending of [0, 1.5, Infinity])
+      expect(() => createValveGroup({ id: 'g', resolve, maxPending })).toThrow(
+        /maxPending/,
+      );
     expect(() => createValveGroup({ id: 'g', resolve, idleTtl: -1 })).toThrow(
       /idleTtl/,
     );

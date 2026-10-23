@@ -317,13 +317,14 @@ See [Independent keyed groups](/docs/guides/independent-groups/).
 
 `ValveGroupOptions<K extends string = string>` accepts:
 
-| Option    | Type                               | Default                  | Description                                                                            |
-| --------- | ---------------------------------- | ------------------------ | -------------------------------------------------------------------------------------- |
-| `id`      | `string`                           | Required                 | Stable namespace, 1 to 198 characters without `{` or `}`.                              |
-| `store`   | `Store`                            | New private memory store | Shared by all children. A supplied store is never closed by the group.                 |
-| `resolve` | `(key: K) => ValveGroupKeyOptions` | Required                 | Synchronous options per local child creation, including after eviction; never per job. |
-| `maxSize` | `number`                           | `1000`                   | Positive integer bounding all local children, busy and idle.                           |
-| `idleTtl` | `Duration`                         | `'10m'`                  | Idle retention after the last call settles. Paused or busy children stay longer.       |
+| Option       | Type                               | Default                  | Description                                                                                      |
+| ------------ | ---------------------------------- | ------------------------ | ------------------------------------------------------------------------------------------------ |
+| `id`         | `string`                           | Required                 | Stable namespace, 1 to 198 characters without `{` or `}`.                                        |
+| `store`      | `Store`                            | New private memory store | Shared by all children. A supplied store is never closed by the group.                           |
+| `resolve`    | `(key: K) => ValveGroupKeyOptions` | Required                 | Synchronous options per local child creation, including after eviction; never per job.           |
+| `maxSize`    | `number`                           | `1000`                   | Positive integer bounding all local children, busy and idle.                                     |
+| `maxPending` | `number`                           | `1000`                   | Positive integer bounding calls waiting for a closing child. Overflow rejects with `QUEUE_FULL`. |
+| `idleTtl`    | `Duration`                         | `'10m'`                  | Idle retention after the last call settles. Paused or busy children stay longer.                 |
 
 Child IDs are exactly `` `${id}:${encodeURIComponent(key)}` ``. Keys must be
 nonempty strings that `encodeURIComponent` can encode; the derived ID must be

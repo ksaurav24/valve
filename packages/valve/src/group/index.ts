@@ -59,6 +59,12 @@ export interface ValveGroupOptions<K extends string = string> {
    */
   maxSize?: number;
   /**
+   * Max calls waiting for a closing child to free room. Positive integer.
+   * Default `1000`. Overflow rejects with `QUEUE_FULL`; independent of each
+   * child's `maxQueue`. Aborted or expired calls immediately leave this queue.
+   */
+  maxPending?: number;
+  /**
    * How long a valve stays after its last call settles. Valves that are paused
    * or still have work stay longer. Eviction only frees local memory: budgets,
    * pauses and managed limits stay in the store. Default `"10m"`.
@@ -149,11 +155,21 @@ export interface ValveGroup<K extends string = string> extends AsyncDisposable {
   close(options?: { drain?: boolean }): Promise<void>;
 }
 
-type Operation<R> = (
-  valve: Valve,
-  waited: number,
-  maxWait: number | undefined,
-) => R;
+// Receives the milliseconds left of the call's maxWait if it waited for room.
+type Operation<R> = (valve: Valve, rest: number | undefined) => R;
+
+interface Config {
+  options: ValveGroupKeyOptions;
+  maxWait: number | undefined;
+}
+
+interface Waiter {
+  key: string;
+  // Options resolved while waiting, used if this call creates the valve.
+  config: Config | undefined;
+  ready: (entry: Entry) => void;
+  fail: (error: unknown) => void;
+}
 
 interface Entry {
   key: string;
@@ -161,7 +177,7 @@ interface Entry {
   refs: number;
   used: number;
   closing?: Promise<void>;
-  // The key's default maxWait in ms, which includes time spent waiting for room.
+  // The key's default maxWait in ms, applied to time spent waiting for room.
   maxWait: number | undefined;
 }
 
@@ -204,13 +220,14 @@ export function createValveGroup<K extends string = string>(
       'Return options per key',
     );
   const maxSize = integer(options.maxSize ?? 1000, id, 'maxSize');
+  const maxPending = integer(options.maxPending ?? 1000, id, 'maxPending');
   const ttl = duration(options.idleTtl ?? '10m', id, 'idleTtl');
   const owned = !options.store;
   const store = options.store ?? memoryStore();
   // Insertion order is last release order, so the first idle entry is least recently used.
   const entries = new Map<string, Entry>();
-  // The newest call waiting for each key, which later calls for the key wait behind.
-  const waits = new Map<string, Promise<Entry>>();
+  // Calls waiting for room in call order, bounded by maxPending.
+  const waiters = new Set<Waiter>();
   const listeners = new Map<
     keyof ValveEventMap,
     Set<(payload: never, key: K) => void>
@@ -257,41 +274,67 @@ export function createValveGroup<K extends string = string>(
   function forward(key: K, valve: Valve, event: keyof ValveEventMap) {
     valve.on(event, (payload) => emit(event, payload, key));
   }
-  function create(key: K) {
+  const closed = () => failure(id, 'CLOSED', 'group is closed.');
+  /**
+   * Read and copy the key's options once. Calls to this group while it runs, or
+   * while createValve reads the copy, would duplicate a key or overrun maxSize.
+   */
+  function configure(key: K): Config {
     const child = childId(key);
-    let resolved;
     resolving = true;
     try {
-      resolved = resolve(key);
+      const resolved = resolve(key);
+      if (
+        !resolved ||
+        typeof resolved !== 'object' ||
+        'then' in resolved ||
+        'id' in resolved ||
+        'store' in resolved
+      )
+        invalid(
+          child,
+          'resolve must synchronously return options without id or store',
+          resolved,
+          'The group derives the id and shares its store',
+        );
+      const copy = { ...resolved };
+      // Snapshot nested configuration before a wait can expose it to mutation.
+      if (copy.rate)
+        copy.rate = Array.isArray(copy.rate)
+          ? copy.rate.map((rule) => ({ ...rule }))
+          : { ...copy.rate };
+      if (typeof copy.concurrency === 'object')
+        copy.concurrency = { ...copy.concurrency };
+      if (copy.backoff) copy.backoff = { ...copy.backoff };
+      return {
+        options: copy,
+        maxWait:
+          copy.maxWait === undefined
+            ? undefined
+            : duration(copy.maxWait, child, 'maxWait'),
+      };
     } finally {
       resolving = false;
     }
-    if (closePromise) throw failure(id, 'CLOSED', 'group is closed.');
-    if (
-      !resolved ||
-      typeof resolved !== 'object' ||
-      'then' in resolved ||
-      'id' in resolved ||
-      'store' in resolved
-    )
-      invalid(
-        child,
-        'resolve must synchronously return options without id or store',
-        resolved,
-        'The group derives the id and shares its store',
-      );
-    const valve = createValve({ ...resolved, id: child, store });
-    for (const event of listeners.keys()) forward(key, valve, event);
-    const entry: Entry = {
-      key,
-      valve,
-      refs: 0,
-      used: 0,
-      maxWait:
-        resolved.maxWait === undefined ? undefined : duration(resolved.maxWait),
-    };
-    entries.set(key, entry);
-    return entry;
+  }
+  function create(key: K, config = configure(key)) {
+    if (closePromise) throw closed();
+    resolving = true;
+    try {
+      const valve = createValve({ ...config.options, id: childId(key), store });
+      for (const event of listeners.keys()) forward(key, valve, event);
+      const entry: Entry = {
+        key,
+        valve,
+        refs: 0,
+        used: 0,
+        maxWait: config.maxWait,
+      };
+      entries.set(key, entry);
+      return entry;
+    } finally {
+      resolving = false;
+    }
   }
   /** Busy entries are pinned; paused ones keep their local pause and backoff. */
   function evictable(entry: Entry) {
@@ -303,6 +346,7 @@ export function createValveGroup<K extends string = string>(
   function evict(entry: Entry) {
     return (entry.closing = entry.valve.close({ drain: true }).finally(() => {
       if (entries.get(entry.key) === entry) entries.delete(entry.key);
+      admit();
     }));
   }
   function sweep() {
@@ -342,56 +386,50 @@ export function createValveGroup<K extends string = string>(
         entries.set(entry.key, entry);
       }
       if (!closePromise && !sweepTimer) arm(entry.used + ttl);
+      // An idle valve can make room for a waiting call.
+      if (waiters.size) admit();
     }
     if (!--pending) drained?.();
   }
   /**
-   * Find, create or make room for the key's valve, pinning it before returning.
-   * Synchronous unless the call must wait for a close; waiting calls for a key
-   * queue behind each other, so they reach the valve in call order.
+   * Pin the key's valve, creating one or evicting an idle one to make room.
+   * @returns undefined when the call must wait for a valve to close.
+   * @throws {ValveError} QUEUE_FULL when every valve is busy.
    */
-  function acquire(key: K, turn?: boolean): Entry | Promise<Entry> {
-    if (closePromise) throw failure(id, 'CLOSED', 'group is closed.');
-    // Creating inside resolve could duplicate a key or overrun maxSize.
-    if (resolving)
-      throw failure(
-        id,
-        'INVALID_OPTIONS',
-        'resolve must not call its own group. Return options only.',
-      );
+  function claim(key: K, config?: Config) {
     const entry = entries.get(key);
-    // A call whose turn came never waits behind the calls queued after it.
-    const queued = turn ? undefined : waits.get(key);
-    if (entry && !entry.closing && !queued) return pin(entry);
-    let wait = queued ?? entry?.closing;
-    if (!wait) {
-      childId(key);
-      if (entries.size < maxSize) return pin(create(key));
-      for (const other of entries.values())
-        if (other.closing || evictable(other)) {
-          wait = other.closing ?? evict(other);
-          break;
-        }
-      if (!wait)
-        throw failure(
-          id,
-          'QUEUE_FULL',
-          `all ${maxSize} valves (maxSize) are busy. Retry later or raise maxSize.`,
-        );
+    if (entry) return entry.closing ? undefined : pin(entry);
+    if (entries.size < maxSize) return pin(create(key, config));
+    for (const other of entries.values())
+      if (other.closing || evictable(other)) {
+        if (!other.closing) void evict(other);
+        return undefined;
+      }
+    throw failure(id, 'QUEUE_FULL', 'maxSize reached: no idle valve.');
+  }
+  /** Retry waiting calls in call order, never letting a key's later call pass an earlier one. */
+  function admit() {
+    for (const waiter of [...waiters]) {
+      if (!waiters.has(waiter)) continue;
+      let entry;
+      try {
+        entry = claim(waiter.key as K, waiter.config);
+      } catch (error) {
+        waiter.fail(error);
+        continue;
+      }
+      if (entry) waiter.ready(entry);
     }
-    const retry = () => {
-      if (waits.get(key) === next) waits.delete(key);
-      return acquire(key, true);
-    };
-    const next: Promise<Entry> = wait.then(retry, retry);
-    if (!turn || !waits.has(key)) waits.set(key, next);
-    return next;
   }
   /** Run one operation on the key's pinned valve and unpin it once it settles. */
-  function settle<R>(entry: Entry, operation: Operation<R>, waited: number) {
+  function settle<R>(
+    entry: Entry,
+    operation: Operation<R>,
+    rest: number | undefined,
+  ) {
     let result;
     try {
-      result = Promise.resolve(operation(entry.valve, waited, entry.maxWait));
+      result = Promise.resolve(operation(entry.valve, rest));
     } catch (error) {
       result = Promise.reject(error);
     }
@@ -404,94 +442,102 @@ export function createValveGroup<K extends string = string>(
         release(entry);
         throw error;
       },
-    );
+    ) as Promise<Awaited<R>>;
   }
   /**
-   * Run an operation on the key's valve. A call that must wait for room still
-   * honors its signal and maxWait, since the valve has not seen the job yet.
+   * Run an operation on the key's valve. A call that waits for room keeps its
+   * signal and its maxWait (or the key's default), since the valve has not seen
+   * it yet; the operation then receives the milliseconds left. At most maxPending
+   * calls wait at once, and a call that gives up never creates a valve.
    */
   function use<R>(
     key: K,
     operation: Operation<R>,
     wait?: { signal?: AbortSignal | undefined; maxWait?: Duration | undefined },
   ): Promise<Awaited<R>> {
-    let ready;
     try {
-      ready = acquire(key);
+      if (closePromise) throw closed();
+      if (resolving)
+        throw failure(
+          id,
+          'INVALID_OPTIONS',
+          'resolve must not call this group.',
+        );
+      const entry = entries.get(key);
+      const queued = waiters.size
+        ? [...waiters].find((call) => call.key === key)
+        : undefined;
+      // Valve methods never run jobs synchronously, so a ready valve is called directly.
+      if (entry && !entry.closing && !queued)
+        return settle(pin(entry), operation, undefined);
+      const child = childId(key);
+      const own =
+        wait?.maxWait === undefined
+          ? undefined
+          : duration(wait.maxWait, child, 'job maxWait');
+      const ready = queued ? undefined : claim(key);
+      if (ready) return settle(ready, operation, undefined);
+      if (waiters.size >= maxPending)
+        throw failure(id, 'QUEUE_FULL', `maxPending ${maxPending} reached.`);
+      const config = entries.has(key)
+        ? undefined
+        : (queued?.config ?? configure(key));
+      if (closePromise) throw closed();
+      const limit = own ?? config?.maxWait ?? entries.get(key)?.maxWait;
+      const signal = wait?.signal;
+      const aborted = () =>
+        failure(
+          child,
+          'ABORTED',
+          'job was aborted before starting.',
+          signal?.reason,
+        );
+      const expired = () =>
+        failure(
+          child,
+          'MAX_WAIT_EXCEEDED',
+          `maxWait ${limit}ms exceeded waiting for room.`,
+        );
+      if (signal?.aborted) throw aborted();
+      const deadline = limit === undefined ? undefined : Date.now() + limit;
+      return new Promise((done, fail) => {
+        let timer: ReturnType<typeof setTimeout> | undefined;
+        const leave = () => {
+          waiters.delete(waiter);
+          clearTimeout(timer);
+          signal?.removeEventListener('abort', abort);
+        };
+        const waiter: Waiter = {
+          key,
+          config,
+          ready: (pinned) => {
+            leave();
+            const rest =
+              deadline === undefined ? undefined : deadline - Date.now();
+            if (rest !== undefined && rest <= 0) {
+              fail(expired());
+              release(pinned);
+            } else settle(pinned, operation, rest).then(done, fail);
+          },
+          fail: (error) => {
+            leave();
+            fail(error);
+          },
+        };
+        const abort = () => waiter.fail(aborted());
+        // Rearm long deadlines past the platform timer maximum.
+        const tick = () => {
+          const rest = deadline! - Date.now();
+          if (rest > 0) timer = setTimeout(tick, Math.min(2147483647, rest));
+          else waiter.fail(expired());
+        };
+        waiters.add(waiter);
+        signal?.addEventListener('abort', abort, { once: true });
+        if (deadline !== undefined) tick();
+      });
     } catch (error) {
       return Promise.reject(error);
     }
-    // Valve methods never run jobs synchronously, so a ready valve is called directly.
-    if (!('then' in ready))
-      return settle(ready, operation, 0) as Promise<Awaited<R>>;
-    const waiting = ready;
-    const started = Date.now();
-    return new Promise((done, fail) => {
-      const signal = wait?.signal;
-      let timer: ReturnType<typeof setTimeout> | undefined;
-      let gone = false;
-      const stop = (error?: unknown) => {
-        if (gone) return true;
-        gone = true;
-        clearTimeout(timer);
-        signal?.removeEventListener('abort', abort);
-        if (error) fail(error);
-        return false;
-      };
-      const abort = () =>
-        stop(
-          failure(
-            childId(key),
-            'ABORTED',
-            'job was aborted before starting.',
-            signal!.reason,
-          ),
-        );
-      waiting.then(
-        (pinned) => {
-          if (stop()) release(pinned);
-          else settle(pinned, operation, Date.now() - started).then(done, fail);
-        },
-        (error: unknown) => stop(error),
-      );
-      if (signal?.aborted) return void abort();
-      signal?.addEventListener('abort', abort, { once: true });
-      if (wait?.maxWait !== undefined) {
-        const limit = duration(wait.maxWait, childId(key), 'maxWait');
-        timer = setTimeout(
-          () =>
-            stop(
-              failure(
-                childId(key),
-                'MAX_WAIT_EXCEEDED',
-                `job waited longer than maxWait ${limit}ms for room in the group.`,
-              ),
-            ),
-          Math.min(2147483647, limit),
-        );
-      }
-    });
-  }
-  /**
-   * Milliseconds left of a call's maxWait after waiting for room, or undefined
-   * when it did not wait or has no limit.
-   * @throws {ValveError} MAX_WAIT_EXCEEDED when the wait used the whole limit.
-   */
-  function left(
-    valve: Valve,
-    waited: number,
-    maxWait: Duration | undefined,
-    fallback: number | undefined,
-  ) {
-    const limit = maxWait === undefined ? fallback : duration(maxWait);
-    if (!waited || limit === undefined) return undefined;
-    if (waited >= limit)
-      throw failure(
-        valve.id,
-        'MAX_WAIT_EXCEEDED',
-        `job waited longer than maxWait ${limit}ms for room in the group.`,
-      );
-    return limit - waited;
   }
   /** Queue a job; time spent waiting for room counts toward its maxWait. */
   function submit<R>(
@@ -501,13 +547,11 @@ export function createValveGroup<K extends string = string>(
   ) {
     return use(
       key,
-      (valve, waited, fallback) => {
-        const rest = left(valve, waited, runOptions.maxWait, fallback);
-        return valve.run(
+      (valve, rest) =>
+        valve.run(
           fn,
           rest === undefined ? runOptions : { ...runOptions, maxWait: rest },
-        );
-      },
+        ),
       runOptions,
     );
   }
@@ -522,24 +566,22 @@ export function createValveGroup<K extends string = string>(
         (...args) =>
           submit(key, () => fn(...args), runOptions),
       wrapFetch: ((fetchImpl, fetchOptions) =>
-        (...args: never[]) =>
-          use<unknown>(
+        (...args: never[]) => {
+          const [request, init] = args as unknown as [
+            { signal?: AbortSignal } | undefined,
+            { signal?: AbortSignal } | undefined,
+          ];
+          // maxWait bounds every attempt, including retries after a shared
+          // pause, so a wait for room can exhaust it but never shortens it.
+          return use<unknown>(
             key,
-            // maxWait bounds every attempt, including retries after a shared
-            // pause, so a wait for room can exhaust it but never shortens it.
-            (valve, waited, fallback) => {
-              left(valve, waited, fetchOptions?.maxWait, fallback);
-              return valve.wrapFetch(fetchImpl, fetchOptions)(...args);
-            },
+            (valve) => valve.wrapFetch(fetchImpl, fetchOptions)(...args),
             {
-              signal: (
-                (args[1] ?? args[0]) as { signal?: AbortSignal } | undefined
-              )?.signal,
-              ...(fetchOptions?.maxWait === undefined
-                ? {}
-                : { maxWait: fetchOptions.maxWait }),
+              signal: init?.signal ?? request?.signal,
+              maxWait: fetchOptions?.maxWait,
             },
-          )) as Valve['wrapFetch'],
+          );
+        }) as Valve['wrapFetch'],
       observe: (response) => {
         use(key, (valve) => valve.observe(response)).catch((error) =>
           emit('warning', { message: `observe failed: ${String(error)}` }, key),
@@ -555,24 +597,26 @@ export function createValveGroup<K extends string = string>(
   }
   function close(closeOptions: { drain?: boolean } = {}): Promise<void> {
     if (closePromise) return closePromise;
-    clearTimeout(sweepTimer);
-    const drain = !!closeOptions.drain;
+    let finish!: (closing: Promise<void>) => void;
     // Mark the group closed before child listeners can call back into it.
-    closePromise = Promise.resolve()
-      .then(() =>
-        Promise.all(
-          [...entries.values()].map(
-            (entry) => (entry.closing ??= entry.valve.close({ drain })),
-          ),
+    closePromise = new Promise((done) => (finish = done));
+    clearTimeout(sweepTimer);
+    for (const waiter of [...waiters]) waiter.fail(closed());
+    const drain = !!closeOptions.drain;
+    finish(
+      Promise.all(
+        [...entries.values()].map(
+          (entry) => (entry.closing ??= entry.valve.close({ drain })),
         ),
       )
-      .then(() =>
-        pending ? new Promise<void>((done) => (drained = done)) : undefined,
-      )
-      .then(() => {
-        entries.clear();
-        return owned ? store.close() : undefined;
-      });
+        .then(() =>
+          pending ? new Promise<void>((done) => (drained = done)) : undefined,
+        )
+        .then(() => {
+          entries.clear();
+          return owned ? store.close() : undefined;
+        }),
+    );
     return closePromise;
   }
   return {
