@@ -4,7 +4,8 @@
  * Run after `pnpm --filter valvejs build`:
  *   cd packages/perf && node --expose-gc --import tsx src/micro/group-memory.ts
  * Reports retained heap per resident key valve versus plain createValve, and
- * checks that high-cardinality churn stays within maxSize with no leaked timers.
+ * checks that high-cardinality churn stays within maxSize and leaves no ref'd
+ * timers (the group's own sweep timer is unref'd, so it is not counted).
  */
 import { createValve } from '../../../valve/dist/index.js';
 import { createValveGroup } from '../../../valve/dist/group/index.js';
@@ -74,5 +75,10 @@ const result = {
   timersAfterClose: timers(),
 };
 console.log(JSON.stringify(result, null, 2));
-if (peak > 64 || result.timersAfterClose > 0 || residentTimers > 1)
+if (
+  peak > 64 ||
+  residentTimers > 0 ||
+  churnTimers > 0 ||
+  result.timersAfterClose > 0
+)
   process.exitCode = 1;

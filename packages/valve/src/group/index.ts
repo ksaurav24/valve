@@ -225,10 +225,19 @@ export function createValveGroup<K extends string = string>(
       );
     return child;
   }
+  /** Call each listener on its own, reporting throws as warnings like Valve.on. */
   function emit(event: keyof ValveEventMap, payload: unknown, key: K) {
-    listeners
-      .get(event)
-      ?.forEach((listener) => listener(payload as never, key));
+    for (const listener of [...(listeners.get(event) ?? [])])
+      try {
+        listener(payload as never, key);
+      } catch (error) {
+        if (event !== 'warning')
+          emit(
+            'warning',
+            { message: `Listener for ${event} threw: ${String(error)}` },
+            key,
+          );
+      }
   }
   function forward(key: K, valve: Valve, event: keyof ValveEventMap) {
     valve.on(event, (payload) => emit(event, payload, key));
@@ -391,17 +400,9 @@ export function createValveGroup<K extends string = string>(
             valve.wrapFetch(fetchImpl, fetchOptions)(...args),
           )) as Valve['wrapFetch'],
       observe: (response) => {
-        use(key, (valve) => valve.observe(response)).catch((error) => {
-          try {
-            emit(
-              'warning',
-              { message: `observe failed: ${String(error)}` },
-              key,
-            );
-          } catch {
-            // Warning listeners that throw have nowhere else to report.
-          }
-        });
+        use(key, (valve) => valve.observe(response)).catch((error) =>
+          emit('warning', { message: `observe failed: ${String(error)}` }, key),
+        );
       },
       pause: (value) => use(key, (valve) => valve.pause(value)),
       resume: () => use(key, (valve) => valve.resume()),

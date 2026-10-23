@@ -1,5 +1,6 @@
 /** T0 in-process microbenchmark suite definitions. */
 
+import { existsSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import { Bench } from 'tinybench';
@@ -192,11 +193,14 @@ export async function microSuites(opts: {
 
   const suites = [run, ruledRun, acquire, scoped, headers, timers, fetchBench];
   // Builds before valvejs/group have no group entry; their suites are skipped.
-  const groupModule = (await import(
-    pathToFileURL(
-      join(dirname(fileURLToPath(opts.valveModuleUrl)), 'group', 'index.js'),
-    ).href
-  ).catch(() => undefined)) as GroupModule | undefined;
+  const groupPath = join(
+    dirname(fileURLToPath(opts.valveModuleUrl)),
+    'group',
+    'index.js',
+  );
+  const groupModule = existsSync(groupPath)
+    ? ((await import(pathToFileURL(groupPath).href)) as GroupModule)
+    : undefined;
   if (groupModule) {
     const childOptions = { concurrency: 16, feedback: false };
     const hot = groupModule.createValveGroup({

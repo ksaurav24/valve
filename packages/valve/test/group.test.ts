@@ -527,6 +527,23 @@ describe('createValveGroup lifecycle', () => {
     await expect(member.run(() => 2)).resolves.toBe(2);
   });
 
+  it('isolates a throwing listener from the others', async () => {
+    const g = group({ id: 'isolate', resolve: () => ({ concurrency: 1 }) });
+    const seen: string[] = [];
+    const warnings: string[] = [];
+    g.on('idle', () => {
+      throw new Error('metrics bug');
+    });
+    g.on('idle', (_event, key) => seen.push(key));
+    g.on('warning', (event, key) => warnings.push(`${key}:${event.message}`));
+    g.on('warning', () => {
+      throw new Error('warning bug');
+    });
+    await g.run('k', () => 1);
+    await until(() => seen.length === 1);
+    expect(warnings).toEqual(['k:Listener for idle threw: Error: metrics bug']);
+  });
+
   it('forwards events from current and future valves with their key', async () => {
     const g = group({ id: 'events', resolve: () => ({ concurrency: 1 }) });
     await g.run('early', () => 1);
