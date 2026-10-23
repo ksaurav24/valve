@@ -1,0 +1,368 @@
+---
+title: Compose valves
+description: Choose between atomic scoped admission, explicit sequential admission, and separate workflow stages, and know what each guarantees.
+---
+
+A job sometimes touches more than one budget. Valve offers three ways to model
+that. They differ in what happens when one budget admits the job and another
+does not, so pick by the guarantee you need.
+
+## Choose a model
+
+| Model                                  | Use when                                                                                                | If a later budget denies                            |
+| -------------------------------------- | ------------------------------------------------------------------------------------------------------- | --------------------------------------------------- |
+| One valve with several rules or scopes | One operation must spend every applicable budget together, or none.                                     | Nothing is spent. Admission is atomic.              |
+| `runSequential` or manual nesting      | Independent budgets with separate IDs, queues, and limits, where the first charge is intended to stand. | Earlier admissions stay spent. Nothing is refunded. |
+| Separate `run` calls per stage         | A workflow has steps at different places, such as fetch provider A, transform, call provider B.         | Each step is admitted on its own, when it runs.     |
+
+Prefer the first model whenever the budgets belong to one operation. See
+[Scoped rate limits](/docs/guides/scoped-rate-limits/) and
+[Choose provider quota scopes](/docs/guides/provider-quota-scopes/). Use
+`runSequential` when you want separate reservations on purpose, for example to
+count every attempt at an ingress or abuse valve even when the downstream
+tenant budget rejects the job.
+
+<Callout type="warn" title="Sequential composition is not atomic">
+  `runSequential` never spends budgets together. Each stage admits on its own,
+  in order. If a later stage rejects, times out, is aborted, or its valve is
+  closed, the earlier admissions remain spent.
+</Callout>
+
+## Nest runs by hand
+
+Calling one valve's `run` inside another's job is the simplest composition:
+
+```ts
+import { createValve } from 'valvejs';
+
+const ingress = createValve({
+  id: 'ingress',
+  rate: { limit: 100, interval: '1s' },
+});
+const tenants = createValve({
+  id: 'tenants',
+  rate: { name: 'tenant', scope: 'tenant', limit: 10, interval: '1s' },
+});
+
+async function handle(tenant: string, signal: AbortSignal) {
+  return ingress.run(
+    () =>
+      tenants.run(() => callProvider(signal), {
+        scopes: { tenant },
+        cost: 2,
+        priority: 5,
+        signal,
+      }),
+    { cost: 1, signal },
+  );
+}
+
+declare function callProvider(signal?: AbortSignal): Promise<Response>;
+```
+
+## Use `runSequential`
+
+`runSequential` does the same thing with a flat list. Stages are listed
+outermost first, and `runSequential([a, b], fn)` is equivalent to
+`a.run(() => b.run(fn))`.
+
+```ts
+import { runSequential } from 'valvejs';
+
+async function handle(tenant: string, signal: AbortSignal) {
+  return runSequential(
+    [
+      { valve: ingress, options: { cost: 1 } },
+      { valve: tenants, options: { scopes: { tenant }, cost: 2, priority: 5 } },
+    ],
+    ({ signal }) => callProvider(signal),
+    { signal },
+  );
+}
+```
+
+Each stage receives only its own `options`: `scopes`, `cost`, `priority`,
+`maxWait`, and `observe`. Nothing is copied between stages, so a `cost` or
+`priority` on one stage does not affect another. The `signal` in the third
+argument is passed to every stage and to `fn` through its job context.
+
+`runSequential` never throws synchronously. It rejects with `INVALID_OPTIONS`,
+before any stage admits, when:
+
+- `stages` is empty or not an array.
+- A stage has no valve.
+- `fn` is not a function.
+- Two stages use the same valve `id`, whether the same instance or two
+  instances with one ID.
+
+A single stage is allowed and behaves like `valve.run`.
+
+### Why stage IDs must differ
+
+Nesting one ID inside itself waits on budget, concurrency, and leases that the
+outer job holds. A single-slot valve nested in itself deadlocks, and a rate
+budget is charged twice. To charge one budget more, use one stage with a higher
+`cost`.
+
+## See that earlier admissions stay spent
+
+This runnable example uses memory stores. The first valve admits two jobs per
+hour. The second allows one job per tenant. Both use `maxWait: 0`, so a denial
+rejects at once with `MAX_WAIT_EXCEEDED`.
+
+```ts
+import assert from 'node:assert/strict';
+import { createValve, isValveError, memoryStore, runSequential } from 'valvejs';
+
+const ingress = createValve({
+  id: 'ingress',
+  rate: { limit: 2, interval: '1h', algorithm: 'fixed-window' },
+  maxWait: 0,
+  store: memoryStore(),
+});
+const tenants = createValve({
+  id: 'tenants',
+  rate: {
+    name: 'tenant',
+    scope: 'tenant',
+    limit: 1,
+    interval: '1h',
+    algorithm: 'fixed-window',
+  },
+  maxWait: 0,
+  store: memoryStore(),
+});
+
+try {
+  const stages = (tenant: string) => [
+    { valve: ingress },
+    { valve: tenants, options: { scopes: { tenant } } },
+  ];
+
+  await runSequential(stages('tenant-1'), () => 'ok');
+
+  // The tenant budget is spent, so the second stage rejects.
+  const error = await runSequential(stages('tenant-1'), () => 'ok').catch(
+    (e: unknown) => e,
+  );
+  assert.ok(isValveError(error));
+  assert.equal(error.code, 'MAX_WAIT_EXCEEDED');
+  assert.equal(error.valveId, 'tenants');
+
+  // The rejected call still spent one ingress admission, so the 2-unit
+  // window is now empty and a fresh tenant is refused at the first stage.
+  const next = await runSequential(stages('tenant-2'), () => 'ok').catch(
+    (e: unknown) => e,
+  );
+  assert.ok(isValveError(next));
+  assert.equal(next.valveId, 'ingress');
+} finally {
+  await Promise.all([ingress.close(), tenants.close()]);
+}
+
+// One valve with a shared and a scoped rule is atomic: the denied job spends nothing.
+const atomic = createValve({
+  id: 'atomic',
+  rate: [
+    { name: 'shared', limit: 2, interval: '1h', algorithm: 'fixed-window' },
+    {
+      name: 'tenant',
+      scope: 'tenant',
+      limit: 1,
+      interval: '1h',
+      algorithm: 'fixed-window',
+    },
+  ],
+  maxWait: 0,
+});
+
+try {
+  await atomic.run(() => 'ok', { scopes: { tenant: 'tenant-1' } });
+  await assert.rejects(
+    atomic.run(() => 'ok', { scopes: { tenant: 'tenant-1' } }),
+    { code: 'MAX_WAIT_EXCEEDED' },
+  );
+  // The denied job spent no shared unit, so another tenant still fits.
+  await atomic.run(() => 'ok', { scopes: { tenant: 'tenant-2' } });
+} finally {
+  await atomic.close();
+}
+console.log('ok');
+```
+
+The second sequential call is rejected by the `tenants` valve, yet it still
+used one `ingress` admission, so the next call fails at `ingress`. The single
+valve with a shared and a scoped rule rejects the repeated tenant without
+spending the shared budget, so another tenant is still admitted.
+
+## Admit workflow stages separately
+
+When a workflow calls different providers at different steps, admit each call
+where it happens. Do not hold one stage's admission open around the whole
+workflow:
+
+```ts
+import { createValve } from 'valvejs';
+
+const providerA = createValve({
+  id: 'provider-a',
+  rate: { limit: 10, interval: '1s' },
+});
+const providerB = createValve({
+  id: 'provider-b',
+  rate: { limit: 2, interval: '1s' },
+});
+
+async function sync(id: string, signal: AbortSignal) {
+  const record = await providerA.run(() => fetchRecord(id, signal), {
+    signal,
+  });
+  const payload = transform(record);
+  return providerB.run(() => sendRecord(payload, signal), { signal });
+}
+
+declare function fetchRecord(
+  id: string,
+  signal?: AbortSignal,
+): Promise<unknown>;
+declare function transform(record: unknown): string;
+declare function sendRecord(
+  payload: string,
+  signal?: AbortSignal,
+): Promise<Response>;
+```
+
+Provider A's slot is free while the transform runs and while provider B's call
+waits. Nesting these calls, or listing them as `runSequential` stages, would
+admit provider B before the provider A request has even started and hold
+provider A's job open for the whole workflow.
+
+## Rejections and errors
+
+Rejections carry the `valveId` of the stage that produced them, so you can tell
+an ingress denial from a tenant denial. A rejection from an inner stage
+propagates through the outer job, so the outer valve counts that job as
+**failed**, not rejected, in its stats. See [Error handling](/docs/guides/error-handling/).
+
+## Concurrency and leases stay held
+
+The outer job is running while the inner stage waits. The outer valve's local
+concurrency slot and any [global lease](/docs/guides/global-concurrency/) stay
+occupied for the whole wait. This has two effects:
+
+- **Head-of-line blocking.** Jobs waiting on a slow inner stage hold outer
+  slots, which cuts throughput for other work that uses the outer valve. Avoid
+  concurrency limits on outer stages where you can, and give inner stages a
+  `maxWait`, or share an `AbortSignal.timeout`, so held slots are released.
+- **Lock-ordering deadlocks.** Two call sites that nest the same single-slot
+  valves in opposite orders can each hold the slot the other needs. With
+  global valves this can span processes. Always nest the same valves in the
+  same order everywhere.
+
+## Cancellation and deadlines
+
+Each stage has its own queue, priority, `maxQueue`, and `maxWait`. There is no
+end-to-end deadline. For one, pass `AbortSignal.timeout(ms)` as the shared
+signal:
+
+```ts
+await runSequential(
+  [
+    { valve: ingress },
+    { valve: tenants, options: { scopes: { tenant: 'tenant-1' } } },
+  ],
+  ({ signal }) => callProvider(signal),
+  { signal: AbortSignal.timeout(5000) },
+);
+```
+
+Aborting while a stage is queued stops `fn` from starting. Admissions already
+granted stay spent. A running `fn` is not interrupted by Valve: pass the signal
+to your client so it stops. See
+[Priorities and shutdown](/docs/guides/priorities-and-shutdown/).
+
+## Store failures
+
+Each stage uses its own valve's store and its own `onStoreError` policy. One
+stage can wait and retry while another fails open. A store outage on a later
+stage leaves earlier admissions spent.
+
+## Provider 429 feedback
+
+`runSequential` never calls `observe` for you. Feedback belongs to the valve
+whose ID owns the provider quota. Set `observe` in that stage's options, or
+call that valve's `observe()` yourself. See
+[Respect provider feedback](/docs/guides/respect-retry-after/).
+
+Do not call a stage valve's `wrapFetch` result inside `fn`. Each request
+would be admitted by that valve a second time. A `wrapFetch` from a valve that
+is not a stage acts as one more innermost stage: its retries queue again on
+that valve while every outer stage stays held, and only that valve reads the
+responses.
+
+## Managed limits
+
+[`updateLimits`](/docs/guides/runtime-limits/) acts on one valve. There is no
+cross-valve atomic update. If you change several stages, each change commits
+separately, so jobs admitted in between see the new limit on one stage and the
+old limit on another.
+
+## Lifecycle
+
+The helper never closes a valve or a store. You own `close()` and `idle()` for
+every stage valve and for any store you passed in. Once a stage valve is
+closed, sequences that reach it reject with `CLOSED` after earlier stages have
+admitted them. With the default `close()`, jobs already queued on it also
+reject with `CLOSED`; with `close({ drain: true })` they still run.
+
+## Redis, Valkey, and memory
+
+Different valve IDs are independent budgets, even on one Redis or Valkey store
+or one connection. Sharing a connection does not make the stages atomic. With a
+store, budgets are shared across processes. Queues are local to each process,
+so waiting, priorities, and `maxQueue` apply per process. Only budgets, pauses,
+and global leases are distributed.
+
+```ts
+import { Redis } from 'ioredis';
+import { createValve, runSequential } from 'valvejs';
+import { redisStore } from 'valvejs/redis';
+
+const store = redisStore({ client: new Redis(process.env.REDIS_URL!) });
+const ingress = createValve({
+  id: 'ingress',
+  rate: { limit: 100, interval: '1s' },
+  store,
+});
+const tenants = createValve({
+  id: 'tenants',
+  rate: { name: 'tenant', scope: 'tenant', limit: 10, interval: '1s' },
+  store,
+});
+
+// Two independent budgets on one connection, admitted one after the other.
+await runSequential(
+  [
+    { valve: ingress },
+    { valve: tenants, options: { scopes: { tenant: 'tenant-1' } } },
+  ],
+  ({ signal }) => callProvider(signal),
+);
+```
+
+## Pitfalls
+
+- **Re-entrancy.** Calling a stage valve's `run` from inside `fn` admits again
+  on that valve. Valve cannot detect this, so avoid it.
+- **Assuming atomicity.** If a failed later stage must not cost the earlier
+  budget, merge the budgets into one valve with scopes.
+- **No `wrapSequential`.** To wrap a function, call `runSequential` inside it:
+
+```ts
+const limitedCall = (tenant: string, signal: AbortSignal) =>
+  runSequential(
+    [{ valve: ingress }, { valve: tenants, options: { scopes: { tenant } } }],
+    ({ signal }) => callProvider(signal),
+    { signal },
+  );
+```

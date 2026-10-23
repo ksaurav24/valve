@@ -5,6 +5,7 @@
     "runtime-limits",
     "provider-quota-scopes",
     "scoped-rate-limits",
+    "compose-valves",
     "global-concurrency",
     "respect-retry-after",
     "priorities-and-shutdown",

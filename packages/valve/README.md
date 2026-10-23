@@ -116,6 +116,30 @@ IDs, not phone numbers or secrets. Feedback and pauses remain Valve-wide.
 See [Scoped rate limits](https://valvejs.vercel.app/docs/guides/scoped-rate-limits/)
 for wrappers, store requirements, deployment safety, and limits.
 
+## Compose valves
+
+Use one valve with scoped rules when budgets must be spent together or not at
+all. When independent budgets with separate IDs should be admitted in order,
+`runSequential` makes that explicit:
+
+```ts
+import { runSequential } from 'valvejs';
+
+await runSequential(
+  [
+    { valve: ingress },
+    { valve: tenants, options: { scopes: { tenant: 'tenant-1' } } },
+  ],
+  ({ signal }) => callProvider(signal),
+  { signal },
+);
+```
+
+It is not atomic: an earlier admission stays spent if a later stage rejects,
+and outer jobs keep their concurrency slots and global leases while later
+stages wait.
+See [Compose valves](https://valvejs.vercel.app/docs/guides/compose-valves/).
+
 ## Runtime limit updates
 
 Opt in with named rules and `limits: 'managed'`. Configured numeric values seed
