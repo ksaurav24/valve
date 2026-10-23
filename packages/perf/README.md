@@ -70,6 +70,11 @@ guarantee a resolved performance result. See [REPRODUCING.md](./REPRODUCING.md).
 | T3 matrix     | `pnpm perf matrix --profile …`, `pnpm perf libs` | Paired A/B/A-A trials and competitor categories. Results are comparable only within the same environment fingerprint.                                   |
 | T4 soak/chaos | `pnpm perf soak`, `pnpm perf chaos`              | Long windows and faults. Full runs are manual because they take hours and require controlled infrastructure.                                            |
 
+T0 includes `group.run` suites that compare `valvejs/group` with a direct valve, plus new-key
+churn at `maxSize: 64`. For retained heap per key, churn bounds, and leftover timers, run
+`node --expose-gc --import tsx src/micro/group-memory.ts` from this package after
+`pnpm --filter valvejs build`. It exits nonzero if the cache exceeds `maxSize` or leaves timers.
+
 The model controls admission state, not JavaScript timers, promise ordering, sockets, or Valve's
 runtime scheduler. Scheduler claims therefore come only from real-time T2-T4 runs.
 
