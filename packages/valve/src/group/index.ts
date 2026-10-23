@@ -571,7 +571,7 @@ export function createValveGroup<K extends string = string>(
     key: K,
     fn: (ctx: JobContext) => R,
     runOptions: RunOptions<Awaited<R>> = {},
-  ) {
+  ): Promise<Awaited<R>> {
     runOptions = read(() => {
       const copy = { ...runOptions };
       if (copy.scopes !== undefined) copy.scopes = copyScopes(copy.scopes);
@@ -604,7 +604,9 @@ export function createValveGroup<K extends string = string>(
             for (const field of ['cost', 'priority', 'scopes'] as const) {
               const value = options[field];
               if (typeof value === 'function')
-                Object.assign(options, { [field]: value(...args) });
+                Object.assign(options, {
+                  [field]: Reflect.apply(value, undefined, args),
+                });
             }
             if (options.scopes !== undefined)
               options.scopes = copyScopes(options.scopes);
