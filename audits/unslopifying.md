@@ -1,6 +1,8 @@
 # Unslopifying audit
 
 Baseline: `origin/master` at `4803503b533b70de62f42e604c087ba68df39f66`.
+The library version at this baseline is **valvejs 0.6.0**, including its managed
+runtime quota implementation. Older versions appear only in release history.
 The audit used a clean worktree, excluding the original checkout's local edits.
 
 ## Scope and method
