@@ -53,6 +53,8 @@ export interface ValveGroupOptions<K extends string = string> {
    * used idle valve is closed to make room. If every valve is busy, the call
    * that needs a new one rejects with `QUEUE_FULL`. A call waiting for an evicted
    * valve to close keeps its `signal`, and the wait counts toward its `maxWait`.
+   * For `wrapFetch`, whose `maxWait` bounds each attempt, a wait that uses the
+   * whole limit rejects, but a shorter one does not shorten later attempts.
    * Positive integer. Default `1000`.
    */
   maxSize?: number;
@@ -470,6 +472,27 @@ export function createValveGroup<K extends string = string>(
       }
     });
   }
+  /**
+   * Milliseconds left of a call's maxWait after waiting for room, or undefined
+   * when it did not wait or has no limit.
+   * @throws {ValveError} MAX_WAIT_EXCEEDED when the wait used the whole limit.
+   */
+  function left(
+    valve: Valve,
+    waited: number,
+    maxWait: Duration | undefined,
+    fallback: number | undefined,
+  ) {
+    const limit = maxWait === undefined ? fallback : duration(maxWait);
+    if (!waited || limit === undefined) return undefined;
+    if (waited >= limit)
+      throw failure(
+        valve.id,
+        'MAX_WAIT_EXCEEDED',
+        `job waited longer than maxWait ${limit}ms for room in the group.`,
+      );
+    return limit - waited;
+  }
   /** Queue a job; time spent waiting for room counts toward its maxWait. */
   function submit<R>(
     key: K,
@@ -479,18 +502,11 @@ export function createValveGroup<K extends string = string>(
     return use(
       key,
       (valve, waited, fallback) => {
-        const limit =
-          runOptions.maxWait === undefined
-            ? fallback
-            : duration(runOptions.maxWait);
-        if (!waited || limit === undefined) return valve.run(fn, runOptions);
-        if (waited >= limit)
-          throw failure(
-            valve.id,
-            'MAX_WAIT_EXCEEDED',
-            `job waited longer than maxWait ${limit}ms for room in the group.`,
-          );
-        return valve.run(fn, { ...runOptions, maxWait: limit - waited });
+        const rest = left(valve, waited, runOptions.maxWait, fallback);
+        return valve.run(
+          fn,
+          rest === undefined ? runOptions : { ...runOptions, maxWait: rest },
+        );
       },
       runOptions,
     );
@@ -509,7 +525,12 @@ export function createValveGroup<K extends string = string>(
         (...args: never[]) =>
           use<unknown>(
             key,
-            (valve) => valve.wrapFetch(fetchImpl, fetchOptions)(...args),
+            // maxWait bounds every attempt, including retries after a shared
+            // pause, so a wait for room can exhaust it but never shortens it.
+            (valve, waited, fallback) => {
+              left(valve, waited, fetchOptions?.maxWait, fallback);
+              return valve.wrapFetch(fetchImpl, fetchOptions)(...args);
+            },
             {
               signal: (
                 (args[1] ?? args[0]) as { signal?: AbortSignal } | undefined

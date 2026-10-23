@@ -262,7 +262,10 @@ used idle child is closed to make room. Children with calls in progress,
 queued or running jobs, or a local paused estimate are not evicted.
 
 A call that waits for an evicted child to close keeps its abort `signal`, and
-the wait counts toward its `maxWait` (the run option, or the key's default).
+the wait counts toward its `maxWait` (the run option, or the key's default). A
+member's `wrapFetch` applies `maxWait` to each attempt, including retries after
+a shared pause. A wait that uses the whole limit rejects with
+`MAX_WAIT_EXCEEDED`, but a shorter wait does not shorten later attempts.
 
 If no child can be evicted, a call needing a new child rejects with
 `QUEUE_FULL`. This is group capacity backpressure, separate from `maxQueue`,

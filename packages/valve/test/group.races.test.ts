@@ -338,6 +338,53 @@ describe('createValveGroup races', () => {
     }
   });
 
+  it('R4e: rejects a fetch whose wait for room used its whole maxWait', async () => {
+    const store = memoryStore();
+    const release = store.release!.bind(store);
+    let gate = deferred();
+    store.release = async (...args) => {
+      await gate.promise;
+      return release(...args);
+    };
+    const g = createValveGroup({
+      id: 'review-fetch-deadline',
+      store,
+      maxSize: 1,
+      resolve: (key) => ({
+        concurrency: { limit: 1, scope: 'global' },
+        maxWait: key === 'short' ? 20 : 5000,
+      }),
+    });
+    const calls: string[] = [];
+    const fetchImpl = (...args: [url: string, init?: RequestInit]) => {
+      calls.push(args[0]);
+      return Promise.resolve({ status: 200, headers: {} });
+    };
+    try {
+      await g.run('a', () => 1);
+      // The key's default maxWait is exhausted while waiting for room.
+      const short = outcome(g.get('short').wrapFetch(fetchImpl)('short'));
+      await sleep(50);
+      gate.release();
+      expect(await short).toBe('MAX_WAIT_EXCEEDED');
+      gate = deferred();
+      await g.run('a', () => 1).catch(() => {});
+      // A wait shorter than maxWait leaves the call to run normally.
+      const long = g.get('long').wrapFetch(fetchImpl, { maxWait: 2000 })(
+        'long',
+      );
+      await sleep(50);
+      gate.release();
+      expect((await long).status).toBe(200);
+      expect(calls).toEqual(['long']);
+      expect(g.stats().active).toBe(0);
+    } finally {
+      gate.release();
+      await g.close();
+      await store.close();
+    }
+  });
+
   it('R4b: includes time waiting for room in maxWait', async () => {
     const store = memoryStore();
     const release = store.release!.bind(store);
