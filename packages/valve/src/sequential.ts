@@ -102,7 +102,10 @@ export function runSequential<R>(
     const signal = options?.signal;
     const enter = (index: number): Promise<Awaited<R>> => {
       const { valve, options: own } = stages[index]!;
-      const runOptions = signal ? { ...own, signal } : own;
+      // Only the shared signal applies, even if untyped callers pass another.
+      const runOptions: RunOptions<Awaited<R>> = { ...own };
+      delete runOptions.signal;
+      if (signal) runOptions.signal = signal;
       if (index === stages.length - 1) return valve.run(fn, runOptions);
       return valve.run(() => enter(index + 1), runOptions);
     };

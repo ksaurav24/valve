@@ -363,20 +363,67 @@ describe('runSequential', () => {
     expect(inner).not.toHaveBeenCalled();
   });
 
-  it('never feeds responses itself; observe applies only to its own stage', async () => {
+  it('never feeds responses itself; observe applies once, to its own stage', async () => {
     const a = valve({ id: 'feedback-a', concurrency: 1 });
     const b = valve({ id: 'feedback-b', concurrency: 1 });
+    const pauses = { a: vi.fn(), b: vi.fn() };
+    a.on('pause', pauses.a);
+    b.on('pause', pauses.b);
     const limited = { status: 429, headers: { 'retry-after': '60' } };
     await runSequential([{ valve: a }, { valve: b }], () => limited);
-    expect(a.stats().pausedUntil).toBeNull();
-    expect(b.stats().pausedUntil).toBeNull();
+    expect(pauses.a).not.toHaveBeenCalled();
+    expect(pauses.b).not.toHaveBeenCalled();
+    const observe = vi.fn((r: typeof limited) => r);
     await runSequential(
-      [{ valve: a }, { valve: b, options: { observe: (r) => r } }],
+      [{ valve: a }, { valve: b, options: { observe } }],
       () => limited,
     );
+    expect(observe).toHaveBeenCalledExactlyOnceWith(limited);
+    expect(pauses.a).not.toHaveBeenCalled();
+    expect(pauses.b).toHaveBeenCalledExactlyOnceWith({
+      durationMs: 60000,
+      reason: 'feedback',
+    });
     expect(a.stats().pausedUntil).toBeNull();
-    expect(b.stats().pausedUntil).toBeGreaterThan(Date.now());
     expect(b.stats().totals.retried).toBe(0);
+  });
+
+  it('ignores a signal smuggled into stage options by untyped callers', async () => {
+    const a = valve({ id: 'smuggle-a', rate: minute });
+    const b = valve({ id: 'smuggle-b', rate: minute });
+    const options = { signal: AbortSignal.abort() } as never;
+    await expect(
+      runSequential([{ valve: a }, { valve: b, options }], () => 'ran'),
+    ).resolves.toBe('ran');
+    const shared = new AbortController();
+    const c = valve({ id: 'smuggle-c', concurrency: 1 });
+    const d = valve({ id: 'smuggle-d', concurrency: 1 });
+    await expect(
+      runSequential(
+        [{ valve: c }, { valve: d, options }],
+        ({ signal }) => signal,
+        { signal: shared.signal },
+      ),
+    ).resolves.toBe(shared.signal);
+  });
+
+  it('propagates a later stage store failure after the earlier stage admitted', async () => {
+    const a = valve({ id: 'store-a', rate: minute });
+    const broken = memoryStore();
+    delete broken.acquireSync;
+    broken.acquire = () => Promise.reject(new Error('store down'));
+    const b = valve({
+      id: 'store-b',
+      rate: minute,
+      store: broken,
+      onStoreError: 'throw',
+    });
+    const fn = vi.fn();
+    await expect(
+      runSequential([{ valve: a }, { valve: b }], fn),
+    ).rejects.toMatchObject({ code: 'STORE_UNAVAILABLE', valveId: 'store-b' });
+    expect(fn).not.toHaveBeenCalled();
+    expect(await spent(a)).toBe(true);
   });
 
   it('updates managed limits per stage only', async () => {

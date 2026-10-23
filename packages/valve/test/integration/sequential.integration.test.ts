@@ -9,6 +9,11 @@ import type { Valve } from '../../src/index.js';
 const url = process.env.REDIS_URL;
 const suite = url ? describe : describe.skip;
 const minute = { limit: 1, interval: '1m', algorithm: 'fixed-window' } as const;
+const until = async (ready: () => boolean) => {
+  for (let i = 0; i < 200 && !ready(); i++)
+    await new Promise((resolve) => setTimeout(resolve, 10));
+  expect(ready()).toBe(true);
+};
 suite('runSequential on Redis/Valkey', () => {
   const client = new Redis(url!, { lazyConnect: true });
   const prefix = `sequential-${randomUUID()}`;
@@ -82,25 +87,41 @@ suite('runSequential on Redis/Valkey', () => {
     let release!: () => void;
     const gate = new Promise<void>((resolve) => (release = resolve));
     const blocker = b.run(() => gate);
-    await new Promise((resolve) => setTimeout(resolve, 50));
-    const nested = runSequential([{ valve: a }, { valve: b }], () => 'nested');
-    await new Promise((resolve) => setTimeout(resolve, 50));
-    await expect(
-      peer.run(() => 'peer', { maxWait: 100 }),
-    ).rejects.toMatchObject({ code: 'MAX_WAIT_EXCEEDED', valveId: outer });
-    release();
-    await expect(nested).resolves.toBe('nested');
-    await expect(peer.run(() => 'peer')).resolves.toBe('peer');
-    await blocker;
+    try {
+      await until(() => b.stats().running === 1);
+      const nested = runSequential(
+        [{ valve: a }, { valve: b }],
+        () => 'nested',
+      );
+      await until(() => a.stats().running === 1 && b.stats().queued === 1);
+      // Another worker sharing the outer id waits while its lease is held.
+      await expect(
+        peer.run(() => 'peer', { maxWait: 100 }),
+      ).rejects.toMatchObject({ code: 'MAX_WAIT_EXCEEDED', valveId: outer });
+      release();
+      await expect(nested).resolves.toBe('nested');
+      await expect(peer.run(() => 'peer')).resolves.toBe('peer');
+    } finally {
+      release();
+      await blocker;
+    }
   });
 
   it('feeds provider feedback only to the stage that observes it', async () => {
     const a = valve({ id: `feedback-a-${randomUUID()}`, concurrency: 1 });
     const b = valve({ id: `feedback-b-${randomUUID()}`, concurrency: 1 });
+    const pauses = { a: 0, b: 0 };
+    a.on('pause', () => pauses.a++);
+    b.on('pause', () => pauses.b++);
+    let observed = 0;
     await runSequential(
-      [{ valve: a }, { valve: b, options: { observe: (r) => r } }],
+      [
+        { valve: a },
+        { valve: b, options: { observe: (r) => (observed++, r) } },
+      ],
       () => ({ status: 429, headers: { 'retry-after': '60' } }),
     );
+    expect({ observed, ...pauses }).toEqual({ observed: 1, a: 0, b: 1 });
     expect(a.stats().pausedUntil).toBeNull();
     expect(b.stats().pausedUntil).toBeGreaterThan(Date.now());
   });
