@@ -43,6 +43,30 @@ async function blockedRoom(options: Partial<ValveGroupOptions> = {}) {
 }
 
 describe('group acquisition snapshots', () => {
+  for (const method of ['run', 'wrap'] as const) {
+    it(`preserves a callable observer without Function.prototype through ${method}`, async () => {
+      const group = createValveGroup({
+        id: 'callable-observer',
+        resolve: () => ({ concurrency: 1 }),
+      });
+      const observe = Object.setPrototypeOf(
+        () => ({ status: 429, headers: {} }),
+        null,
+      );
+      try {
+        const member = group.get('a');
+        const result =
+          method === 'run'
+            ? member.run(() => 17, { observe })
+            : member.wrap(() => 17, { observe })();
+        await expect(result).resolves.toBe(17);
+        expect(member.stats()?.pausedUntil).not.toBeNull();
+      } finally {
+        await group.close();
+      }
+    });
+  }
+
   it('preserves an observer method receiver and its feedback', async () => {
     class Options {
       #status = 429;
