@@ -46,9 +46,10 @@ The audit used a clean worktree, excluding the original checkout's local edits.
 - Reused the admission context builder for immutable and managed requests,
   including global lease ownership. Each admission still increments the lease
   sequence once.
-- Kept managed numeric precision validation in the memory store's `resolve()`
-  boundary. Removed repeated checks over the same unchanged frames and time in
-  scoped admission and the per-job batch helper.
+- Retained all managed numeric precision checks. An attempted removal of the
+  scoped and per-batch guards was reverted after the follow-up review reproduced
+  a public request getter changing authoritative limits after `resolve()`.
+  A regression test now preserves the baseline rejection behavior.
 - Assigned the largest configured burst once when applying a patch. The expiry
   calculation still sees the updated maximum, matching the Lua implementation.
 - Removed impossible-cost retry resets already guaranteed by the loop's initial
@@ -116,7 +117,7 @@ build tooling). Commands are run from the repository root:
 - `REDIS_URL=redis://127.0.0.1:16479 pnpm test:integration` against an isolated
   disposable Redis 7.4 container
 
-All checks above passed: 509 library tests, 5 type tests, 221 performance tests,
+All checks above passed: 510 library tests, 5 type tests, 221 performance tests,
 28 tooling tests, 26 website tests, and 94 Redis integration tests. The performance
 suite skipped one external archive check; the integration suite skipped 12 tests
 requiring a Redis Cluster endpoint or a local Redis server binary.
@@ -130,8 +131,12 @@ changelog order was also checked against the package notes, including grouped
 historical previews.
 
 Source conventions, package publishing checks and bundle-size budgets passed.
-An independent final review found no blocking regressions and matched 8,000
-baseline/current state transitions plus 10 seeded statistical samples.
+The website rebuild passed on retry; Next.js reported an advisory for the
+existing 16.4.0 dependency. That dependency was not changed by this cleanup.
+The initial differential review matched 8,000 baseline/current state transitions
+plus 10 seeded statistical samples. A subsequent targeted review found the
+request-getter counterexample missed by those samples; the precision guards
+were restored and the counterexample was added as a regression test.
 
 This audit is evidence for the listed findings, not proof that every possible
 dead branch or future maintenance issue has been eliminated.

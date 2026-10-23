@@ -24,6 +24,42 @@ const waitFor = async (condition: () => boolean) => {
 };
 
 describe('managed numeric precision', () => {
+  it('rechecks precision after a request getter changes authoritative limits', async () => {
+    let now = 0;
+    const store = memoryStore({ clock: () => now });
+    const id = 'reentrant-precision';
+    const rules = normalize({
+      id,
+      limits: 'managed',
+      rate: { name: 'r', limit: 1, interval: 1, burst: 1 },
+    }).rules;
+    await store.managed!.getLimits({ id, rules });
+    let update: Promise<unknown> | undefined;
+    try {
+      expect(() =>
+        store.managed!.acquireSync!({
+          id,
+          rules,
+          costs: [1],
+          get known() {
+            now = 1e12;
+            update = store.managed!.updateLimits({
+              id,
+              rules,
+              patch: { r: { limit: 1e9 } },
+            });
+            return '0.0';
+          },
+        }),
+      ).toThrowError(expect.objectContaining({ code: 'INVALID_OPTIONS' }));
+      await expect(update).resolves.toMatchObject({
+        rules: { r: { limit: 1e9 } },
+      });
+    } finally {
+      await store.close();
+    }
+  });
+
   it('fails closed before an unsafe high-rate frame can grant twice at one instant', async () => {
     let now = 0;
     const store = memoryStore({ clock: () => now });

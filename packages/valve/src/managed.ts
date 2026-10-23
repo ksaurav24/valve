@@ -296,8 +296,7 @@ export function expiry(rule: FrameRule, x: number, now: number) {
 }
 
 /**
- * Grant a prefix of costs under authoritative rules validated by the store's resolver.
- * Mirrors managed.lua.
+ * Grant a prefix of costs under authoritative managed rules, mirroring managed.lua.
  * GCRA states are clamped to the largest debt the frame allows, which only
  * affects state written under a different frame.
  * @returns The immutable result shape plus `impossible` when the first ungranted
@@ -309,6 +308,14 @@ export function managedBatch(
   states: RuleState[],
   now: number,
 ) {
+  // Validate the whole batch before changing even its copied rule states.
+  // Request getters can change authoritative frames after the store resolves them.
+  if (rules.some((rule) => !precise(rule, now)))
+    throw failure(
+      'managed',
+      'INVALID_OPTIONS',
+      'Managed GCRA limits exceed the safe numeric precision. Use a lower rate or a coordinated migration.',
+    );
   const thetas = rules.map((rule, i) => {
     if (rule.algorithm !== 'gcra') return 0;
     const t = theta(rule, now);

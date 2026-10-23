@@ -1,7 +1,8 @@
 # Removal justification and dependency verification
 
 Baseline: valvejs **0.6.0**, commit `4803503b533b70de62f42e604c087ba68df39f66`.
-Implementation reviewed: `26ef07c` (the cleanup and baseline clarification).
+The original cleanup at `26ef07c` was rechecked against the baseline; the
+precision-guard removal it contained was rejected and restored as described below.
 This document covers every removed implementation, helper, dependency and
 redundant branch in PR #115.
 
@@ -123,13 +124,16 @@ manifest and all three public entry modules are unchanged.
 These removals have callers. Their justification is equivalent behavior, not
 an assertion that nobody used the admission paths.
 
-18. **Repeated `precise` checks:** `memory-store.ts`'s `resolve()` still validates
-    every authoritative rule before returning. `managedBatch` has only two
-    call sites: `managedAcquireSync` and `managedScopedSync`, both after
-    `resolve()` using the same `now` and the resolved frames. Admission mutates
-    copied usage state, not the frames. The removed scoped and per-job checks
-    therefore repeated the same predicate. The boundary check and the separate
-    proposed-limit check in `applyPatch()` remain.
+18. **`precise` checks: retained, not removed.** The follow-up review disproved
+    the claim that the frames must remain unchanged after `resolve()`. A public
+    `ManagedAcquireRequest.known` getter can synchronously call `updateLimits`
+    while `changed()` reads the request, before `managedBatch()` runs. With the
+    reproduced rate/clock change, the baseline throws `INVALID_OPTIONS`, while
+    the original cleanup granted one job against the unsafe frame. Both removed
+    guards were restored exactly, including scoped admission's frame check.
+    The regression in `test/managed-review.test.ts` uses a correctly typed string
+    getter and confirms the restored rejection. `resolve()` and `applyPatch()`
+    validation also remain. These guards cannot be justified as dead checks.
 
 19. **Duplicate largest-burst assignment:** the former GCRA rate-change branch
     assigned `ub = max(ub, burst)` and the following statement repeated it.
@@ -166,11 +170,20 @@ or public library type was removed.
   headers in both ESM and CommonJS. All six export sets match.
 - The focused recheck passed **221 library tests** covering managed precision,
   patch histories, scoped admission, global leases and scheduling, plus
-  **41 performance statistics and CLI tests**. The full-suite, Redis parity,
-  build and browser results are recorded in `unslopifying.md`.
+  **41 performance statistics and CLI tests**. After restoring the guards and
+  adding the regression, all **510 library tests** and **5 type tests** passed.
+  Workspace typecheck, lint, package validation and bundle budgets also passed.
+  The full-suite, Redis parity, build and browser results are recorded in
+  `unslopifying.md`.
 - The prior independent differential review matched 8,000 baseline/current state
-  transitions and 10 seeded statistical samples. A fresh removal review checks
-  the source-level proofs separately from those sampled executions.
+  transitions and 10 seeded statistical samples. The targeted removal review
+  then found the getter counterexample, demonstrating the limit of sampled
+  equivalence. A three-way reproduction confirms baseline and restored code
+  throw `INVALID_OPTIONS`, while `26ef07c` grants one job. The relevant guard
+  removals were withdrawn rather than defended with the earlier passing tests.
+- A fresh review confirmed that both restored guards match the baseline, the
+  request-getter regression is correctly typed and passes, and the prior
+  precision objection is resolved. No additional blocking removal was found.
 
 Representative searches that can be rerun from the repository root:
 
