@@ -64,7 +64,7 @@ The audit used a clean worktree, excluding the original checkout's local edits.
 - Reused the scoped fixture's identical `job` builder in the scoped unit tests.
 - Removed private performance exports with no callers anywhere in the repository:
   `consoleSummary`, `decisionPlan`, and `coversAllPairs`. Their active console
-  reporting, decision-plan construction and pairwise tests remain.
+  reporting, decision-plan construction and pairwise generation remain.
 
 ## Remaining findings and decisions
 
