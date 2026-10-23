@@ -7,6 +7,7 @@ import type {
   Duration,
   JobContext,
   RunOptions,
+  RateRule,
   Valve,
   ValveEventMap,
   ValveOptions,
@@ -296,6 +297,24 @@ export function createValveGroup<K extends string = string>(
       resolving = false;
     }
   }
+  /** Read the documented dictionary fields, including prototype accessors. */
+  function copyOptions<T extends object>(
+    options: T,
+    keys: readonly (keyof T)[],
+  ): T {
+    if (
+      !options ||
+      (typeof options !== 'object' && typeof options !== 'function')
+    )
+      return options;
+    const copy: Partial<T> = {};
+    for (const key of keys) {
+      const value = options[key];
+      if (value !== undefined) copy[key] = value;
+    }
+    // Callers list all relevant fields; Valve still validates their values.
+    return copy as T;
+  }
   function copyScopes<T>(scopes: T): T {
     return scopes && typeof scopes === 'object' && !Array.isArray(scopes)
       ? { ...scopes }
@@ -323,15 +342,40 @@ export function createValveGroup<K extends string = string>(
           resolved,
           'The group derives the id and shares its store',
         );
-      const copy = { ...resolved };
+      const copy = copyOptions(resolved, [
+        'rate',
+        'concurrency',
+        'maxQueue',
+        'maxWait',
+        'feedback',
+        'maxPause',
+        'backoff',
+        'onStoreError',
+        'limits',
+        'batch',
+      ]);
       // Snapshot nested configuration before a wait can expose it to mutation.
+      const rule = (value: RateRule) =>
+        copyOptions(value, [
+          'name',
+          'scope',
+          'limit',
+          'interval',
+          'burst',
+          'algorithm',
+        ]);
       if (copy.rate)
         copy.rate = Array.isArray(copy.rate)
-          ? copy.rate.map((rule) => ({ ...rule }))
-          : { ...copy.rate };
-      if (typeof copy.concurrency === 'object')
-        copy.concurrency = { ...copy.concurrency };
-      if (copy.backoff) copy.backoff = { ...copy.backoff };
+          ? copy.rate.map(rule)
+          : rule(copy.rate as RateRule);
+      if (copy.concurrency && typeof copy.concurrency === 'object')
+        copy.concurrency = copyOptions(copy.concurrency, [
+          'limit',
+          'scope',
+          'leaseTtl',
+        ]);
+      if (copy.backoff)
+        copy.backoff = copyOptions(copy.backoff, ['base', 'max']);
       return {
         options: copy,
         maxWait:
@@ -573,7 +617,14 @@ export function createValveGroup<K extends string = string>(
     runOptions: RunOptions<Awaited<R>> = {},
   ): Promise<Awaited<R>> {
     runOptions = read(() => {
-      const copy = { ...runOptions };
+      const copy = copyOptions(runOptions, [
+        'cost',
+        'priority',
+        'maxWait',
+        'signal',
+        'observe',
+        'scopes',
+      ]);
       if (copy.scopes !== undefined) copy.scopes = copyScopes(copy.scopes);
       return copy;
     });
@@ -600,7 +651,18 @@ export function createValveGroup<K extends string = string>(
       wrapFetch: ((fetchImpl, fetchOptions) =>
         async (...args: never[]) => {
           const config = read(() => {
-            const options = { ...fetchOptions };
+            const options = copyOptions(
+              fetchOptions === undefined ? {} : fetchOptions,
+              [
+                'retries',
+                'retryUnsafeMethods',
+                'maxReplayBodySize',
+                'cost',
+                'priority',
+                'scopes',
+                'maxWait',
+              ],
+            );
             for (const field of ['cost', 'priority', 'scopes'] as const) {
               const value = options[field];
               if (typeof value === 'function')
@@ -614,9 +676,7 @@ export function createValveGroup<K extends string = string>(
               { signal?: AbortSignal } | undefined,
               { signal?: AbortSignal } | undefined,
             ];
-            const copy = init ? { ...init } : init;
-            if (copy) (args as unknown[])[1] = copy;
-            return { options, signal: copy?.signal ?? request?.signal };
+            return { options, signal: init?.signal ?? request?.signal };
           });
           // maxWait bounds every attempt, including retries after a shared
           // pause, so a wait for room can exhaust it but never shortens it.

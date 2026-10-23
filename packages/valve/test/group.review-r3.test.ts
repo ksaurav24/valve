@@ -43,8 +43,104 @@ async function blockedRoom(options: Partial<ValveGroupOptions> = {}) {
 }
 
 describe('group acquisition snapshots', () => {
+  it('preserves inherited run options and resolver configuration', async () => {
+    const controller = new AbortController();
+    controller.abort();
+    class Rule {
+      get limit() {
+        return 1;
+      }
+      get interval() {
+        return '1h' as const;
+      }
+    }
+    class Policy {
+      get concurrency() {
+        return 1;
+      }
+      get rate() {
+        return new Rule();
+      }
+    }
+    class Canceled {
+      get signal() {
+        return controller.signal;
+      }
+    }
+    class Expensive {
+      get cost() {
+        return 2;
+      }
+    }
+    const group = createValveGroup({
+      id: 'prototype-options',
+      resolve: () => new Policy(),
+    });
+    const work = vi.fn(() => 1);
+    try {
+      await expect(group.run('a', work, new Canceled())).rejects.toMatchObject({
+        code: 'ABORTED',
+      });
+      await expect(group.run('b', work, new Expensive())).rejects.toMatchObject(
+        { code: 'COST_EXCEEDS_LIMIT' },
+      );
+      expect(work).not.toHaveBeenCalled();
+      await expect(group.run('c', work)).resolves.toBe(1);
+    } finally {
+      await group.close();
+    }
+  });
+
+  it('preserves prototype fetch options and RequestInit fields', async () => {
+    class Init {
+      get method() {
+        return 'POST';
+      }
+      get body() {
+        return 'payload';
+      }
+    }
+    class Options {
+      get cost() {
+        return 2;
+      }
+      get retries() {
+        return 0;
+      }
+    }
+    const group = createValveGroup({
+      id: 'prototype-fetch',
+      resolve: () => ({ rate: { limit: 1, interval: '1h' } }),
+    });
+    const echo = vi.fn(async (url: string, init?: RequestInit) => {
+      const request = new Request(url, init);
+      return {
+        status: 200,
+        headers: {},
+        method: request.method,
+        body: await request.text(),
+      };
+    });
+    try {
+      const member = group.get('a');
+      await expect(
+        member.wrapFetch(echo, new Options())(
+          'https://example.test/',
+          new Init(),
+        ),
+      ).rejects.toMatchObject({ code: 'COST_EXCEEDS_LIMIT' });
+      expect(echo).not.toHaveBeenCalled();
+      await expect(
+        member.wrapFetch(echo)('https://example.test/', new Init()),
+      ).resolves.toMatchObject({ method: 'POST', body: 'payload' });
+    } finally {
+      await group.close();
+    }
+  });
+
   for (const method of [
     'run',
+    'run function',
     'wrap',
     'wrapFetch',
     'wrapFetch resolver',
@@ -64,11 +160,14 @@ describe('group acquisition snapshots', () => {
       });
       try {
         const scopes = { user: 'alice' };
-        const options = { scopes, priority: 1 };
+        const options = Object.assign(
+          method === 'run function' ? () => undefined : {},
+          { scopes, priority: 1 },
+        );
         const member = test.group.get('b');
         const fetchImpl = vi.fn(async () => ({ status: 200, headers: {} }));
         const waiting =
-          method === 'run'
+          method === 'run' || method === 'run function'
             ? member.run(() => 1, options)
             : method === 'wrap'
               ? member.wrap(() => 1, options)()
