@@ -235,12 +235,11 @@ export function applyPatch(
     relaxed ||= limit > rule.limit || burst > rule.burst;
     const before = rule.intervalMs / rule.limit;
     const after = rule.intervalMs / limit;
+    rule.ub = Math.max(rule.ub, burst);
     if (rule.algorithm === 'gcra' && after !== before) {
       rebase(rule, now);
-      rule.ub = Math.max(rule.ub, burst);
       if (after > before) rule.sw = Math.max(rule.sw, now + rule.ub * after);
     }
-    rule.ub = Math.max(rule.ub, burst);
     rule.limit = limit;
     rule.burst = burst;
   }
@@ -297,7 +296,8 @@ export function expiry(rule: FrameRule, x: number, now: number) {
 }
 
 /**
- * Grant a prefix of costs under authoritative managed rules, mirroring managed.lua.
+ * Grant a prefix of costs under authoritative rules validated by the store's resolver.
+ * Mirrors managed.lua.
  * GCRA states are clamped to the largest debt the frame allows, which only
  * affects state written under a different frame.
  * @returns The immutable result shape plus `impossible` when the first ungranted
@@ -309,13 +309,6 @@ export function managedBatch(
   states: RuleState[],
   now: number,
 ) {
-  // Validate the whole batch before changing even its copied rule states.
-  if (rules.some((rule) => !precise(rule, now)))
-    throw failure(
-      'managed',
-      'INVALID_OPTIONS',
-      'Managed GCRA limits exceed the safe numeric precision. Use a lower rate or a coordinated migration.',
-    );
   const thetas = rules.map((rule, i) => {
     if (rule.algorithm !== 'gcra') return 0;
     const t = theta(rule, now);
@@ -371,7 +364,7 @@ export function managedBatch(
   }
   return {
     granted,
-    retryAfterMs: impossible ? 0 : retryAfterMs,
+    retryAfterMs,
     pausedMs: 0,
     impossible,
   };

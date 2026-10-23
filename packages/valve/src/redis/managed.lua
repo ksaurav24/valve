@@ -311,7 +311,6 @@ if op == 'a' then
     end
     granted = granted + 1
   end
-  if impossible == 1 then retry = 0 end
   commitLimits()
   if granted > 0 then
     for i, r in ipairs(rules) do
@@ -382,17 +381,18 @@ if op == 's' then
     local retry = math.max(pause, leaseRetry)
     local impossible = false
     for _, zero in ipairs(job.refs) do if job.cost > cap(keys[zero + 1].r) then impossible = true end end
-    for _, zero in ipairs(job.refs) do
-      local s = keys[zero + 1]
-      local r = s.r
-      if impossible then
-      elseif r.algo == 0 then
-        local excess = math.max(s.a, s.th) + r.sr * job.cost - r.sr * r.b - s.th
-        if excess > 0 then retry = math.max(retry, math.ceil(excess * ratio(r))) end
-      else
-        local w = math.floor(now / r.I)
-        local count = s.a == w and s.b or 0
-        if count + job.cost > r.L then retry = math.max(retry, math.ceil((w + 1) * r.I - now)) end
+    if not impossible then
+      for _, zero in ipairs(job.refs) do
+        local s = keys[zero + 1]
+        local r = s.r
+        if r.algo == 0 then
+          local excess = math.max(s.a, s.th) + r.sr * job.cost - r.sr * r.b - s.th
+          if excess > 0 then retry = math.max(retry, math.ceil(excess * ratio(r))) end
+        else
+          local w = math.floor(now / r.I)
+          local count = s.a == w and s.b or 0
+          if count + job.cost > r.L then retry = math.max(retry, math.ceil((w + 1) * r.I - now)) end
+        end
       end
     end
     -- A pause or full lease set answers first; capacity is judged once admissible.

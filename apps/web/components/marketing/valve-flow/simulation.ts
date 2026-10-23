@@ -67,7 +67,7 @@ export function vfCreateSim(g: FlowGeometry, rate: number) {
     I,
     step: () => {},
   };
-  sim.workers = g.workers.map((w, i) => ({
+  sim.workers = g.workers.map((_, i) => ({
     i,
     burst: false,
     until: exp(4) + i * 2,

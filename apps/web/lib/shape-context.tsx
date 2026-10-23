@@ -33,17 +33,6 @@ interface ShapeClasses {
   mergedRadius: number;
 }
 
-/**
- * Radius for a surface inset inside another rounded surface.
- *
- * `inset` is the interior spacing (usually parent padding); pass the parent's
- * border separately as `borderWidth`. Together they form the visible
- * edge-to-edge distance. Clamping at zero prevents an invalid negative radius.
- */
-function nestedRadius(outerRadius: number, inset: number, borderWidth = 0) {
-  return Math.max(0, outerRadius - inset - borderWidth);
-}
-
 const shapeMap: Record<ShapeVariant, ShapeClasses> = {
   pill: {
     variant: 'pill',
@@ -157,5 +146,5 @@ function ShapeProvider({
   );
 }
 
-export { ShapeProvider, useShape, useShapeContext, shapeMap, nestedRadius };
+export { ShapeProvider, useShape, useShapeContext, shapeMap };
 export type { ShapeVariant, ShapeClasses };

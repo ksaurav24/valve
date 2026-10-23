@@ -171,7 +171,7 @@ export function createValve(options: ValveOptions): Valve {
     );
     if (config.managed) watchLimits(at);
   }
-  /** Managed context sent with every store call, seeded by the newest observed limits. */
+  /** Admission context, including the newest observed limits for managed valves. */
   function context() {
     return {
       id,
@@ -895,22 +895,7 @@ export function createValve(options: ValveOptions): Valve {
     // Concurrency-only valves still consult the pause in their shared store.
     costs.length = 0;
     for (const job of live) costs.push(job.cost);
-    const request = config.managed
-      ? { ...context(), costs }
-      : {
-          id,
-          rules,
-          costs,
-          ...(config.global
-            ? {
-                lease: {
-                  limit: config.concurrency,
-                  ttlMs: config.leaseTtl,
-                  owner: `${owner}:${leaseSequence++}`,
-                },
-              }
-            : {}),
-        };
+    const request = { ...context(), costs };
     const acquiredAt = Date.now();
     const version = noticeVersion;
     const issued = config.managed ? ++limitsIssued : 0;

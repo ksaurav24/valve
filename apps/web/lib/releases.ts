@@ -48,8 +48,6 @@ export const releases: Release[] = changelogEntries
     githubUrl: githubUrl(entry.version),
   }));
 
-export const latestPublished = npm.latest;
-
 export function versionState(version: string): VersionState {
   return npmVersionState(
     version,

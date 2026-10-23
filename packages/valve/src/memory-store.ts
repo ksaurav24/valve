@@ -413,12 +413,6 @@ export function memoryStore(options: MemoryStoreOptions = {}): Store {
     const now = clock();
     const state = resolve(request, true, now);
     const frames = plan.rules.map((rule) => state.rules.get(rule.name!)!);
-    if (frames.some((frame) => !precise(frame, now)))
-      throw failure(
-        request.id,
-        'INVALID_OPTIONS',
-        'Managed GCRA limits exceed the safe numeric precision. Use a lower rate or a coordinated migration.',
-      );
     const entries =
       scopedStates.get(request.id) ?? new Map<string, RuleState>();
     const current = plan.keys.map((key) => {
