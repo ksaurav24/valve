@@ -10,7 +10,7 @@ import type {
   SafetyReport,
   TrialRecord,
 } from '../core/types.ts';
-import { mergeSafety, safetyText } from '../oracle/safety.ts';
+import { mergeSafety } from '../oracle/safety.ts';
 import { holm, mean, sd, signFlipTest } from './stats.ts';
 import { aaVerdict, alphaPerLook, verdictFor } from './sequential.ts';
 import type {
@@ -371,23 +371,4 @@ export function describe(cell: CellSpec): string {
   ]
     .filter(Boolean)
     .join(' · ');
-}
-
-/** Lines summarizing safety then performance, for the console. */
-export function consoleSummary(s: RunSummary): string[] {
-  const lines = [`SAFETY: ${s.safety}`];
-  for (const c of s.cells)
-    for (const a of c.safety)
-      if (a.status !== 'PASS')
-        lines.push(
-          `  ${c.cellId} [${a.arm}] ${safetyText({ status: a.status, checked: [], unverified: a.unverified, counts: a.counts, samples: [] })}`,
-        );
-  const verdicts = s.cells.flatMap((c) =>
-    c.comparisons
-      .filter((x) => x.arm !== 'aa')
-      .map((x) => `${c.cellId} ${x.arm} ${x.metric}: ${x.verdict}`),
-  );
-  if (verdicts.length)
-    lines.push('PERFORMANCE:', ...verdicts.map((v) => `  ${v}`));
-  return lines;
 }

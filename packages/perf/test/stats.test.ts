@@ -82,6 +82,12 @@ describe('edge cases and properties', () => {
     const options = { exactUpTo: 0, iterations: 20_000, seed: 123 };
     const actual = signFlipTest(diffs, options);
     expect(actual).toBe(signFlipTest(diffs, options));
+    expect(
+      signFlipTest(
+        [1, 2, -3, 4, 5, -6, 7, 8, -9, 10, 11, -12, 13, 14, -15, 16, 17],
+        options,
+      ),
+    ).toBe(0.13979301034948252);
     expect(Math.abs(actual - signFlipTest(diffs))).toBeLessThan(0.025);
     expect(
       signFlipTest(Array<number>(17).fill(1), { iterations: 1, seed: 1 }),

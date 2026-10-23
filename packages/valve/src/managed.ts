@@ -235,12 +235,11 @@ export function applyPatch(
     relaxed ||= limit > rule.limit || burst > rule.burst;
     const before = rule.intervalMs / rule.limit;
     const after = rule.intervalMs / limit;
+    rule.ub = Math.max(rule.ub, burst);
     if (rule.algorithm === 'gcra' && after !== before) {
       rebase(rule, now);
-      rule.ub = Math.max(rule.ub, burst);
       if (after > before) rule.sw = Math.max(rule.sw, now + rule.ub * after);
     }
-    rule.ub = Math.max(rule.ub, burst);
     rule.limit = limit;
     rule.burst = burst;
   }
@@ -310,6 +309,7 @@ export function managedBatch(
   now: number,
 ) {
   // Validate the whole batch before changing even its copied rule states.
+  // Request getters can change authoritative frames after the store resolves them.
   if (rules.some((rule) => !precise(rule, now)))
     throw failure(
       'managed',
@@ -371,7 +371,7 @@ export function managedBatch(
   }
   return {
     granted,
-    retryAfterMs: impossible ? 0 : retryAfterMs,
+    retryAfterMs,
     pausedMs: 0,
     impossible,
   };

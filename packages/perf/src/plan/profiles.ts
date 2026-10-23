@@ -1,5 +1,5 @@
 // Profiles turn suites into concrete cell lists, arms, looks and budgets (RFC §5).
-import type { CellSpec, DecisionMetric, DecisionPlan } from '../core/types.ts';
+import type { CellSpec, DecisionMetric } from '../core/types.ts';
 import {
   coveringCells,
   onServer,
@@ -156,14 +156,6 @@ export function profileCells(
     }
   }
   return { cells, skipped };
-}
-
-/** Combine a profile's preregistered looks and alpha with its selected decision metrics. */
-export function decisionPlan(
-  profile: ProfileDef,
-  metrics: DecisionMetric[],
-): DecisionPlan {
-  return { metrics, looks: profile.looks, alpha: profile.alpha };
 }
 
 /** Preregistered metrics of the suite that owns a cell. */

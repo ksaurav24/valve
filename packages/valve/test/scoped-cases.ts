@@ -4,7 +4,10 @@ import type {
   ScopedAcquireResult,
 } from '../src/store.js';
 
-const job = (recipient: string, cost = 1) => ({ cost, scopes: { recipient } });
+export const job = (recipient: string, cost = 1) => ({
+  cost,
+  scopes: { recipient },
+});
 const midnight = Date.UTC(2050, 0, 2);
 // Explicit expectations shared by both backends, independent of either algorithm implementation.
 export const scopedCases: {

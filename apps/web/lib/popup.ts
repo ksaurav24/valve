@@ -21,19 +21,6 @@ export const popupScrollAreaClass = 'min-h-0 flex-1 max-h-[inherit]';
 export const popupViewportClass =
   '!h-auto max-h-[inherit] [&>div[style]]:!block [&>div[style]]:!min-w-0 [--scroll-fade-size:32px]';
 
-/** Keys that count as keyboard navigation inside a popup (earn the ring). */
-export const POPUP_NAV_KEYS = [
-  'ArrowDown',
-  'ArrowUp',
-  'ArrowLeft',
-  'ArrowRight',
-  'Home',
-  'End',
-  'PageUp',
-  'PageDown',
-  'Tab',
-];
-
 /**
  * Rows the fluid hover must skip: a disabled row is neither a target
  * nor a hover stop, whichever attribute the primitive marks it with.

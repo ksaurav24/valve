@@ -1,5 +1,6 @@
 // Replication-level statistics and multiplicity adjustments.
 import studentTQuantile from '@stdlib/stats-base-dists-t-quantile';
+import { mulberry32 } from '../core/rng.ts';
 
 /** Arithmetic mean; NaN for an empty sample. */
 export function mean(values: readonly number[]): number {
@@ -83,14 +84,7 @@ export function signFlipTest(
     visit(0, 0);
     return count / 2 ** diffs.length;
   }
-  // Mulberry32: fixed 32-bit state makes seeded robustness checks reproducible.
-  let state = seed >>> 0;
-  const random = () => {
-    state = (state + 0x6d2b79f5) >>> 0;
-    let value = Math.imul(state ^ (state >>> 15), state | 1);
-    value ^= value + Math.imul(value ^ (value >>> 7), value | 61);
-    return ((value ^ (value >>> 14)) >>> 0) / 2 ** 32;
-  };
+  const random = mulberry32(seed);
   let count = 1;
   for (let i = 0; i < iterations; i++) {
     let sum = 0;

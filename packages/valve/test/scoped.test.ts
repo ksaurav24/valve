@@ -1,4 +1,4 @@
-import { scopedCases } from './scoped-cases.js';
+import { job, scopedCases } from './scoped-cases.js';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { createValve, memoryStore } from '../src/index.js';
 import { normalize } from '../src/rules.js';
@@ -21,7 +21,6 @@ const rate = [
     algorithm: 'fixed-window' as const,
   },
 ];
-const job = (recipient: string, cost = 1) => ({ cost, scopes: { recipient } });
 const request = (
   jobs = [job('A'), job('A'), job('B'), job('C')],
 ): ScopedAcquireRequest => ({

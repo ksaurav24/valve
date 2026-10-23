@@ -381,7 +381,7 @@ const TabsSubtleItem = forwardRef<HTMLButtonElement, TabsSubtleItemProps>(
       // Base UI Tab renders a native <button type="button"> and wires
       // role="tab", aria-selected, roving tabindex, and activation for us.
       // id/aria-controls are only overridden when an idPrefix is supplied so
-      // externally rendered TabsSubtlePanel elements stay linked.
+      // externally rendered tabpanels stay linked.
       <Tabs.Tab
         ref={(node: HTMLElement | null) => {
           const button = node as HTMLButtonElement | null;
@@ -462,38 +462,5 @@ const TabsSubtleItem = forwardRef<HTMLButtonElement, TabsSubtleItemProps>(
 
 TabsSubtleItem.displayName = 'TabsSubtleItem';
 
-interface TabsSubtlePanelProps extends HTMLAttributes<HTMLDivElement> {
-  index: number;
-  selectedIndex: number;
-  idPrefix: string;
-  children: ReactNode;
-}
-
-// Rendered outside <TabsSubtle> at every call site, so it cannot use Base UI's
-// Tabs.Panel (which requires the Tabs.Root context). It stays a plain tabpanel
-// linked to its tab through the shared idPrefix.
-const TabsSubtlePanel = forwardRef<HTMLDivElement, TabsSubtlePanelProps>(
-  ({ index, selectedIndex, idPrefix, children, className, ...props }, ref) => {
-    const isSelected = selectedIndex === index;
-
-    return (
-      <div
-        ref={ref}
-        id={`${idPrefix}-panel-${index}`}
-        role="tabpanel"
-        aria-labelledby={`${idPrefix}-tab-${index}`}
-        hidden={!isSelected}
-        tabIndex={-1}
-        className={cn('outline-none', className)}
-        {...props}
-      >
-        {isSelected && children}
-      </div>
-    );
-  },
-);
-
-TabsSubtlePanel.displayName = 'TabsSubtlePanel';
-
-export { TabsSubtle, TabsSubtleItem, TabsSubtlePanel };
+export { TabsSubtle, TabsSubtleItem };
 export default TabsSubtle;

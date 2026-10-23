@@ -75,18 +75,3 @@ export function pairwise(factors: Factors, seed = 1, candidates = 30): Row[] {
   }
   return rows;
 }
-
-/** Verify that `rows` cover every level pair of `factors`. */
-export function coversAllPairs(
-  factors: Factors,
-  rows: readonly Row[],
-): boolean {
-  const names = Object.keys(factors);
-  for (let i = 0; i < names.length; i++)
-    for (let j = i + 1; j < names.length; j++)
-      for (const va of factors[names[i]!]!)
-        for (const vb of factors[names[j]!]!)
-          if (!rows.some((r) => r[names[i]!] === va && r[names[j]!] === vb))
-            return false;
-  return true;
-}
