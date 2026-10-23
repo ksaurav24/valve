@@ -43,6 +43,28 @@ async function blockedRoom(options: Partial<ValveGroupOptions> = {}) {
 }
 
 describe('group acquisition snapshots', () => {
+  it('preserves an observer method receiver and its feedback', async () => {
+    class Options {
+      #status = 429;
+      observe() {
+        return { status: this.#status, headers: { 'retry-after': '1' } };
+      }
+    }
+    const group = createValveGroup({
+      id: 'observer-receiver',
+      resolve: () => ({ concurrency: 1 }),
+    });
+    const warnings = vi.fn();
+    group.on('warning', warnings);
+    try {
+      await group.run('a', () => 1, new Options());
+      expect(group.get('a').stats()?.pausedUntil).not.toBeNull();
+      expect(warnings).not.toHaveBeenCalled();
+    } finally {
+      await group.close();
+    }
+  });
+
   it('preserves inherited run options and resolver configuration', async () => {
     const controller = new AbortController();
     controller.abort();

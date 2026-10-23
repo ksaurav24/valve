@@ -626,6 +626,8 @@ export function createValveGroup<K extends string = string>(
         'scopes',
       ]);
       if (copy.scopes !== undefined) copy.scopes = copyScopes(copy.scopes);
+      if (typeof copy.observe === 'function')
+        copy.observe = copy.observe.bind(runOptions);
       return copy;
     });
     return use(
