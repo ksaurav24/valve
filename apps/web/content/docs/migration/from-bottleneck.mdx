@@ -14,8 +14,9 @@ in-process and can share limits through Redis. The main differences:
   update authoritative numeric limits in Redis.
 - Crashed workers' **global concurrency slots** expire automatically through
   leases, without per-job `expiration`.
-- valve has no callback API, no `Group` class, and no general runtime
-  `updateSettings`; managed limits update only `limit` and GCRA `burst`.
+- Independent keyed groups use `createValveGroup` from `valvejs/group`. They
+  are not a Bottleneck `Group` drop-in. There is no callback API or general
+  runtime `updateSettings`; managed limits update only `limit` and GCRA `burst`.
 
 There is no compatibility layer. Translate pacing and quota policies explicitly;
 reservoir reset times and chained reservations can change behavior.
@@ -353,33 +354,55 @@ const apiFetch = api.wrapFetch(fetch, { retries: 2 });
 
 ## Groups
 
-`Bottleneck.Group` creates one limiter per key. For per-key rate budgets under
-one shared policy, prefer scoped rules as shown above; inactive Redis counters
-expire automatically. For independent per-key concurrency limits or feedback
-pauses, keep a `Map` of valves that share one store. See [Per-tenant budgets](/docs/examples/per-tenant-budgets/).
+`Bottleneck.Group` creates one limiter per key. Use atomic scoped rules when
+one request must spend shared and per-key budgets together. For independent
+per-key policies, concurrency, queues, and feedback cooldowns, use
+`createValveGroup` from `valvejs/group`:
 
 ```ts
-// Bottleneck
-const group = new Bottleneck.Group({ maxConcurrent: 2, minTime: 250 });
-await group.key(`shop:${shopId}`).schedule(() => syncShop(shopId));
+import { createValveGroup } from 'valvejs/group';
 
-// valve
-const valves = new Map<string, Valve>();
-function valveFor(key: string) {
-  let valve = valves.get(key);
-  if (!valve) {
-    valve = createValve({
-      id: key,
-      rate: { limit: 4, interval: '1s' },
-      concurrency: 2,
-      store,
-    });
-    valves.set(key, valve);
-  }
-  return valve;
+const shops = createValveGroup({
+  id: 'shops',
+  maxSize: 500,
+  idleTtl: '10m',
+  resolve: () => ({
+    rate: { name: 'requests', limit: 4, interval: '1s' },
+    concurrency: 2,
+    limits: 'managed',
+  }),
+});
+try {
+  await shops.run('shop-42', () => 'synced');
+  await shops.get('shop-42').updateLimits({ requests: { limit: 8 } });
+} finally {
+  await shops.close({ drain: true });
 }
-await valveFor(`shop:${shopId}`).run(() => syncShop(shopId));
 ```
+
+The example translates `minTime: 250` to GCRA pacing at four requests per
+second with the default burst of one. Pass one shared Redis store to the
+group for multi-worker budgets. This API is not a drop-in replacement:
+
+- IDs are stable and deterministic: group ID plus `:` plus
+  `encodeURIComponent(key)`. Workers must agree on the namespace and key mapping.
+- `resolve(key)` returns per-key options synchronously at child creation,
+  including after eviction. There is no shared limiter options object plus
+  `on('created')` configuration step.
+- `get(key)` returns a safe reusable member, not a raw child Valve. There are
+  no `key()` or `deleteKey()` methods. Idle children are evicted automatically.
+- Busy or locally paused children are never evicted. `maxSize` bounds busy and
+  idle children; a new key rejects with `QUEUE_FULL` if none can be evicted.
+- Managed `updateLimits` changes one key's authoritative numeric limits across
+  workers and survives local eviction. Resolver seeds do not overwrite it.
+- Eviction keeps store budgets and cooldowns. Stats and backoff counters are
+  local and reset on recreation; there is no cross-worker fairness guarantee.
+
+Groups do not make cross-key admission atomic. `runSequential` also leaves
+earlier admissions spent when a later stage denies. For a hard shared parent
+plus per-key quota on one request, keep one valve with scoped rules.
+See [Independent keyed groups](/docs/guides/independent-groups/) for lifecycle,
+key hygiene, feedback, and close order.
 
 ## Events
 

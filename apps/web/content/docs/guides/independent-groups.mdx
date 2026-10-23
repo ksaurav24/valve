@@ -1,0 +1,303 @@
+---
+title: Independent keyed groups
+description: Give tenants, credentials, or models independent budgets and cooldowns with a bounded local cache.
+---
+
+Use `createValveGroup` when each tenant, provider credential, or model needs its
+own policy, queue, concurrency, and feedback cooldown. Keys are independent;
+a group does not spend budgets across keys atomically.
+
+## Choose a model
+
+| Model                                  | Use when                                                               | Admission guarantee                                     |
+| -------------------------------------- | ---------------------------------------------------------------------- | ------------------------------------------------------- |
+| One valve with atomic scoped rules     | One request spends a hard shared parent quota and a per-key quota.     | All applicable budgets are spent together, or none.     |
+| Independent group                      | Keys have separate quotas, tiers, concurrency, or 429 cooldowns.       | Each key admits independently. No shared parent budget. |
+| Sequential stages with `runSequential` | Separate budgets must admit in order and earlier charges should stand. | Earlier admissions stay spent if a later stage denies.  |
+
+For a hard parent quota plus a per-tenant quota on the same request, use
+[scoped rate limits](/docs/guides/scoped-rate-limits/). Neither a group nor
+[`runSequential`](/docs/guides/compose-valves/) gives atomic admission across
+separate Valve IDs.
+
+## Resolve tenant tiers
+
+```ts
+import { createValveGroup } from 'valvejs/group';
+
+const tiers = new Map([
+  ['tenant-42', { limit: 40, concurrency: 4 }],
+  ['tenant-7', { limit: 10, concurrency: 2 }],
+]);
+const tierFor = (tenant: string) =>
+  tiers.get(tenant) ?? { limit: 5, concurrency: 1 };
+
+const tenants = createValveGroup({
+  id: 'crm:tenants',
+  maxSize: 500,
+  idleTtl: '10m',
+  resolve: (tenant) => {
+    const tier = tierFor(tenant); // Synchronous application lookup.
+    return {
+      rate: { name: 'tenant', limit: tier.limit, interval: '1s' },
+      concurrency: tier.concurrency,
+      maxQueue: 100,
+      maxWait: '10s',
+      limits: 'managed',
+    };
+  },
+});
+
+try {
+  const result = await tenants.run('tenant-42', () => 'sent', {
+    priority: 5,
+    cost: 1,
+    signal: AbortSignal.timeout(5000),
+  });
+  console.log(result);
+} finally {
+  await tenants.close({ drain: true });
+}
+```
+
+`createValveGroup` is an opt-in `valvejs/group` export, like `valvejs/redis`
+and `valvejs/headers`. It is not exported from `valvejs`, which keeps the core
+entry within its 17.5 KB gzip budget.
+
+`resolve(key)` returns `ValveOptions` without `id` or `store`. It runs
+synchronously once per local child creation: on first use and again after
+eviction, never per job. A promise, or a result containing `id` or `store`,
+is rejected with `INVALID_OPTIONS`. Options are read at creation; mutating the
+returned object later has no effect. Load tier configuration before using the
+group and keep rule structure consistent across workers.
+
+Without `store`, the group creates one private memory store shared by its
+children. It does not share state across processes.
+
+## Keep a member safely
+
+`get(key)` validates the key and returns a `ValveGroupMember` without creating
+a child. Keep the member or its wrappers for as long as needed:
+
+```ts
+import type { ValveGroup } from 'valvejs/group';
+
+async function sendMessage(tenants: ValveGroup, message: string) {
+  const tenant = tenants.get('tenant-42');
+  const send = tenant.wrap((text: string) => Promise.resolve(text));
+  return send(message);
+}
+```
+
+Call this helper with an open group. Members expose `key`, `id`,
+`run`, `wrap`, `wrapFetch`, `observe`, `pause`, `resume`, `getLimits`,
+`updateLimits`, and `stats()`. They are not raw child Valve handles. Each call
+pins its child until that call settles. After eviction, the next call
+transparently creates a new child. `stats()` returns `undefined` when no local
+child exists and does not create one.
+
+## Share provider credential budgets with Redis
+
+Use opaque credential IDs as keys, never the credentials themselves. All
+workers must use the same Redis namespace, group ID, and key mapping.
+This example requires `ioredis` and `REDIS_URL`:
+
+```ts
+import { Redis } from 'ioredis';
+import { createValveGroup } from 'valvejs/group';
+import { redisStore } from 'valvejs/redis';
+
+const redis = new Redis(process.env.REDIS_URL!, { enableOfflineQueue: false });
+const store = redisStore({ client: redis });
+const credentials = createValveGroup({
+  id: 'partner:credentials',
+  store,
+  resolve: () => ({
+    rate: { name: 'requests', limit: 20, interval: '1s' },
+    concurrency: 2,
+    limits: 'managed',
+  }),
+});
+
+try {
+  const limitedFetch = credentials.get('credential-42').wrapFetch();
+  const response = await limitedFetch('https://api.example.com/contacts', {
+    headers: { Authorization: `Bearer ${process.env.PARTNER_TOKEN!}` },
+    signal: AbortSignal.timeout(5000),
+  });
+  console.log(response.status);
+  await credentials.get('credential-42').updateLimits({
+    requests: { limit: 40 },
+  });
+} finally {
+  await credentials.close({ drain: true });
+  await store.close();
+  await redis.quit();
+}
+```
+
+The same key on another worker shares its stored budget and pause. Distinct
+keys have independent queues, budgets, cooldowns, and concurrency. Numeric
+concurrency is local; use a global concurrency option when the key needs a
+shared lease limit. Queues and stats stay local, with no cross-worker fairness.
+
+Close the group first, then the supplied store, then the Redis clients you own.
+A group never closes a supplied store. Its default private memory store is
+closed by the group. If a store is shared with other valves or groups, close
+all of them before closing it.
+
+## Wrap model endpoints
+
+Only separate models when their provider quotas are independent. These rates
+are illustrative. If models share a quota pool, use one key for that pool.
+
+```ts
+import { createValveGroup } from 'valvejs/group';
+
+type Model = 'small' | 'large';
+const models = createValveGroup<Model>({
+  id: 'inference:account-42',
+  resolve: (model) => ({
+    rate: { limit: model === 'small' ? 20 : 5, interval: '1s' },
+    concurrency: 2,
+  }),
+});
+const largeFetch = models.get('large').wrapFetch(fetch, { retries: 0 });
+const unsubscribe = models.on('pause', (event, key) => {
+  console.warn({ key, ...event });
+});
+
+try {
+  const response = await largeFetch('https://api.example.com/models/large', {
+    signal: AbortSignal.timeout(5000),
+  });
+  console.log(response.status);
+} finally {
+  await models.close({ drain: true });
+  unsubscribe();
+}
+```
+
+## Keep feedback on its key
+
+A member's `wrapFetch` observes responses and applies 429 cooldowns only to
+that key. Its retry behavior matches [Valve.wrapFetch](/docs/reference/api/#wrapfetch):
+GET, HEAD, OPTIONS, PUT, and DELETE retry by default. POST and PATCH require
+explicit opt-in after checking the provider's idempotency contract. Disabling
+retries still applies feedback.
+
+For a custom client, pass `observe` in that key's run options, or call the
+member's `observe(response)`. `observe` returns `void`; feedback writes happen
+in the background. Do not wrap the same request in both `group.run` and the
+member's `wrapFetch`, which would admit it twice.
+
+The model example uses `group.on('pause', (event, key) => ...)` to listen to
+all current and future children. It returns an unsubscribe function. Register
+listeners before submitting work. `pause` and `resume` affect only
+the member's ID, across workers sharing the store. Pauses do not cancel work
+already admitted. The group cannot infer a provider's quota scope from a URL
+or a response.
+
+## Update managed limits
+
+With `limits: 'managed'`, resolver `limit` and GCRA `burst` values seed only a
+key the store does not know yet. Stored values remain authoritative after
+local eviction. Use a member's `getLimits()` and `updateLimits()` to read and
+change them:
+
+```ts
+import type { ValveGroup } from 'valvejs/group';
+
+async function upgradeCredential(credentials: ValveGroup, key: string) {
+  const credential = credentials.get(key);
+  const before = await credential.getLimits();
+  return credential.updateLimits(
+    { requests: { limit: 60 } },
+    { expect: { requests: { limit: before.rules.requests.limit } } },
+  );
+}
+```
+
+Call this helper with the Redis group above before shutdown. The update affects that
+key on all workers and preserves spent budget. Changing the tier lookup alone
+does not overwrite stored limits. Names, scopes, algorithms, intervals, and
+global concurrency stay fixed. In immutable mode, workers resolving different
+rules for the same key are rejected by the store with `INVALID_OPTIONS`, just
+as with `createValve`. See [Runtime limits](/docs/guides/runtime-limits/).
+
+## Map IDs and protect keys
+
+A child's ID is exactly `` `${id}:${encodeURIComponent(key)}` ``. For example,
+`crm:tenants` and `tenant-42` produce `crm:tenants:tenant-42`. Migrating from
+hand-built IDs `crm:tenants:${tenant}` preserves stored state for plain keys
+like this when the store namespace and rules match. Keys containing characters
+that need encoding produce different IDs from an unencoded mapping.
+
+The group ID must contain 1 to 198 characters without `{` or `}`. Keys must be
+nonempty strings with valid URI encoding, and the derived child ID must fit
+200 characters. Invalid keys reject with `INVALID_OPTIONS`; `get()` validates
+synchronously, while `run()` rejects its promise. Encoding is injective and
+contains no `:`, so different keys and group namespaces do not collide.
+
+Hash long opaque keys yourself with a stable scheme on every worker:
+
+```ts
+import { createHash } from 'node:crypto';
+
+const keyFor = (opaqueId: string) =>
+  createHash('sha256').update(opaqueId).digest('hex');
+```
+
+Allow room for the 64-character hash and separator in the group ID. Keys appear
+in Redis key names. Encoding is not anonymization: use opaque non-secret IDs,
+not API tokens, emails, or phone numbers. For sensitive source values, use a
+keyed hash rather than a plain hash. Changing the mapping creates new budgets.
+
+## Bound local children and handle capacity
+
+`maxSize` defaults to `1000` and bounds all local children, busy and idle. It
+is a positive integer and is never exceeded. At capacity, the least recently
+used idle child is closed to make room. Children with calls in progress,
+queued or running jobs, or a local paused estimate are not evicted.
+
+If no child can be evicted, a call needing a new child rejects with
+`QUEUE_FULL`. This is group capacity backpressure, separate from `maxQueue`,
+which bounds each child's local job queue. Existing keys can still accept work
+subject to their own queue bounds. Apply upstream backpressure rather than
+retrying in a tight loop:
+
+```ts
+import { isValveError } from 'valvejs';
+import type { ValveGroup } from 'valvejs/group';
+
+async function tryTenant(tenants: ValveGroup, tenant: string) {
+  try {
+    return await tenants.run(tenant, () => 'sent');
+  } catch (error) {
+    if (isValveError(error) && error.code === 'QUEUE_FULL') {
+      return 'busy'; // Let the caller defer or reject the request.
+    }
+    throw error;
+  }
+}
+```
+
+`idleTtl` defaults to `'10m'`, measured after the last call settles. Paused
+children or children with work stay longer. Cleanup uses one unref'd timer.
+Eviction frees local memory only: budgets, pauses, managed limits, and shared
+cooldown remain in the store under its normal retention rules. Recreated
+children continue that shared state; local stats and backoff counters reset.
+
+`group.stats()` returns `{ size, active }`: retained children and children
+with a call in progress in this process. It is not a distributed total.
+
+## Shut down
+
+`close()` stops admission, rejects queued jobs with `CLOSED`, closes children,
+and waits for running calls to settle. `close({ drain: true })` lets queued
+work run first. Repeated calls return the same promise. Later member operations
+that need a child reject with `CLOSED`; retained members do not reopen the group.
+`await using` is also supported and calls `close()` without draining.
+
+For a caller-owned Redis store, follow the close order shown above. Stop
+incoming application work before draining so shutdown can finish.

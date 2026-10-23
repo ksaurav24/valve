@@ -137,8 +137,10 @@ all tenants. If recipients are tenant-local, supply a stable opaque ID for the
 values. Every identity within a rule has the same limit and burst. Managed
 limits can change that shared value at runtime, but cannot assign different
 values per identity. For different policy
-tiers, use separately configured Valve IDs only when their budgets are genuinely
-independent, or enforce the shared parent quota outside those instances.
+tiers with independent budgets, use [independent keyed groups](/docs/guides/independent-groups/).
+Each key can have its own policy, concurrency, and feedback cooldown. A group
+does not enforce a shared parent quota across keys. Keep one valve with scoped
+rules when the same request must spend a hard parent and per-key budget atomically.
 
 Scoped admission is atomic within one Valve. To combine separate Valve IDs
 with independent, non-atomic reservations, see

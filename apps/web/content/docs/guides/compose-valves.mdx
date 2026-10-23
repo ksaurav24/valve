@@ -3,7 +3,7 @@ title: Compose valves
 description: Choose between atomic scoped admission, explicit sequential admission, and separate workflow stages, and know what each guarantees.
 ---
 
-A job sometimes touches more than one budget. Valve offers three ways to model
+A job sometimes touches more than one budget. Valve offers several ways to model
 that. They differ in what happens when one budget admits the job and another
 does not, so pick by the guarantee you need.
 
@@ -12,6 +12,7 @@ does not, so pick by the guarantee you need.
 | Model                                  | Use when                                                                                                | If a later budget denies                            |
 | -------------------------------------- | ------------------------------------------------------------------------------------------------------- | --------------------------------------------------- |
 | One valve with several rules or scopes | One operation must spend every applicable budget together, or none.                                     | Nothing is spent. Admission is atomic.              |
+| Independent keyed groups               | Tenants, credentials, or models have independent policies, queues, and cooldowns.                       | Keys admit independently; no shared parent quota.   |
 | `runSequential` or manual nesting      | Independent budgets with separate IDs, queues, and limits, where the first charge is intended to stand. | Earlier admissions stay spent. Nothing is refunded. |
 | Separate `run` calls per stage         | A workflow has steps at different places, such as fetch provider A, transform, call provider B.         | Each step is admitted on its own, when it runs.     |
 
@@ -27,6 +28,13 @@ tenant budget rejects the job.
   in order. If a later stage rejects, times out, is aborted, or its valve is
   closed, the earlier admissions remain spent.
 </Callout>
+
+For many independent tenant, credential, or model valves, use
+[independent keyed groups](/docs/guides/independent-groups/) instead of managing
+a map of children. Groups bound local memory and keep retained members safe
+across eviction. They do not make cross-key budgets atomic. A group member
+is not a raw `Valve` and cannot be passed as a `runSequential` stage; use
+explicit nested member calls when sequential charges are intended.
 
 ## Nest runs by hand
 
