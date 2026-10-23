@@ -65,10 +65,12 @@ and `valvejs/headers`. It is not exported from `valvejs`, which keeps the core
 entry within its 17.5 KB gzip budget.
 
 `resolve(key)` returns `ValveOptions` without `id` or `store`. It runs
-synchronously once per local child creation: on first use and again after
-eviction, never per job. A promise, or a result containing `id` or `store`,
+synchronously on first local use and again after eviction, never per job.
+It may run before room is available to obtain the default `maxWait`, even if
+the call later aborts or expires without creating a child. Concurrent calls
+waiting for the same key share that configuration snapshot. A promise, or a result containing `id` or `store`,
 is rejected with `INVALID_OPTIONS`. So is any call to the same group made
-from inside `resolve`. Options are read at creation; mutating the returned
+from inside `resolve`. Options are copied when resolved; mutating the returned
 object later has no effect. Load tier configuration before using the
 group and keep rule structure consistent across workers.
 

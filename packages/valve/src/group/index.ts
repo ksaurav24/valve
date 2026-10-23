@@ -39,12 +39,13 @@ export interface ValveGroupOptions<K extends string = string> {
    */
   store?: Store;
   /**
-   * Returns the options for one key. Called synchronously each time the key
-   * gets a valve in this process: on first use and again after eviction, never
-   * per job. Return the same rules for a key on every worker. With
+   * Returns options synchronously on first local use and after eviction, not
+   * per job. May run before room is available to read the default maxWait;
+   * canceled calls then create no child. Concurrent waiting calls share the
+   * snapshot. Return the same rules for a key on every worker. With
    * `limits: "managed"`, its `limit` and `burst` only seed a key the store does
    * not know yet, so stored limits and updates survive eviction. Options are
-   * read when the valve is created; later changes to the object have no effect.
+   * copied when resolved; later changes to the object have no effect.
    * Calls to this group from inside `resolve` reject with `INVALID_OPTIONS`.
    */
   resolve: (key: K) => ValveGroupKeyOptions;
