@@ -13,7 +13,8 @@ export const SIZE_BUDGETS = {
   headers: 2048,
   // Opt-in subpath; bundles createValve and memoryStore, so it sits above core.
   // Submission snapshots and bounded acquisition cleanup have their own budget.
-  group: 19500,
+  // Wrap-time fetch validation and detached eviction closes added 137 bytes.
+  group: 19600,
 } as const;
 export const BUNDLE_SETTINGS =
   'browser, esm, es2022, bundle, minify, gzip default level';
