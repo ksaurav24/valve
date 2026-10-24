@@ -98,6 +98,12 @@ before any stage admits, when:
 - Two stages use the same valve `id`, whether the same instance or two
   instances with one ID.
 
+A stage's own options (`cost`, `priority`, `scopes`, `maxWait`) are validated
+by its valve only when that stage is entered, after earlier stages admit. A
+`cost` above a later stage's limit, or an unknown scope key, rejects with that
+stage's `valveId` and leaves earlier admissions spent on every call. Check
+those options before the call if they come from input.
+
 A single stage is allowed and behaves like `valve.run`.
 
 ### Why stage IDs must differ

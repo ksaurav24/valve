@@ -7,7 +7,7 @@ import type { JobContext, RunOptions, Valve } from './types.js';
  */
 export interface SequentialStage<T = unknown> {
   /** The valve that admits this stage. Every stage needs a different `id`. */
-  readonly valve: Valve;
+  readonly valve: Pick<Valve, 'id' | 'run'>;
   /**
    * Options for this stage only. Nothing is copied between stages. The shared
    * signal comes from {@link RunSequentialOptions}. `observe` feeds this
@@ -49,7 +49,8 @@ export interface RunSequentialOptions {
  * @throws never synchronously. Rejects with `INVALID_OPTIONS` for no stages,
  * a stage without a valve, repeated valve ids, or a non-function `fn`, before
  * any stage admits. Otherwise rejects with the first stage rejection, whose
- * `valveId` names the stage.
+ * `valveId` names the stage. A stage validates its own options only when it
+ * is entered, after earlier stages admit.
  * @example
  * const result = await runSequential(
  *   [
@@ -82,7 +83,10 @@ export function runSequential<R>(
       );
     // Snapshot stages so later caller mutation cannot bypass validation.
     const ids = new Set<string>();
-    const list: { valve: Valve; own: RunOptions<Awaited<R>> }[] = [];
+    const list: {
+      valve: Pick<Valve, 'id' | 'run'>;
+      own: RunOptions<Awaited<R>>;
+    }[] = [];
     for (const stage of stages) {
       const valve = (stage as SequentialStage | undefined)?.valve;
       if (typeof valve?.run !== 'function')
@@ -103,11 +107,22 @@ export function runSequential<R>(
           'Use one stage with a higher cost to charge one budget more',
         );
       ids.add(valve.id);
+      // Read documented fields like valve.run does, inherited ones included.
       // Untyped callers cannot add a stage signal of their own.
-      const own: RunOptions<Awaited<R>> = { ...stage.options };
-      delete own.signal;
-      if (own.scopes) own.scopes = { ...own.scopes };
-      list.push({ valve, own });
+      const from = stage.options as Record<string, unknown> | undefined;
+      const own: Record<string, unknown> = {};
+      for (const key of ['cost', 'priority', 'maxWait', 'scopes', 'observe']) {
+        const value = from?.[key];
+        if (value !== undefined) own[key] = value;
+      }
+      const { scopes, observe } = own;
+      // Arrays pass through so valve.run still rejects them.
+      if (scopes && typeof scopes === 'object' && !Array.isArray(scopes))
+        own.scopes = { ...scopes };
+      if (typeof observe === 'function')
+        own.observe = (result: unknown) =>
+          Reflect.apply(observe, from, [result]);
+      list.push({ valve, own: own as RunOptions<Awaited<R>> });
     }
     // Each stage gets its outer job's signal: the shared signal, or a lease
     // signal derived from it that also aborts if an outer global lease is lost.

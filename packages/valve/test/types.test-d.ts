@@ -206,6 +206,8 @@ test('runSequential infers results and keeps options per stage', () => {
     ],
     async (): Promise<ResponseLike> => ({ status: 200, headers: {} }),
   );
+  // Any object with id and run, such as a group member, is a stage.
+  void runSequential([{ valve: { id: 'member', run: a.run } }], () => 1);
   const stages: SequentialStage[] = [{ valve: a }, { valve: b }];
   expectTypeOf(runSequential(stages, () => 'x')).toEqualTypeOf<
     Promise<string>

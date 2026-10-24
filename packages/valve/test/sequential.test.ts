@@ -469,6 +469,85 @@ describe('runSequential', () => {
     await expect(tenant('t2')).resolves.toBe(false);
   });
 
+  it('reads inherited and non-enumerable options like valve.run', async () => {
+    const hidden = (key: string, value: number) =>
+      Object.defineProperty({}, key, { value }) as never;
+    const inherited = (key: string, value: number) =>
+      Object.create({ [key]: value }) as never;
+    const five = {
+      limit: 5,
+      interval: '1m',
+      algorithm: 'fixed-window',
+    } as const;
+    for (const make of [hidden, inherited]) {
+      const direct = valve({ id: `cost-direct-${make.name}`, rate: five });
+      const staged = valve({ id: `cost-staged-${make.name}`, rate: five });
+      await direct.run(() => 1, make('cost', 5));
+      await runSequential(
+        [{ valve: staged, options: make('cost', 5) }],
+        () => 1,
+      );
+      await expect(spent(direct)).resolves.toBe(true);
+      await expect(spent(staged)).resolves.toBe(true);
+
+      const slot = valve({ id: `priority-${make.name}`, concurrency: 1 });
+      const gate = deferred();
+      const holder = slot.run(() => gate.promise);
+      const order: string[] = [];
+      const low = runSequential([{ valve: slot }], () => order.push('low'));
+      const high = runSequential(
+        [{ valve: slot, options: make('priority', 10) }],
+        () => order.push('high'),
+      );
+      await tick();
+      gate.release();
+      await Promise.all([holder, low, high]);
+      expect(order).toEqual(['high', 'low']);
+    }
+  });
+
+  it('calls observe with the stage options as its receiver', async () => {
+    const limited = { status: 429, headers: { 'retry-after': '60' } };
+    class Options {
+      readonly #response = limited;
+      observe() {
+        return this.#response;
+      }
+    }
+    const a = valve({ id: 'receiver-a', concurrency: 1 });
+    const b = valve({ id: 'receiver-b', concurrency: 1 });
+    await runSequential(
+      [{ valve: a }, { valve: b, options: new Options() }],
+      () => limited,
+    );
+    expect(a.stats().pausedUntil).toBeNull();
+    expect(b.stats().pausedUntil).not.toBeNull();
+  });
+
+  it('passes array scopes through so valve.run still rejects them', async () => {
+    const scoped = valve({
+      id: 'array-scoped',
+      rate: { ...minute, name: 'tenant', scope: 'tenant' },
+    });
+    const plain = valve({ id: 'array-plain', rate: minute });
+    const cases = [
+      [scoped, Object.assign([], { tenant: 't1' })],
+      [plain, []],
+    ] as const;
+    for (const [target, value] of cases) {
+      const scopes = value as never;
+      await expect(target.run(() => 1, { scopes })).rejects.toSatisfy(
+        (error: unknown) => isValveError(error, 'INVALID_OPTIONS'),
+      );
+      await expect(
+        runSequential([{ valve: target, options: { scopes } }], () => 1),
+      ).rejects.toSatisfy((error: unknown) =>
+        isValveError(error, 'INVALID_OPTIONS'),
+      );
+      await expect(spent(target)).resolves.toBe(false);
+    }
+  });
+
   it('propagates a later stage store failure after the earlier stage admitted', async () => {
     const a = valve({ id: 'store-a', rate: minute });
     const broken = memoryStore();
