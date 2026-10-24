@@ -58,11 +58,11 @@ store with no cross-process sharing.
 
 ## Bound local memory
 
-The group keeps at most `maxSize` local children, busy and idle. It evicts the
-least recently used idle child at capacity and cleans up idle children after
-`idleTtl`. Busy or locally paused children are never evicted. If no child can
-be evicted, a call needing a new key rejects with `QUEUE_FULL`; apply upstream
-backpressure. `maxQueue` separately bounds each child's waiting jobs.
+The group keeps at most `maxSize` live local children, busy and idle. At
+capacity it evicts the least recently used idle child, preferring ones that are
+not paused, and it cleans up idle unpaused children after `idleTtl`. Busy
+children are never evicted. If every child is busy, a call needing a new key
+rejects with `QUEUE_FULL`; apply upstream backpressure. `maxQueue` separately bounds each child's waiting jobs.
 
 Members and wrapped functions remain safe to keep across eviction. A later
 call recreates the child without clearing its stored budget, pause, or managed

@@ -30,6 +30,12 @@ async function blockedRoom(options: Partial<ValveGroupOptions> = {}) {
     () => 1,
     options.resolve ? { scopes: { user: 'seed' } } : {},
   );
+  // x evicts a, whose close is held; with maxSize 1 closing, new keys must wait.
+  await group.run(
+    'x',
+    () => 0,
+    options.resolve ? { scopes: { user: 'seed' } } : {},
+  );
   return {
     group,
     open,
@@ -280,8 +286,9 @@ describe('group acquisition snapshots', () => {
       expect(await waiting).toBe('MAX_WAIT_EXCEEDED');
       expect(test.subscribe.mock.calls.map(([id]) => id)).toEqual([
         'review-r3:a',
+        'review-r3:x',
       ]);
-      expect(test.group.stats()).toEqual({ size: 0, active: 0 });
+      expect(test.group.stats()).toEqual({ size: 1, active: 0 });
     } finally {
       await test.close();
     }

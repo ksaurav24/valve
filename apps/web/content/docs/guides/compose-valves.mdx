@@ -33,8 +33,9 @@ For many independent tenant, credential, or model valves, use
 [independent keyed groups](/docs/guides/independent-groups/) instead of managing
 a map of children. Groups bound local memory and keep retained members safe
 across eviction. They do not make cross-key budgets atomic. A group member
-is not a raw `Valve` and cannot be passed as a `runSequential` stage; use
-explicit nested member calls when sequential charges are intended.
+is not a raw `Valve`, but it has the `id` and `run` a stage needs, so
+`{ valve: tenants.get(tenant) }` works as a `runSequential` stage when
+sequential charges are intended.
 
 ## Nest runs by hand
 

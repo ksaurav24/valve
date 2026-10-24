@@ -391,8 +391,9 @@ group for multi-worker budgets. This API is not a drop-in replacement:
   `on('created')` configuration step.
 - `get(key)` returns a safe reusable member, not a raw child Valve. There are
   no `key()` or `deleteKey()` methods. Idle children are evicted automatically.
-- Busy or locally paused children are never evicted. `maxSize` bounds busy and
-  idle children; a new key rejects with `QUEUE_FULL` if none can be evicted.
+- Busy children are never evicted, and paused ones only when room is needed.
+  `maxSize` bounds live busy and idle children; a new key rejects with
+  `QUEUE_FULL` if every child is busy.
 - Managed `updateLimits` changes one key's authoritative numeric limits across
   workers and survives local eviction. Resolver seeds do not overwrite it.
 - Eviction keeps store budgets and cooldowns. Stats and backoff counters are

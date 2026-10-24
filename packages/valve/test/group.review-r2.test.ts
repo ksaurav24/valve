@@ -34,6 +34,8 @@ const blockedRoom = async (keyOptions: ValveGroupKeyOptions = {}) => {
     }),
   });
   await group.run('a', () => 1);
+  // x evicts a, whose close is held; with maxSize 1 closing, new keys must wait.
+  await group.run('x', () => 0);
   return {
     group,
     gate,
@@ -241,6 +243,8 @@ describe('round 2 counterexamples', () => {
     });
     try {
       await g.run('a', () => 1);
+      // Fill the only live slot, so maxSize (1) closes are in flight and new keys wait.
+      await g.run('x', () => 0);
       const controller = new AbortController();
       const canceled = Array.from({ length: 200 }, (_, i) =>
         outcome(
@@ -256,7 +260,7 @@ describe('round 2 counterexamples', () => {
       gate.release();
       await sleep(20);
       expect(resolve.mock.calls).toHaveLength(resolved);
-      expect(g.stats()).toEqual({ size: 0, active: 0 });
+      expect(g.stats()).toEqual({ size: 1, active: 0 });
     } finally {
       gate.release();
       await g.close();
@@ -281,6 +285,8 @@ describe('round 2 counterexamples', () => {
     });
     try {
       await g.run('a', () => 1);
+      // Fill the only live slot, so maxSize (1) closes are in flight and new keys wait.
+      await g.run('x', () => 0);
       const controller = new AbortController();
       const first = outcome(g.run('b', () => 1, { signal: controller.signal }));
       const second = outcome(g.run('b', () => 2));

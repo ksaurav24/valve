@@ -209,7 +209,10 @@ or a response.
 With `limits: 'managed'`, resolver `limit` and GCRA `burst` values seed only a
 key the store does not know yet. Stored values remain authoritative after
 local eviction. Use a member's `getLimits()` and `updateLimits()` to read and
-change them:
+change them. Each call needs the key's local child, so on a key with no child
+it takes a cache slot like any other call and can reject with `QUEUE_FULL` when
+every child is busy. Keep a little headroom in `maxSize` if limit changes must
+succeed during saturation:
 
 ```ts
 import type { ValveGroup } from 'valvejs/group';
@@ -261,18 +264,26 @@ keyed hash rather than a plain hash. Changing the mapping creates new budgets.
 
 ## Bound local children and handle capacity
 
-`maxSize` defaults to `1000` and bounds all local children, busy and idle. It
-is a positive integer and is never exceeded. At capacity, the least recently
-used idle child is closed to make room. Children with calls in progress,
-queued or running jobs, or a local paused estimate are not evicted.
+`maxSize` defaults to `1000` and bounds live local children, busy and idle. It
+is a positive integer. At capacity, the least recently used idle child leaves
+the cache at once and closes in the background, so the new key's child is
+created immediately, including for `maxWait: 0`. Idle children that are not
+paused go first. An idle child with a local paused estimate is evicted only
+when no other idle child can make room; its shared pause stays in the store,
+so the recreated child still honors it, and only local backoff counters reset.
+Children with calls in progress or queued or running jobs are never evicted.
 
-A call that waits for an evicted child to close keeps its abort `signal`, and
+A child that is closing blocks only calls for its own key, which wait for the
+close so a key never has two children. At most `maxSize` evicted children close
+at once, so together with live children a group holds at most `2 × maxSize`.
+When that many closes are in flight, calls needing a new child wait for one.
+A call that waits keeps its abort `signal`, and
 the wait counts toward its `maxWait` (the run option, or the key's default). A
 member's `wrapFetch` applies `maxWait` to each attempt, including retries after
 a shared pause. A wait that uses the whole limit rejects with
 `MAX_WAIT_EXCEEDED`, but a shorter wait does not shorten later attempts.
 
-If no child can be evicted, a call needing a new child rejects with
+If every live child is busy, a call needing a new child rejects with
 `QUEUE_FULL`. This is group capacity backpressure, separate from `maxQueue`,
 which bounds each child's local job queue. Existing keys can still accept work
 subject to their own queue bounds. Apply upstream backpressure rather than
@@ -294,24 +305,25 @@ async function tryTenant(tenants: ValveGroup, tenant: string) {
 }
 ```
 
-`maxPending` defaults to `1000` and bounds calls waiting for a closing child
-to free room. Overflow rejects with `QUEUE_FULL`, separately from each child's
+`maxPending` defaults to `1000` and bounds calls waiting for a closing child,
+whether their own key's or one freeing room. Overflow rejects with `QUEUE_FULL`, separately from each child's
 `maxQueue`. Aborted or expired calls immediately leave this queue.
 
-`idleTtl` defaults to `'10m'`, measured after the last call settles. Paused
-children or children with work stay longer. Cleanup uses one unref'd timer.
+`idleTtl` defaults to `'10m'`, measured after the last call settles. Idle
+cleanup skips paused children until their pause ends, and children with work. Cleanup uses one unref'd timer.
 Eviction frees local memory only: budgets, pauses, managed limits, and shared
 cooldown remain in the store under its normal retention rules. Recreated
 children continue that shared state; local stats and backoff counters reset.
 
-`group.stats()` returns `{ size, active }`: retained children and children
-with a call in progress in this process. It is not a distributed total.
+`group.stats()` returns `{ size, active }`: live children (not those still
+closing) and children with a call in progress in this process. It is not a distributed total.
 
 ## Shut down
 
 `close()` stops admission, rejects queued jobs with `CLOSED`, closes children,
 and waits for running calls to settle. `close({ drain: true })` lets queued
-work run first. Repeated calls return the same promise. Later member operations
+work run first. Either way, calls still waiting for a closing child reject
+with `CLOSED`, since no child has queued them yet. Repeated calls return the same promise. Later member operations
 that need a child reject with `CLOSED`; retained members do not reopen the group.
 `await using` is also supported and calls `close()` without draining.
 

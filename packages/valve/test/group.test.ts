@@ -1,6 +1,6 @@
 // Independent keyed groups: isolation, stable ids, bounded lifecycle, and managed limits.
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { isValveError, memoryStore } from '../src/index.js';
+import { createValve, isValveError, memoryStore } from '../src/index.js';
 import type { Store } from '../src/index.js';
 import { createValveGroup } from '../src/group/index.js';
 import type { ValveGroup, ValveGroupOptions } from '../src/group/index.js';
@@ -309,9 +309,31 @@ describe('createValveGroup isolation', () => {
     const response = await limited('https://api.example/a');
     expect(response.status).toBe(200);
     expect(calls).toHaveLength(2);
-    await expect(
-      g.get('model-a').wrapFetch(fetchImpl, { retries: -1 })('x'),
-    ).rejects.toMatchObject({ code: 'INVALID_OPTIONS' });
+  });
+
+  it('validates wrapFetch arguments at wrap time like a plain valve', async () => {
+    const g = group({ id: 'wf', resolve: () => ({ concurrency: 1 }) });
+    const plain = createValve({ id: 'wf:plain', concurrency: 1 });
+    const fetchImpl = async () => ({ status: 200, headers: {} });
+    const cases = [
+      () => ['nope', undefined],
+      () => [fetchImpl, { retries: -1 }],
+      () => [fetchImpl, { retries: 1.5 }],
+      () => [fetchImpl, { maxReplayBodySize: Infinity }],
+      () => [fetchImpl, { maxWait: '1 minute' }],
+    ] as const;
+    for (const args of cases) {
+      const [impl, opts] = args() as unknown as [never, never];
+      expect(() => plain.wrapFetch(impl, opts)).toThrow(
+        expect.objectContaining({ code: 'INVALID_OPTIONS' }),
+      );
+      expect(() => g.get('k').wrapFetch(impl, opts)).toThrow(
+        expect.objectContaining({ code: 'INVALID_OPTIONS', valveId: 'wf:k' }),
+      );
+    }
+    // Validation happens before any valve exists.
+    expect(g.stats()).toEqual({ size: 0, active: 0 });
+    await plain.close();
   });
 });
 
@@ -472,10 +494,15 @@ describe('createValveGroup lifecycle', () => {
     // The sweep starts closing the idle valve, which waits for the held release.
     await new Promise((resolve) => setTimeout(resolve, 20));
     expect(held).toBe(true);
-    expect(g.stats().size).toBe(1);
-    const again = g.run('a', () => 'again');
+    // The closing valve has left the cache but still blocks its own key.
+    expect(g.stats().size).toBe(0);
+    let settled = false;
+    const again = g.run('a', () => 'again').finally(() => (settled = true));
     await new Promise((resolve) => setTimeout(resolve, 10));
-    expect(resolve).toHaveBeenCalledTimes(1);
+    // The waiting call may resolve options early, but creates no new valve.
+    expect(settled).toBe(false);
+    expect(counter.live.size).toBe(0);
+    expect(g.stats().size).toBe(0);
     hold.release();
     await expect(again).resolves.toBe('again');
     expect(counter.peak).toBe(1);
@@ -517,6 +544,91 @@ describe('createValveGroup lifecycle', () => {
     expect(order.slice(3)).toEqual(['b1', 'b2', 'b3']);
     await g.close();
     await store.close();
+  });
+
+  it('creates a new key at once with maxWait 0 when an idle valve can go', async () => {
+    const { store, live } = counted();
+    const g = group({
+      id: 'zero',
+      store,
+      maxSize: 2,
+      resolve: () => ({ concurrency: 1 }),
+    });
+    await g.run('a', () => 1);
+    await g.run('b', () => 1);
+    await expect(g.run('c', () => 'c', { maxWait: 0 })).resolves.toBe('c');
+    // The least recently used valve made room; the cache stays at maxSize.
+    expect(g.get('a').stats()).toBeUndefined();
+    expect(g.stats().size).toBe(2);
+    await until(() => !live.has('zero:a'));
+  });
+
+  it('does not let one slow close block unrelated keys', async () => {
+    const store = memoryStore();
+    const release = store.release!.bind(store);
+    const hold = deferred();
+    store.release = async (...args) => {
+      await hold.promise;
+      return release(...args);
+    };
+    const g = group({
+      id: 'slow-close',
+      store,
+      maxSize: 3,
+      resolve: () => ({ concurrency: { limit: 1, scope: 'global' as const } }),
+    });
+    for (const key of ['a', 'b', 'c']) await g.run(key, () => key);
+    // Each new key evicts one idle valve whose close stays held.
+    const ran = await Promise.all(
+      ['d', 'e'].map((key) => g.run(key, () => key, { maxWait: 40 })),
+    );
+    expect(ran).toEqual(['d', 'e']);
+    expect(g.stats().size).toBe(3);
+    hold.release();
+    await g.close();
+    await store.close();
+  });
+
+  it('evicts an idle paused valve only when room is needed, keeping its shared pause', async () => {
+    const store = memoryStore();
+    const g = group({
+      id: 'paused-room',
+      store,
+      maxSize: 2,
+      resolve: () => ({ concurrency: 1 }),
+    });
+    await g.get('a').pause('1h');
+    await g.run('b', () => 1);
+    // An unpaused idle valve goes first.
+    await expect(g.run('c', () => 'c')).resolves.toBe('c');
+    expect(g.get('b').stats()).toBeUndefined();
+    expect(g.get('a').stats()?.pausedUntil).not.toBeNull();
+    await g.get('c').pause('1h');
+    // Every valve is paused and idle: the least recently used one makes room.
+    await expect(g.run('d', () => 'd')).resolves.toBe('d');
+    expect(g.get('a').stats()).toBeUndefined();
+    // The recreated valve still honors the pause stored for its key.
+    await expect(g.run('a', () => 'a', { maxWait: 0 })).rejects.toMatchObject({
+      code: 'MAX_WAIT_EXCEEDED',
+    });
+    await g.close();
+    await store.close();
+  });
+
+  it('rearms the sweep for a release that expires before a paused recheck', async () => {
+    const g = group({
+      id: 'rearm',
+      idleTtl: 30,
+      resolve: () => ({ concurrency: 1 }),
+    });
+    await g.get('p').pause('5s');
+    // The sweep rechecks the paused valve about a second later.
+    await new Promise((resolve) => setTimeout(resolve, 60));
+    await g.run('q', () => 1);
+    const released = Date.now();
+    await until(() => g.get('q').stats() === undefined);
+    expect(Date.now() - released).toBeLessThan(500);
+    expect(g.get('p').stats()).toBeDefined();
   });
 
   it('keeps a member usable across evictions', async () => {
@@ -743,6 +855,8 @@ describe('createValveGroup close', () => {
       resolve: () => ({ concurrency: { limit: 1, scope: 'global' as const } }),
     });
     await g.run('a', () => 1);
+    // x evicts a, whose close is held; with maxSize 1 closing, b must wait.
+    await g.run('x', () => 0);
     const waiting = g.run('b', () => 'b');
     await new Promise((resolve) => setTimeout(resolve, 5));
     const closing = g.close();

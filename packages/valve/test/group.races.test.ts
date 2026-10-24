@@ -276,12 +276,15 @@ describe('createValveGroup races', () => {
     });
     try {
       await g.run('a', () => 1);
+      // Fill the only live slot, so maxSize (1) closes are in flight and new keys wait.
+      await g.run('x', () => 0);
       const short = outcome(g.run('short', () => 'ran-after-deadline'));
       await sleep(50);
       gate.release();
       expect(await short).toBe('MAX_WAIT_EXCEEDED');
       gate = deferred();
       await g.run('a', () => 1).catch(() => {});
+      await g.run('x', () => 0);
       const long = g.run('long', () => 'long');
       await sleep(50);
       gate.release();
@@ -362,6 +365,8 @@ describe('createValveGroup races', () => {
     };
     try {
       await g.run('a', () => 1);
+      // Fill the only live slot, so maxSize (1) closes are in flight and new keys wait.
+      await g.run('x', () => 0);
       // The key's default maxWait is exhausted while waiting for room.
       const short = outcome(g.get('short').wrapFetch(fetchImpl)('short'));
       await sleep(50);
@@ -369,6 +374,7 @@ describe('createValveGroup races', () => {
       expect(await short).toBe('MAX_WAIT_EXCEEDED');
       gate = deferred();
       await g.run('a', () => 1).catch(() => {});
+      await g.run('x', () => 0);
       // A wait shorter than maxWait leaves the call to run normally.
       const long = g.get('long').wrapFetch(fetchImpl, { maxWait: 2000 })(
         'long',
@@ -401,6 +407,8 @@ describe('createValveGroup races', () => {
     });
     try {
       await g.run('a', () => 1);
+      // Fill the only live slot, so maxSize (1) closes are in flight and new keys wait.
+      await g.run('x', () => 0);
       const waiting = outcome(
         g.run('b', () => 'ran-after-deadline', { maxWait: 10 }),
       );
