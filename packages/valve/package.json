@@ -60,6 +60,16 @@
         "default": "./dist/headers/index.cjs"
       }
     },
+    "./group": {
+      "import": {
+        "types": "./dist/group/index.d.ts",
+        "default": "./dist/group/index.js"
+      },
+      "require": {
+        "types": "./dist/group/index.d.cts",
+        "default": "./dist/group/index.cjs"
+      }
+    },
     "./package.json": "./package.json"
   },
   "files": [

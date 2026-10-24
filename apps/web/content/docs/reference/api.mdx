@@ -1,6 +1,6 @@
 ---
 title: API reference
-description: createValve options, valve methods, job options, and types.
+description: createValve, createValveGroup, sequential admission, methods, options, and types.
 ---
 
 The declaration files shipped with the package document every type with
@@ -289,6 +289,166 @@ readonly id: string
 
 The id passed to `createValve`.
 
+## createValveGroup
+
+```ts
+import {
+  createValveGroup,
+  type ValveGroupOptions,
+  type ValveGroupKeyOptions,
+  type ValveGroup,
+  type ValveGroupMember,
+  type ValveGroupStats,
+} from 'valvejs/group';
+```
+
+```ts
+function createValveGroup<K extends string = string>(
+  options: ValveGroupOptions<K>,
+): ValveGroup<K>;
+```
+
+Creates independent keyed valves with a bounded local cache. This opt-in
+subpath is not exported from `valvejs`, keeping the core entry within its
+17.5 KB gzip budget. Invalid group configuration throws `INVALID_OPTIONS`.
+See [Independent keyed groups](/docs/guides/independent-groups/).
+
+### ValveGroupOptions
+
+`ValveGroupOptions<K extends string = string>` accepts:
+
+| Option       | Type                               | Default                  | Description                                                                                      |
+| ------------ | ---------------------------------- | ------------------------ | ------------------------------------------------------------------------------------------------ |
+| `id`         | `string`                           | Required                 | Stable namespace, 1 to 198 characters without `{` or `}`.                                        |
+| `store`      | `Store`                            | New private memory store | Shared by all children. A supplied store is never closed by the group.                           |
+| `resolve`    | `(key: K) => ValveGroupKeyOptions` | Required                 | Synchronous options per local child creation, including after eviction; never per job.           |
+| `maxSize`    | `number`                           | `1000`                   | Positive integer bounding all local children, busy and idle.                                     |
+| `maxPending` | `number`                           | `1000`                   | Positive integer bounding calls waiting for a closing child. Overflow rejects with `QUEUE_FULL`. |
+| `idleTtl`    | `Duration`                         | `'10m'`                  | Idle retention after the last call settles. Paused or busy children stay longer.                 |
+
+Child IDs are exactly `` `${id}:${encodeURIComponent(key)}` ``. Keys must be
+nonempty strings that `encodeURIComponent` can encode; the derived ID must be
+at most 200 characters. Use opaque non-secret keys, or hash long keys yourself.
+Encoding is injective and contains no `:`, preventing collisions between keys
+or group namespaces. `crm:tenants` plus `tenant-42` preserves the hand-built ID
+`crm:tenants:tenant-42` and its existing store state.
+
+### ValveGroupKeyOptions
+
+```ts
+type ValveGroupKeyOptions = Omit<ValveOptions, 'id' | 'store'> & {
+  id?: never;
+  store?: never;
+};
+```
+
+All other Valve options apply per child. A resolver result containing `id`,
+`store`, or a promise is rejected with `INVALID_OPTIONS`, as is a call to the
+same group from inside the resolver, option getters, or fetch option resolvers. Options are copied when resolved;
+later mutations do not affect the child. Resolution may precede waiting for
+room so the default `maxWait` can expire during that wait. Concurrent calls
+waiting for a key share the snapshot; canceled calls create no child. Rules must match across
+workers for a key. In managed mode, numeric seeds only register unknown keys;
+stored limits remain authoritative after eviction. Immutable policy mismatches
+are rejected by the store with `INVALID_OPTIONS`.
+
+### ValveGroup
+
+```ts
+interface ValveGroup<K extends string = string> extends AsyncDisposable {
+  readonly id: string;
+  run<R>(
+    key: K,
+    fn: (ctx: JobContext) => R,
+    options?: RunOptions<Awaited<R>>,
+  ): Promise<Awaited<R>>;
+  get(key: K): ValveGroupMember<K>;
+  on<E extends keyof ValveEventMap>(
+    event: E,
+    listener: (payload: ValveEventMap[E], key: K) => void,
+  ): () => void;
+  stats(): ValveGroupStats;
+  close(options?: { drain?: boolean }): Promise<void>;
+}
+```
+
+`run` is equivalent to `get(key).run(fn, options)` but never throws
+synchronously. `get` validates the key synchronously with `INVALID_OPTIONS`
+and creates no child until an operation needs one. `on` listens to all current
+and future children and returns an unsubscribe function.
+
+At capacity, the least recently used idle child leaves the cache at once and
+closes in the background, so the new child is created immediately (also with
+`maxWait: 0`). Unpaused idle children go first; an idle paused child is
+evicted only when no other can make room, and its shared pause stays in the
+store. Children with calls in progress or queued or running work are never
+evicted. If every live child is busy, a call needing a new child rejects with
+`QUEUE_FULL`. A closing child blocks only its own key. At most `maxSize`
+children close at once, so a group holds at most `2 × maxSize`; beyond that,
+calls needing a new child wait. This is distinct from per-child `maxQueue`. A call
+waiting for an evicted child to close keeps its `signal`, and the wait counts
+toward its `maxWait`. For a member's `wrapFetch`, whose `maxWait` bounds each
+attempt, an exhausted wait rejects but a shorter one does not shorten attempts.
+`maxSize` bounds live children. Idle cleanup uses a single unref'd timer and
+skips paused children until their pause ends. `getLimits` and `updateLimits`
+need the key's local child, so they can reject with `QUEUE_FULL` on a key with
+no child while every child is busy.
+Eviction removes local children only; store budgets, pauses, cooldowns, and
+managed limits survive under normal store retention. Local counters and backoff
+reset on recreation.
+
+`close` closes every child with the same drain semantics as `Valve.close`,
+waits for calls in progress, and closes only a store the group created. Calls
+still waiting for a closing child reject with `CLOSED` even with `drain: true`.
+Repeated calls return the same promise. Subsequent operations needing a child
+reject with `CLOSED`. `await using` calls `close()` without draining. Close the
+group before a supplied store, then close your Redis clients.
+
+Keys have independent budgets, feedback, pauses, queues, and concurrency.
+A group does not provide atomic admission across keys or cross-worker fairness.
+For a shared hard parent quota and a per-key quota on one request, use one
+valve with scoped rules. Sequential stages leave earlier admissions spent
+when a later stage denies.
+
+### ValveGroupMember
+
+```ts
+interface ValveGroupMember<K extends string = string> extends Pick<
+  Valve,
+  | 'run'
+  | 'wrap'
+  | 'wrapFetch'
+  | 'observe'
+  | 'pause'
+  | 'resume'
+  | 'getLimits'
+  | 'updateLimits'
+> {
+  readonly key: K;
+  readonly id: string;
+  stats(): ValveStats | undefined;
+}
+```
+
+A member is safe to retain across eviction. Each call pins its child until
+settlement; the next call after eviction creates a new child transparently.
+It exposes no raw Valve handle or child `close` method. Method signatures
+match `Valve`; `stats` returns `undefined` without a local child and never
+creates one. `observe` returns `void` and reports operation failures through
+the group's `warning` event.
+
+### ValveGroupStats
+
+```ts
+interface ValveGroupStats {
+  readonly size: number;
+  readonly active: number;
+}
+```
+
+`size` counts retained local children, at most `maxSize`. `active` counts
+children with a call in progress, not jobs or distributed workers.
+
 ## runSequential
 
 ```ts
@@ -336,6 +496,7 @@ not rejected. The helper never closes a valve or store and never calls
 | Export                       | Entry point       | Description                                            |
 | ---------------------------- | ----------------- | ------------------------------------------------------ |
 | `memoryStore(options?)`      | `valvejs`         | In-process store. Share one instance to share budgets. |
+| `createValveGroup(options)`  | `valvejs/group`   | Independent keyed valves with bounded local children.  |
 | `redisStore(options)`        | `valvejs/redis`   | See [Redis store](/docs/reference/redis-store/).       |
 | `ValveError`, `isValveError` | `valvejs`         | See [Errors](/docs/reference/errors/).                 |
 | `defaultFeedback`            | Both              | The default feedback reader.                           |

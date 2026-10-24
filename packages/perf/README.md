@@ -70,6 +70,11 @@ guarantee a resolved performance result. See [REPRODUCING.md](./REPRODUCING.md).
 | T3 matrix     | `pnpm perf matrix --profile …`, `pnpm perf libs` | Paired A/B/A-A trials and competitor categories. Results are comparable only within the same environment fingerprint.                                   |
 | T4 soak/chaos | `pnpm perf soak`, `pnpm perf chaos`              | Long windows and faults. Full runs are manual because they take hours and require controlled infrastructure.                                            |
 
+T0 includes `group.run` suites that compare `valvejs/group` with a direct valve, plus new-key
+churn at `maxSize: 64`. For retained heap per key, churn bounds, and leftover timers, run
+`node --expose-gc --import tsx src/micro/group-memory.ts` from this package after
+`pnpm --filter valvejs build`. It exits nonzero if the cache exceeds `maxSize` or leaves timers.
+
 The model controls admission state, not JavaScript timers, promise ordering, sockets, or Valve's
 runtime scheduler. Scheduler claims therefore come only from real-time T2-T4 runs.
 
@@ -172,3 +177,15 @@ possible without presenting them as unrestricted high-rate stress.
 
 The full smoke profile includes deadline exposure. Any deadline violation fails and stops the
 run. PR CI runs memory/Redis/Valkey smoke, real-store integration, and the C1 regression command.
+
+### Independent group bundle budget
+
+The opt-in `valvejs/group` entry has a 19,500-byte gzip source budget. It bundles
+`createValve` and the shared memory store plus the group lifecycle. The original
+19,000-byte allocation left six bytes after bounded acquisition cleanup. Adding
+submission-time scope snapshots, guarded option reads, expiry checks before
+child construction, and preservation of inherited option fields requires about
+400 more bytes. This separate budget decision
+preserves those correctness guarantees and leaves modest room for maintenance.
+The core budget remains 17,500 bytes; core, Redis, and headers sizes are unchanged.
+This is a new subpath budget, not a relaxation of an existing core release limit.

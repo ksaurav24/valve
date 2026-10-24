@@ -1,5 +1,6 @@
 // One pinned bundler and settings for both frozen builds; retain the source-size budgets.
 import { build, version } from 'esbuild';
+import { existsSync } from 'node:fs';
 import { relative, resolve } from 'node:path';
 import { gzipSync } from 'node:zlib';
 import type { BuildIdentity } from '../core/types.ts';
@@ -10,6 +11,10 @@ export const SIZE_BUDGETS = {
   core: 17600,
   redis: 12000,
   headers: 2048,
+  // Opt-in subpath; bundles createValve and memoryStore, so it sits above core.
+  // Submission snapshots and bounded acquisition cleanup have their own budget.
+  // Wrap-time fetch validation and detached eviction closes added 137 bytes.
+  group: 19600,
 } as const;
 export const BUNDLE_SETTINGS =
   'browser, esm, es2022, bundle, minify, gzip default level';
@@ -35,6 +40,7 @@ export async function bundleFootprint(
       core: `./${input}/index.${extension}`,
       redis: `./${input}/redis/index.${extension}`,
       headers: `./${input}/headers/index.${extension}`,
+      group: `./${input}/group/index.${extension}`,
     };
     const consumers = {
       valve: `import { createValve } from '${entries.core}'; globalThis.api = createValve({id:'api',concurrency:16});`,
@@ -42,7 +48,10 @@ export async function bundleFootprint(
       errors: `import { isValveError } from '${entries.core}'; globalThis.isValveError = isValveError;`,
       redis: `import { redisStore } from '${entries.redis}'; globalThis.store = redisStore({adapter:globalThis.adapter});`,
       retryAfter: `import { retryAfter } from '${entries.headers}'; globalThis.feedback = retryAfter();`,
+      group: `import { createValveGroup } from '${entries.group}'; globalThis.group = createValveGroup({id:'tenants',resolve:()=>({concurrency:4})});`,
     };
+    // Baseline builds that predate valvejs/group have no group entry to measure.
+    const groupless = !existsSync(resolve(base, entries.group));
     for (const [name, value] of [
       ...Object.entries(entries).map(
         ([name, path]) => [`entry/${name}`, path] as const,
@@ -51,6 +60,7 @@ export async function bundleFootprint(
         ([name, code]) => [`consumer/${name}`, code] as const,
       ),
     ]) {
+      if (groupless && name.endsWith('/group')) continue;
       const result = await build({
         ...(name.startsWith('entry/')
           ? { entryPoints: [resolve(base, value)] }
@@ -90,21 +100,23 @@ export async function bundleFootprint(
 }
 
 /** Missing or invalid entries fail closed, as do entries over the existing ceiling. */
-export function sizeChecks(rows: BundleRow[]) {
-  return Object.entries(SIZE_BUDGETS).map(([entry, budget]) => {
-    const matches = rows.filter(
-      (r) => r.input === 'src' && r.name === `entry/${entry}`,
-    );
-    const bytes = matches[0]?.gzipBytes;
-    return {
-      entry,
-      budget,
-      bytes,
-      pass:
-        matches.length === 1 &&
-        Number.isSafeInteger(bytes) &&
-        bytes! > 0 &&
-        bytes! <= budget,
-    };
-  });
+export function sizeChecks(rows: BundleRow[], groupExpected = true) {
+  return Object.entries(SIZE_BUDGETS)
+    .filter(([entry]) => entry !== 'group' || groupExpected)
+    .map(([entry, budget]) => {
+      const matches = rows.filter(
+        (r) => r.input === 'src' && r.name === `entry/${entry}`,
+      );
+      const bytes = matches[0]?.gzipBytes;
+      return {
+        entry,
+        budget,
+        bytes,
+        pass:
+          matches.length === 1 &&
+          Number.isSafeInteger(bytes) &&
+          bytes! > 0 &&
+          bytes! <= budget,
+      };
+    });
 }

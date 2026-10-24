@@ -6,6 +6,7 @@
     "provider-quota-scopes",
     "scoped-rate-limits",
     "compose-valves",
+    "independent-groups",
     "global-concurrency",
     "respect-retry-after",
     "priorities-and-shutdown",

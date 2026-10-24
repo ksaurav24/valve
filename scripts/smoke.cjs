@@ -42,6 +42,16 @@ const { createValve } = require('../packages/valve/dist/index.cjs');
       }
     }
   }
+  const {
+    createValveGroup,
+  } = require('../packages/valve/dist/group/index.cjs');
+  const esmGroup = await import('../packages/valve/dist/group/index.js');
+  for (const create of [createValveGroup, esmGroup.createValveGroup]) {
+    const group = create({ id: 'smoke', resolve: () => ({ concurrency: 1 }) });
+    assert.equal(group.get('a:b').id, 'smoke:a%3Ab');
+    assert.equal(await group.run('a:b', () => 7), 7);
+    await group.close();
+  }
   assert.deepEqual(
     headers.retryAfter()({ status: 429, headers: { 'retry-after': '1' } }),
     { pauseMs: 1000 },

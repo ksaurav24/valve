@@ -1,5 +1,6 @@
 /** T0 in-process microbenchmark suite definitions. */
 
+import { existsSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import { Bench } from 'tinybench';
@@ -18,6 +19,16 @@ interface Valve {
 
 interface Store {
   acquireSync?: (request: Record<string, unknown>) => unknown;
+}
+
+interface GroupModule {
+  createValveGroup(options: Record<string, unknown>): {
+    run<T>(
+      key: string,
+      fn: () => T,
+      options?: Record<string, unknown>,
+    ): Promise<Awaited<T>>;
+  };
 }
 
 interface HeadersModule {
@@ -180,5 +191,43 @@ export async function microSuites(opts: {
   const fetchBench = make('valve.wrapFetch');
   fetchBench.add('fake-200', () => wrappedFetch());
 
-  return [run, ruledRun, acquire, scoped, headers, timers, fetchBench];
+  const suites = [run, ruledRun, acquire, scoped, headers, timers, fetchBench];
+  // Builds before valvejs/group have no group entry; their suites are skipped.
+  const groupPath = join(
+    dirname(fileURLToPath(opts.valveModuleUrl)),
+    'group',
+    'index.js',
+  );
+  const groupModule = existsSync(groupPath)
+    ? ((await import(pathToFileURL(groupPath).href)) as GroupModule)
+    : undefined;
+  if (groupModule) {
+    const childOptions = { concurrency: 16, feedback: false };
+    const hot = groupModule.createValveGroup({
+      id: 'micro-group',
+      resolve: () => childOptions,
+    });
+    let key = 0;
+    const churn = groupModule.createValveGroup({
+      id: 'micro-churn',
+      maxSize: 64,
+      resolve: () => childOptions,
+    });
+    const group = make('group.run');
+    group.add('memory/no-rate/batch-1000/one-key', async () => {
+      await Promise.all(
+        Array.from({ length: 1_000 }, () => hot.run('one', noop)),
+      );
+    });
+    group.add('memory/no-rate/batch-1000/64-keys', async () => {
+      await Promise.all(
+        Array.from({ length: 1_000 }, (_, i) => hot.run(`k${i % 64}`, noop)),
+      );
+    });
+    group.add('memory/new-key-each-run/maxSize-64', async () => {
+      await churn.run(`k${key++}`, noop);
+    });
+    suites.push(group);
+  }
+  return suites;
 }

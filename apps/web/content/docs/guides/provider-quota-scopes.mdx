@@ -81,6 +81,20 @@ to the whole ID. Include stable, non-secret credential or account identifiers
 in IDs; do not put raw API keys in Redis key names. IDs must be 1 to 200
 characters and contain no `{` or `}`.
 
+## Manage many independent keys
+
+Use [independent keyed groups](/docs/guides/independent-groups/) for many
+credentials, endpoints, or models with independent quotas. Import
+`createValveGroup` from `valvejs/group`, share one store, and use opaque
+credential or model IDs as keys. The resolver can select a different policy
+per key. A member's `wrapFetch` applies feedback only to its key, and the
+bounded local cache safely evicts idle children without resetting store state.
+
+Do not split a shared credential-wide budget into independent keys. A group
+does not enforce a shared parent quota, and a 429 on one key does not pause
+others. Use one valve with scoped rules when a request must spend both a hard
+parent quota and a per-key quota atomically.
+
 ## Verify sharing and isolation
 
 This example needs no HTTP server or Redis. It feeds a synthetic 429 into a

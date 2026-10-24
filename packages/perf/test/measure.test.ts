@@ -23,7 +23,7 @@ describe('perf-owned artifact measurements', () => {
 
   it('records source/dist entries, tree-shaken consumers, and module attribution', async () => {
     const rows = await bundleFootprint(build);
-    expect(rows).toHaveLength(16);
+    expect(rows).toHaveLength(20);
     const source = rows.find(
       (r) => r.input === 'src' && r.name === 'entry/core',
     )!;
@@ -34,12 +34,12 @@ describe('perf-owned artifact measurements', () => {
     )!;
     expect(errors.gzipBytes).toBeLessThan(source.gzipBytes);
     const checks = sizeChecks(rows);
-    expect(checks).toHaveLength(3);
+    expect(checks).toHaveLength(4);
     expect(checks.every((c) => typeof c.pass === 'boolean')).toBe(true);
   });
 
   it('fails missing, duplicate, malformed, or excessive size measurements', () => {
-    const rows = ['core', 'redis', 'headers'].map((entry) => ({
+    const rows = ['core', 'redis', 'headers', 'group'].map((entry) => ({
       input: 'src',
       name: `entry/${entry}`,
       bytes: 100,
@@ -47,6 +47,12 @@ describe('perf-owned artifact measurements', () => {
       modules: {},
     })) as BundleRow[];
     expect(sizeChecks(rows).every((c) => c.pass)).toBe(true);
+    const legacy = rows.filter((row) => row.name !== 'entry/group');
+    expect(sizeChecks(legacy, false)).toHaveLength(3);
+    expect(sizeChecks(legacy, false).every((check) => check.pass)).toBe(true);
+    expect(
+      sizeChecks(legacy).find((check) => check.entry === 'group')?.pass,
+    ).toBe(false);
     expect(sizeChecks(rows.slice(1))[0]!.pass).toBe(false);
     expect(sizeChecks([...rows, rows[0]!])[0]!.pass).toBe(false);
     for (const size of [NaN, Infinity, 0, -1, SIZE_BUDGETS.core + 1])

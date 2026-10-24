@@ -1,80 +1,80 @@
 ---
 title: Per-tenant budgets
-description: Create one valve per customer credential on demand, and share a single store between them.
+description: Give customer credentials independent quotas with a bounded group sharing one store.
 ---
 
-In a multi-tenant integration, each customer connects their own account, and
-the provider meters each account separately. Give every credential its own
-valve id, created the first time it is needed.
+When each customer connects an account with its own provider quota, use an
+[independent keyed group](/docs/guides/independent-groups/). Each credential
+gets its own budget, queue, concurrency, and feedback cooldown. If requests
+also spend a hard shared parent quota, use one valve with
+[atomic scoped rules](/docs/guides/scoped-rate-limits/) instead.
 
-```ts title="valves.ts"
-import { createValve, type Valve } from 'valvejs';
+This example requires `ioredis`, `REDIS_URL`, and a provider token. The quota
+is illustrative; check the provider's policy for your account.
+
+```ts
+import { Redis } from 'ioredis';
+import { createValveGroup } from 'valvejs/group';
 import { redisStore } from 'valvejs/redis';
 
-const store = redisStore({ client: redis }); // One store for every tenant.
-const valves = new Map<string, Valve>();
+const redis = new Redis(process.env.REDIS_URL!, { enableOfflineQueue: false });
+const store = redisStore({ client: redis });
+const credentials = createValveGroup({
+  id: 'commerce:credentials',
+  store,
+  maxSize: 500,
+  idleTtl: '10m',
+  resolve: () => ({
+    rate: { limit: 2, interval: '1s', burst: 40 },
+    maxWait: '1m',
+    maxQueue: 100,
+  }),
+});
 
-export function shopifyValve(shop: string): Valve {
-  let valve = valves.get(shop);
-  if (!valve) {
-    valve = createValve({
-      id: `shopify:${shop}`,
-      rate: { limit: 2, interval: '1s', burst: 40 },
-      store,
-      maxWait: '1m',
-    });
-    valves.set(shop, valve);
-  }
-  return valve;
-}
-
-export async function closeAll() {
-  await Promise.all([...valves.values()].map((valve) => valve.close()));
-  valves.clear();
-}
-```
-
-Use it wherever you call the provider:
-
-```ts
-const res = await shopifyValve(shop).run(
-  ({ signal }) =>
-    fetch(`https://${shop}/admin/api/2025-01/orders.json`, {
-      headers: { 'X-Shopify-Access-Token': tokens.get(shop)! },
-      signal,
-    }),
-  { observe: (r) => r },
-);
-```
-
-The rule here models a bucket of 40 requests that refills at 2 per second.
-Check the provider's documentation for your plan.
-
-## Why one store
-
-A store is cheap, but each Redis store with a `subscriber` adds pub/sub
-subscriptions. Reuse one store for every valve in the process. Valves still
-keep separate budgets, because their ids differ.
-
-For a memory store, sharing the instance is required: two valves with the same
-id only share a budget when they use the same store object.
-
-## Drop tenants you no longer need
-
-Each valve holds a small local queue and its listeners. If tenants come and go,
-close and remove a valve when its tenant disconnects:
-
-```ts
-export async function removeTenant(shop: string) {
-  const valve = valves.get(shop);
-  valves.delete(shop);
-  await valve?.close();
+try {
+  const limitedFetch = credentials.get('credential-42').wrapFetch();
+  const response = await limitedFetch('https://api.example.com/orders', {
+    headers: { Authorization: `Bearer ${process.env.PROVIDER_TOKEN!}` },
+    signal: AbortSignal.timeout(5000),
+  });
+  console.log(response.status);
+} finally {
+  await credentials.close({ drain: true });
+  await store.close();
+  await redis.quit();
 }
 ```
 
-The budget state in Redis expires on its own once it is no longer used.
+The rule models a bucket of 40 requests that refills at two per second. Each
+worker uses the same group ID, opaque credential key, store namespace, and
+policy so the same key shares its quota and cooldown across workers.
 
-## Ids must be safe
+## Reuse one store
 
-Ids are 1 to 200 characters and must not contain `{` or `}`. If a tenant key
-comes from user input, validate or hash it before building the id.
+All children share one store and its connections. Distinct keys have distinct
+budgets. For a memory store, share the store object between groups if the same
+child IDs must share state; omitting `store` gives each group a private memory
+store with no cross-process sharing.
+
+## Bound local memory
+
+The group keeps at most `maxSize` live local children, busy and idle. At
+capacity it evicts the least recently used idle child, preferring ones that are
+not paused, and it cleans up idle unpaused children after `idleTtl`. Busy
+children are never evicted. If every child is busy, a call needing a new key
+rejects with `QUEUE_FULL`; apply upstream backpressure. `maxQueue` separately bounds each child's waiting jobs.
+
+Members and wrapped functions remain safe to keep across eviction. A later
+call recreates the child without clearing its stored budget, pause, or managed
+limits. Local counters reset. There is no `deleteKey()` method.
+
+## Use safe keys and close in order
+
+Keys become part of Redis key names. Use opaque credential IDs, not tokens,
+emails, or phone numbers. A child's ID is
+`` `${id}:${encodeURIComponent(key)}` `` and must fit 200 characters. The
+group namespace must be 1 to 198 characters without braces. Hash long keys
+with a stable scheme on every worker.
+
+Close the group before its supplied store, then close your Redis clients.
+The group never closes a supplied store. Stop incoming work before draining.

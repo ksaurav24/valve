@@ -153,6 +153,38 @@ retroactive bound on starts admitted under an older value.
 For an unscoped queue, only the first ungranted job is classified as impossible
 in each store batch; later jobs return to the queue for a later admission.
 
+## Update one independent group key
+
+With [independent keyed groups](/docs/guides/independent-groups/), return
+`limits: 'managed'` and named rules from the resolver. Call
+`group.get(key).getLimits()` or `group.get(key).updateLimits(patch)` for that
+key. Its stored values are authoritative on every worker sharing the namespace.
+Resolver numeric values seed only an unknown key; changing those seeds does
+not overwrite an existing policy, including after local eviction.
+
+```ts
+import { createValveGroup } from 'valvejs/group';
+
+const tenants = createValveGroup({
+  id: 'crm:tenants',
+  resolve: () => ({
+    limits: 'managed',
+    rate: { name: 'tenant', limit: 10, interval: '1s' },
+  }),
+});
+try {
+  await tenants.get('tenant-42').updateLimits({ tenant: { limit: 40 } });
+  console.log(await tenants.get('tenant-42').getLimits());
+} finally {
+  await tenants.close({ drain: true });
+}
+```
+
+Without a supplied store this example is local. Pass a Redis store to share
+updates across workers. Each key updates separately; there is no cross-key
+atomic update. Rule structure remains fixed, and immutable mismatches for the
+same child ID are rejected by the store.
+
 ## Update scoped limits
 
 The same patch changes the value for every identity under a scoped rule:

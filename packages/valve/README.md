@@ -116,6 +116,33 @@ IDs, not phone numbers or secrets. Feedback and pauses remain Valve-wide.
 See [Scoped rate limits](https://valvejs.vercel.app/docs/guides/scoped-rate-limits/)
 for wrappers, store requirements, deployment safety, and limits.
 
+## Independent keyed groups
+
+Use a group when tenants, credentials, or models need independent budgets,
+queues, concurrency, and 429 cooldowns:
+
+```ts
+import { createValveGroup } from 'valvejs/group';
+
+const tenants = createValveGroup({
+  id: 'crm:tenants',
+  maxSize: 500,
+  resolve: () => ({ rate: { limit: 10, interval: '1s' }, concurrency: 2 }),
+});
+try {
+  await tenants.run('tenant-42', () => 'sent');
+} finally {
+  await tenants.close({ drain: true });
+}
+```
+
+The opt-in `valvejs/group` entry keeps the core entry small. Members from
+`get(key)` remain safe across idle eviction; store budgets are preserved.
+Groups do not enforce a shared parent quota across keys. For a shared hard
+parent plus per-key quota, use one valve with atomic scoped rules.
+See [Independent keyed groups](https://valvejs.vercel.app/docs/guides/independent-groups/)
+for tier policies, Redis, managed updates, capacity backpressure, and shutdown.
+
 ## Compose valves
 
 Use one valve with scoped rules when budgets must be spent together or not at
