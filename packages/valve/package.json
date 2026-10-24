@@ -93,7 +93,7 @@
   },
   "devDependencies": {
     "@arethetypeswrong/cli": "0.18.5",
-    "@vitest/coverage-v8": "5.0.3",
+    "@vitest/coverage-v8": "5.0.5",
     "fast-check": "4.10.2",
     "ioredis": "6.0.0",
     "ioredis5": "npm:ioredis@^5.11.1",
@@ -101,8 +101,8 @@
     "redis": "6.3.0",
     "redis4": "npm:redis@^4.7.1",
     "redis5": "npm:redis@^5.12.1",
-    "tsdown": "0.23.0",
+    "tsdown": "0.23.1",
     "typedoc": "0.28.20",
-    "vitest": "5.0.3"
+    "vitest": "5.0.5"
   }
 }
