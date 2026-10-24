@@ -6,7 +6,8 @@ import type { BuildIdentity } from '../core/types.ts';
 
 export const SIZE_BUDGETS = {
   // Managed admission and migration are included even for immutable consumers.
-  core: 17500,
+  // runSequential copies each stage's options the way valve.run reads them.
+  core: 17600,
   redis: 12000,
   headers: 2048,
 } as const;

@@ -140,6 +140,10 @@ values per identity. For different policy
 tiers, use separately configured Valve IDs only when their budgets are genuinely
 independent, or enforce the shared parent quota outside those instances.
 
+Scoped admission is atomic within one Valve. To combine separate Valve IDs
+with independent, non-atomic reservations, see
+[Compose valves](/docs/guides/compose-valves/).
+
 ## Wrap clients and retries
 
 Use fixed identities with `wrap`:

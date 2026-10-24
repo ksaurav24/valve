@@ -289,6 +289,48 @@ readonly id: string
 
 The id passed to `createValve`.
 
+## runSequential
+
+```ts
+function runSequential<R>(
+  stages: readonly SequentialStage<Awaited<R>>[],
+  fn: (ctx: JobContext) => R,
+  options?: RunSequentialOptions,
+): Promise<Awaited<R>>;
+```
+
+Runs `fn` after each valve admits it in turn, outermost first. It is
+equivalent to `a.run(() => b.run(fn))`, with each stage's own options. It is
+**not atomic**: an earlier stage's admission stays spent when a later stage
+rejects, times out, is aborted, or is closed, and nothing is refunded. See
+[Compose valves](/docs/guides/compose-valves/).
+
+### SequentialStage
+
+| Field     | Type                         | Description                                                                                  |
+| --------- | ---------------------------- | -------------------------------------------------------------------------------------------- |
+| `valve`   | `Pick<Valve, 'id' \| 'run'>` | The valve that admits this stage. Every stage needs a different `id`.                        |
+| `options` | `Omit<RunOptions, 'signal'>` | Options for this stage only: `scopes`, `cost`, `priority`, `maxWait`, `observe`. Not shared. |
+
+### RunSequentialOptions
+
+| Option   | Type          | Description                                                                                                                                    |
+| -------- | ------------- | ---------------------------------------------------------------------------------------------------------------------------------------------- |
+| `signal` | `AbortSignal` | Cancels whichever stage is waiting. Later stages and `fn` get the admitting job's signal, which aborts with this one or on a lost outer lease. |
+
+### Rejections
+
+`runSequential` never throws synchronously. It rejects with `INVALID_OPTIONS`,
+before any stage admits, for an empty or non-array `stages`, a stage without a
+valve, a non-function `fn`, or two stages with the same valve `id`. Each
+stage's own options are validated only when that stage is entered, so an
+invalid later-stage option rejects after earlier stages admit. Otherwise
+it settles with whatever `fn` settles with, or rejects with the first stage
+rejection, whose `valveId` names that stage. An inner stage rejection
+propagates as the outer job's failure, so the outer valve counts it as failed,
+not rejected. The helper never closes a valve or store and never calls
+`observe` itself.
+
 ## Other exports
 
 | Export                       | Entry point       | Description                                            |

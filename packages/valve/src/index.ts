@@ -1,5 +1,7 @@
 // Public factory, stores, errors, feedback, and structural types.
 export { createValve } from './valve.js';
+export { runSequential } from './sequential.js';
+export type { SequentialStage, RunSequentialOptions } from './sequential.js';
 export { memoryStore } from './memory-store.js';
 export type { MemoryStoreOptions } from './memory-store.js';
 export { ValveError, isValveError } from './errors.js';

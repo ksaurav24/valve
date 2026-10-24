@@ -181,7 +181,7 @@ rate: { limit: 2, interval: '1s', burst: 40 }
 | `on('idle')` or awaiting idle            | `idle()`, or `on('idle')`                                              |
 | `updateSettings(options)`                | `updateLimits` for managed numeric values; migrate structural changes. |
 | `incrementReservoir`, `currentReservoir` | No equivalent.                                                         |
-| `chain(limiter)`                         | Use one atomic policy with scoped rules; see below.                    |
+| `chain(limiter)`                         | Scoped rules (atomic), or `runSequential` (not atomic); see below.     |
 | `jobStatus(id)`, `jobs(status)`          | No equivalent.                                                         |
 
 <Callout type="warn" title="run passes a context, not your arguments">
@@ -252,6 +252,11 @@ and eligible B1 can proceed. The caller manages one Valve and supplies opaque
 identities rather than managing a limiter graph. Priorities and cancellation
 belong to one local queue. Nesting `a.run(() => b.run(fn))` still creates
 independent reservations and does **not** provide this guarantee.
+
+When independent chained reservations are what you want, `runSequential` makes
+them explicit. It nests the valves outermost first, with each stage keeping its
+own ID, queue, and limits. It is not atomic, and an earlier admission stays
+spent when a later stage denies. See [Compose valves](/docs/guides/compose-valves/).
 
 The tradeoffs are explicit:
 
