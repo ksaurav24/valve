@@ -1,0 +1,244 @@
+---
+title: CLI reference
+description: Perf harness commands, profiles, workload selectors, timing options, environment variables, and exit codes.
+---
+
+Invoke the private workspace CLI from the repository root:
+
+```sh
+pnpm perf <command> [options]
+pnpm perf --help
+```
+
+Options are validated per command. Unknown commands, unsupported flags, invalid
+numbers, and conflicting selectors are rejected. Use
+[Run benchmarks](/docs/benchmarking/running/) for complete workflows.
+
+## Commands
+
+| Command                                                        | Behavior and defaults                                                                                                                                                                            |
+| -------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `doctor`                                                       | Capture host capabilities, environment information, and timer lateness.                                                                                                                          |
+| `calibrate [--reps 3]`                                         | Measure cold-process overhead and write host-local planning calibration. Supports `--isolate`.                                                                                                   |
+| `build [--ref REF] [--patch FILE]`                             | Build and freeze the current checkout or a git revision. A patch requires `--ref`. Prints the build identity.                                                                                    |
+| `micro [--quick] [--filter TEXT]`                              | Run Tinybench in-process suites; filter by name and optionally reduce measurement time.                                                                                                          |
+| `model`                                                        | Run portable admission-model, capacity, golden, and oracle checks. Real-server parity belongs to integration tests.                                                                              |
+| `quick [--filter TEXT]`                                        | Run `model`, then reduced `micro` suites. The filter applies to microbenchmarks.                                                                                                                 |
+| `footprint [--check] [--base REF]`                             | Bundle source and dist entries and consumers with the same esbuild settings, record gzip sizes and module attribution. `--check` enforces the candidate's current source-entry budgets.          |
+| `startup [--base REF] [--reps 3]`                              | Alternate build order across three default pairs, with ten fresh Node processes per entry/build/pair. Record import/init time, CPU, heap, RSS, and peak RSS; filesystem caches remain shared.    |
+| `scoped [--stores memory] [--iterations 100] [--base REF]`     | Probe public `Store.acquireScoped`: batches 1/32/128, rules 2/8/16, cold/hot/mixed identities, and 1/4/8-client contention in one Node process. Denial evaluations are separate from grants.     |
+| `drift [--base REF] [--jobs 200] [--response-ms 0] [--reps 3]` | Cold-process pacing at 100/s, burst 1, after 32 warmup jobs. Record public-store calls, queue wait, callback drift, CPU, memory, GC, and event-loop delay. No private wake/admission timestamps. |
+| `plan [--profile targeted]`                                    | Print selected cells, skipped cells, arms, looks, and calibrated estimate. Builds and trials do not execute.                                                                                     |
+| `smoke`                                                        | Short real-time correctness trials; default smoke profile and one replication. Missing store coverage is listed explicitly.                                                                      |
+| `matrix --base REF [--head REF\|--current]`                    | Compare baseline/A/A/candidate arms; default targeted profile, current checkout as candidate.                                                                                                    |
+| `libs [--category L1,L2,D1]`                                   | Compare supported library/category cells with Valve A/A and separate distributed Valve audits.                                                                                                   |
+| `soak [--suite lease] [--duration 4h]`                         | One continuous stateful trial per selected suite; default one-hour window and total offered load of two jobs/second.                                                                             |
+| `chaos [--faults TYPE,...]`                                    | Execute the selected fault-suite cells, with instrumented correctness arms.                                                                                                                      |
+| `c1 [--stores memory,redis74]`                                 | Verify the deadline regression: the later callback must reject with `MAX_WAIT_EXCEEDED` without starting after the earlier job stalls past its deadline.                                         |
+| `report RUN_ID [--html]`                                       | Render saved summary/local diagnostic data as reports. Does not rerun trials or recompute measurements from raw payloads.                                                                        |
+| `legacy catalog [--archive DIR]`                               | Inspect a configured read-only pre-harness evidence archive.                                                                                                                                     |
+| `legacy golden [--archive DIR]`                                | Replay archived analyzers to regenerate legacy golden evidence. Requires the external archive.                                                                                                   |
+
+The four diagnostic commands `footprint`, `startup`, `scoped`, and `drift`
+accept `--base REF` and `--head REF`; the candidate otherwise comes from the
+current checkout. Both artifacts are built before sampling, and the current
+harness measures both. Startup, scoped, and drift remain descriptive.
+
+## Infrastructure commands
+
+```sh
+pnpm perf infra up redis74,valkey8
+pnpm perf infra status
+pnpm perf infra down redis74,valkey8
+pnpm perf infra adopt redis://127.0.0.1:6379 --empty-only --name local-perf
+pnpm perf infra images redis74 --build
+pnpm perf infra up redis74-netem
+```
+
+`up` accepts `--cpuset CPUS` and `--recreate`. Without names, `up` selects
+Redis 7.4 and Valkey 8; `down` selects all registered servers. Supplying names
+makes cleanup explicit. `status` reports reachability, sentinel validity, and
+container identity. `images` checks netem image availability; `--build`
+builds the local netem image. Netem containers use locally built images with
+network-control tools for delay/jitter cells.
+
+| Name       | Docker image        | Published host port |
+| ---------- | ------------------- | ------------------- |
+| `redis62`  | `redis:6.2`         | 16462               |
+| `redis74`  | `redis:7.4`         | 16479               |
+| `redis8`   | `redis:8`           | 16481               |
+| `valkey72` | `valkey/valkey:7.2` | 16472               |
+| `valkey8`  | `valkey/valkey:8`   | 16480               |
+
+`-netem` variants are also recognized, as are locally registered adopted names.
+Linux normally connects through direct container IPs rather than published
+ports. Adoption requires an empty database and makes it disposable; see
+[store ownership](/docs/benchmarking/internals/#store-ownership-and-cleanup).
+
+## Profiles
+
+Profiles select cells, replications, audits, and the decision plan. Use
+`plan --profile NAME` or the intended execution command's `--dry-run` to see
+the concrete selection on your host.
+
+| Profile    | Selection                                                   | Default replication looks | Audit                    | Default budget |
+| ---------- | ----------------------------------------------------------- | ------------------------- | ------------------------ | -------------- |
+| `smoke`    | Available smoke cells, with additional core Valkey coverage | 1                         | Main trials instrumented | None           |
+| `targeted` | Risk cells of selected suites; all suites if not filtered   | 5                         | Separate                 | None           |
+| `sylvie`   | Focused two-worker GCRA and lease cells                     | 10                        | Separate                 | None           |
+| `nightly`  | Risk cells selected by priority within budget               | 5                         | Separate                 | 40 minutes     |
+| `decision` | Risk cells plus deterministic pairwise covering cells       | 5, 10, 20                 | Separate                 | None           |
+
+`pnpm perf:sylvie` is shorthand for `pnpm perf matrix --profile sylvie` and
+defaults to `HEAD` versus current. Sylvie is supported by `matrix` and `plan`.
+It requires isolation and authoritative execution. Other matrix profiles need
+an explicit `--base`.
+
+`--reps N` replaces the profile's staged looks with one fixed-N look. Choose
+it before execution. The decision profile evaluates only its preregistered
+looks and can stop resolved cells early.
+
+## Suites
+
+`--suite` accepts comma-separated suite names:
+
+| Suite          | Coverage                                                       |
+| -------------- | -------------------------------------------------------------- |
+| `gcra`         | GCRA rate/burst admission and saturated or offered demand.     |
+| `fixed-window` | Epoch-aligned fixed-window rules and boundaries.               |
+| `multi-rule`   | Atomic admission across several rules.                         |
+| `scoped`       | Identity-specific and shared rule combinations.                |
+| `weighted`     | Weighted costs and prefix head-of-line effects.                |
+| `lease`        | Global concurrency, lease expiry/renewal, subscriber variants. |
+| `combined`     | Rate rules and global leases in the same admission.            |
+| `deadlines`    | Queue deadlines and late-start exposure.                       |
+| `stores`       | Correctness and risk cells across Redis/Valkey versions.       |
+| `lifecycle`    | Pause/resume/close and related lifecycle behavior.             |
+| `faults`       | Declared worker/server faults and recovery.                    |
+| `runtime`      | Runtime overhead and background-work cells.                    |
+| `network`      | Store RTT delay/jitter; requires netem infrastructure.         |
+| `api`          | Public API workload cells.                                     |
+
+Not every suite has every store variant. `--stores` filters generated cells;
+it does not manufacture a Cartesian product of every suite and store. Inspect
+skipped cells, especially for version and network suites.
+
+## Fault selectors
+
+The default `chaos` suite accepts these `--faults` types:
+
+| Type            | Mechanism                                           |
+| --------------- | --------------------------------------------------- |
+| `client-kill`   | Disconnect server clients to exercise reconnection. |
+| `redis-restart` | Restart the disposable server without persistence.  |
+| `redis-pause`   | Pause the server beyond the workload's lease TTL.   |
+| `redis-stall`   | Run a calibrated blocking server operation.         |
+| `redis-cpu`     | Apply background CPU duty to the server.            |
+| `redis-load`    | Apply competing command load.                       |
+
+Worker-kill and late-join fault specifications (`kill-workers`,
+`spawn-workers`) also exist in declared suite cells. A filter only selects
+fault types available in the chosen suite's cells; it does not add a new fault
+or configure its parameters. Use `--dry-run` to inspect selection.
+
+## Library comparison categories
+
+| Category  | Contract                                      | Other libraries                                           |
+| --------- | --------------------------------------------- | --------------------------------------------------------- |
+| `L1`      | Local concurrency with 1 ms async jobs        | p-limit, p-queue, Bottleneck                              |
+| `L1-noop` | Local concurrency with synchronous no-op jobs | p-limit, p-queue, Bottleneck; analyzed separately from L1 |
+| `L2`      | Local burst-1 pacing                          | p-queue, Bottleneck                                       |
+| `L3`      | Local fixed-window quota                      | p-queue, Bottleneck; window anchoring differs             |
+| `L4`      | Local burst bank                              | Bottleneck, approximate mapping only                      |
+| `L5`      | Queued cancellation                           | p-queue; only still-queued jobs are cancelled             |
+| `D1`      | Distributed global concurrency                | Bottleneck clustering                                     |
+| `D2`      | Distributed burst-1 pacing                    | Bottleneck clustering                                     |
+| `D3`      | Distributed window quota                      | Bottleneck clustering                                     |
+
+Valve-only features such as scoped admission, multiple atomic rules, and
+weighted atomic admission are N/A for competitors that lack the contract.
+An `identity` adapter invokes jobs directly as a harness-floor control.
+Floor measurements are raw absolutes; nothing is subtracted from results.
+
+## Real-time options
+
+These options belong to the shared planning/execution commands: `plan`,
+`smoke`, `matrix`, `libs`, `soak`, and `chaos`. Their effect depends on the
+selected tier; use `--dry-run` to check the resulting cells. They are not
+universal flags for portable commands.
+
+### Selection and build identity
+
+| Option              | Meaning                                                                                                                                              |
+| ------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `--profile NAME`    | Select a named profile. Smoke defaults to `smoke`; matrix defaults to `targeted`.                                                                    |
+| `--suite NAME,...`  | Select workload suites.                                                                                                                              |
+| `--stores NAME,...` | Select stores, including `memory`. `--store` is an alias; do not supply both.                                                                        |
+| `--category ID,...` | Select library categories for `libs`.                                                                                                                |
+| `--faults TYPE,...` | Filter fault cells in `chaos`; unknown types are rejected.                                                                                           |
+| `--cell TEXT`       | Keep cell IDs containing the text.                                                                                                                   |
+| `--limit-cells N`   | Keep the first N cells after priority/ID ordering; report exclusions.                                                                                |
+| `--base REF`        | Baseline git ref, or `current` for the working checkout. Required for ordinary matrix execution.                                                     |
+| `--head REF`        | Candidate git ref; mutually exclusive with `--current`.                                                                                              |
+| `--current`         | Explicitly select the working checkout candidate.                                                                                                    |
+| `--patch FILE`      | Build a patched candidate from `--head`, otherwise the baseline ref (or `HEAD` for a current baseline). Resolved relative to the invoking directory. |
+| `--rebuild`         | Request a current-checkout rebuild. Real-time current builds already rebuild by default.                                                             |
+| `--endpoint URL`    | Override selected Redis addresses with a `redis://` or `rediss://` URL; execution is non-authoritative.                                              |
+
+### Timing and workload
+
+| Option                | Range/default and meaning                                                                                    |
+| --------------------- | ------------------------------------------------------------------------------------------------------------ |
+| `--reps N`            | 1–100 independent repetitions; otherwise use profile looks.                                                  |
+| `--seed N`            | Integer 0–4294967295; real-time default 42. Derives workload and ordering seeds.                             |
+| `--workers N`         | 1–64 processes; overrides selected cells. Sylvie allows at most two.                                         |
+| `--window DURATION`   | Override measurement window; bare numbers are seconds, or use `2s`, `40m`, `4h`. Positive, at most 12 hours. |
+| `--duration DURATION` | Alias for `--window`; also used for continuous soak duration.                                                |
+| `--window-ms N`       | Window in milliseconds, 1–43200000. Supply only one window spelling.                                         |
+| `--warmup-ms N`       | 0–3600000 ms; otherwise the cell's warmup.                                                                   |
+| `--drain-ms N`        | 0–3600000 ms after the window to observe outcomes; otherwise the cell's drain.                               |
+| `--rate N`            | Soak's total offered jobs/second, 0.001–10000; default 2.                                                    |
+| `--budget DURATION`   | Positive, at most 12 hours. Select complete cells that fit the estimated budget.                             |
+
+Window overrides scale fault times to keep the requested fault within a
+short sample. They change the plan and its evidential strength.
+
+### Execution and output
+
+| Option                    | Meaning                                                                                   |
+| ------------------------- | ----------------------------------------------------------------------------------------- |
+| `--dry-run`               | Print the plan without builds or trial execution. `plan` always does this.                |
+| `--yes`                   | Allow execution when the estimate exceeds 60 minutes.                                     |
+| `--isolate`               | Re-exec in a protected systemd user scope and apply worker affinity.                      |
+| `--worker-cpus CPUS`      | CPU list such as `0-3,6`; keep separate from pinned server CPUs.                          |
+| `--require-authoritative` | Fail before trials if required execution controls are missing.                            |
+| `--run-id ID`             | Choose a safe run-directory name; reuse only with identical measurement inputs to resume. |
+| `--html`                  | Write a self-contained HTML report in addition to standard report formats.                |
+| `--keep-raw`              | Retain raw NDJSON streams and worker configs after compressed payload creation.           |
+
+## Environment variables
+
+| Variable                  | Purpose                                                                                                       |
+| ------------------------- | ------------------------------------------------------------------------------------------------------------- |
+| `VALVE_PERF_HOME`         | Override the state root, normally `<repo>/.perf`. Use a consistent location for related invocations.          |
+| `VALVE_PERF_HOST_PORTS=1` | Connect through published host ports instead of Linux direct container IPs; portable execution only.          |
+| `PERF_INTEGRATION=1`      | Opt into harness integration tests using the dedicated Redis 7.4/Valkey 8 endpoints.                          |
+| `PERF_REDIS_URLS`         | Comma-separated integration endpoints. Model parity restricts URLs to the harness loopback ports 16479/16480. |
+| `VALVE_EVIDENCE_ARCHIVE`  | Path to the external legacy evidence archive; alternatively use `legacy --archive`.                           |
+
+`VALVE_PERF_ISOLATED` is internal re-exec state, not a way to enable authority.
+The harness checks live cgroup controls. Repository CI variables
+`PERF_SERVER_CPUS` and `PERF_WORKER_CPUS` supply disjoint CPU lists to dedicated
+workflows.
+
+## Exit codes
+
+| Code | Meaning                                                                                                                                   |
+| ---- | ----------------------------------------------------------------------------------------------------------------------------------------- |
+| 0    | Command completed without a failing execution/safety/regression condition. Results can still be descriptive, inconclusive, or unverified. |
+| 1    | Safety violation, performance regression, failed execution, failed diagnostic check, or size-budget failure, as applicable.               |
+| 2    | Invalid arguments or setup failure.                                                                                                       |
+
+For `c1`, 0 specifically means verified overdue rejection without callback
+execution, 1 means a late callback, and 2 means inconclusive verification or
+setup failure. An unrelated rejection is not a deadline safety pass.
