@@ -19,17 +19,17 @@
   },
   "devDependencies": {
     "@stdlib/stats-base-dists-t-quantile": "0.2.3",
-    "@types/node": "^24.19.1",
+    "@types/node": "^26.6.5",
     "bottleneck": "2.19.5",
     "esbuild": "0.28.2",
     "fast-check": "4.10.2",
-    "ioredis": "5.11.1",
+    "ioredis": "6.0.0",
     "p-limit": "7.3.3",
-    "p-queue": "9.3.3",
+    "p-queue": "10.0.0",
     "tinybench": "6.2.2",
     "tsx": "4.23.15",
-    "typescript": "^6.0.3",
+    "typescript": "^7.0.2",
     "valvejs": "workspace:*",
-    "vitest": "5.0.3"
+    "vitest": "5.0.5"
   }
 }
