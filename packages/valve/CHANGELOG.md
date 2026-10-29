@@ -1,5 +1,13 @@
 # valvejs
 
+## 0.6.1
+
+### Patch Changes
+
+- 4484d1e: Add `runSequential` for explicit, non-atomic composition of independent valves. Stages admit outermost first, each with its own run options and a shared abort signal. Earlier admissions stay spent when a later stage rejects, and outer jobs keep their concurrency slots and global leases while later stages wait.
+- 956cbff: Add `createValveGroup` in the new `valvejs/group` entry for independent keyed valves on one shared store. Each key maps to the stable id `${id}:${encodeURIComponent(key)}`, so workers sharing a store share one budget per key, and different keys never share budgets, cooldowns, or concurrency. A per-key resolver snapshots configuration on first local use, and managed limits stay authoritative across eviction. A bounded cache (`maxSize`, `idleTtl`) plus bounded pending calls (`maxPending`) never evicts busy valves, evicts paused idle valves only when room is needed (their shared pause stays in the store), and rejects calls needing a new valve with `QUEUE_FULL` when every valve is busy.
+- bff5dec: Simplify admission request construction and redundant managed-limit burst assignments and retry branches while preserving precision validation and memory/Redis behavior.
+
 ## 0.6.0
 
 ### Minor Changes
