@@ -1,0 +1,4 @@
+{
+  "title": "Benchmarking",
+  "pages": ["index", "running", "cli", "results", "internals"]
+}

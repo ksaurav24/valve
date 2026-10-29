@@ -1,0 +1,284 @@
+---
+title: Run benchmarks
+description: Set up the perf workspace, run correctness checks, compare revisions, and preserve benchmark evidence.
+---
+
+This guide assumes a Valve repository checkout. Run all commands from its root,
+with the latest Node.js 24 LTS (at least 24.11) and pnpm 11.28.4. Run timing measurements without
+builds, tests, or other heavy workloads competing for CPU.
+
+## Set up portable checks
+
+```sh
+pnpm install --frozen-lockfile
+pnpm --filter valvejs build
+pnpm perf doctor
+pnpm perf quick
+```
+
+`doctor` records host capabilities and timer lateness. `quick` runs portable
+model/oracle checks and reduced Tinybench suites; it does not provision stores.
+Commands print their run IDs and write evidence under `.perf/runs/`.
+
+For a focused operation or diagnostic:
+
+```sh
+pnpm perf micro --filter headers
+pnpm perf footprint --check
+pnpm perf startup --base HEAD
+pnpm perf drift --base HEAD --jobs 200 --response-ms 5 --reps 3
+pnpm perf scoped --stores memory --iterations 100 --base HEAD
+```
+
+Startup, drift, and scoped results are descriptive even when repeated. Use the
+paired matrix for inferential comparisons. See the [CLI reference](/docs/benchmarking/cli/)
+for each probe's scope.
+
+For the standalone group heap/churn check, build Valve first, then run:
+
+```sh
+pnpm --filter @valve/perf exec node --expose-gc --import tsx src/micro/group-memory.ts
+```
+
+It reports retained heap per resident key versus plain valves, exercises
+50,000 new keys with `maxSize: 64`, and fails if the size bound is exceeded or
+referenced timers remain. This helper prints JSON directly; it does not create
+the standard run manifest/reports.
+
+## Run real-store correctness checks
+
+Start dedicated harness-owned Docker containers:
+
+```sh
+pnpm perf infra up redis74
+pnpm perf infra up valkey8
+pnpm perf infra status
+pnpm perf smoke --stores memory,redis74,valkey8 --html
+pnpm perf c1 --stores memory,redis74,valkey8
+```
+
+Inspect the selected and skipped cells printed by the command. Suites that
+need other server versions or netem infrastructure can be skipped when only
+these two stores are provisioned. Smoke is a broad correctness check, not a
+performance gate.
+
+To run the harness's real-store integration tests against these instances:
+
+```sh
+PERF_INTEGRATION=1 pnpm --filter @valve/perf test:integration
+```
+
+The integration opt-in selects the harness ports for Redis 7.4 and Valkey 8.
+Missing servers fail explicitly. These are harness tests; the library's own
+`pnpm test:integration` has a separate setup described in
+[Development](/docs/reference/testing/).
+
+Remove the stores after your checks:
+
+```sh
+pnpm perf infra down redis74
+pnpm perf infra down valkey8
+```
+
+### Use an existing dedicated endpoint
+
+An unregistered endpoint uses a fresh per-trial key prefix:
+
+```sh
+pnpm perf smoke --suite gcra --stores redis74 --endpoint redis://127.0.0.1:6379
+```
+
+The endpoint override replaces the selected server's address and makes the run
+non-authoritative. Ordinary prefix-mode trials clean up only their own keys.
+Faults require a registered, sentinel-verified disposable endpoint.
+
+To register an **empty, dedicated, disposable** database:
+
+```sh
+pnpm perf infra adopt redis://127.0.0.1:6379 --empty-only --name local-perf
+pnpm perf smoke --suite gcra --stores local-perf
+pnpm perf infra down local-perf
+```
+
+Adoption refuses a non-empty database. Registered disposable databases can be
+flushed between trials. Use dedicated infrastructure, including for prefix-mode
+runs, to keep other activity out of measurements. Never adopt a shared or
+production database. See [Store ownership and cleanup](/docs/benchmarking/internals/#store-ownership-and-cleanup).
+
+## Compare a change against a baseline
+
+First provision a dedicated store, inspect the host, and calibrate execution
+estimates:
+
+```sh
+pnpm perf infra up redis74
+pnpm perf doctor
+pnpm perf calibrate
+pnpm perf matrix --profile targeted --suite gcra --stores redis74 --base HEAD --current --dry-run
+```
+
+`--dry-run` prints selected cells, arms, replication looks, exclusions, and the
+time estimate without building or executing trials. Review that exact command,
+then run it without `--dry-run`:
+
+```sh
+pnpm perf matrix --profile targeted --suite gcra --stores redis74 --base HEAD --current --html
+```
+
+`HEAD` means the committed baseline. `--current` measures the working checkout,
+including local library edits. To compare two commits, replace `--current` with
+`--head <candidate-ref>`. To test repeatability with identical artifacts, use
+`--base HEAD --head HEAD`.
+
+The targeted profile uses five paired repetitions per cell. Each repetition
+has fresh baseline, baseline A/A, and candidate trials sharing a workload seed.
+A separate instrumented audit checks the candidate's correctness. Read
+[the comparison protocol](/docs/benchmarking/results/#paired-comparisons-and-aa)
+before interpreting the results.
+
+An estimate over 60 minutes requires `--yes`. For a budgeted study, inspect
+`pnpm perf plan --profile nightly --suite gcra --budget 40m`, then use the
+same selectors on `matrix` with explicit base/candidate builds. The budget
+selects complete cells by priority; it is not a hard runtime deadline.
+
+### Verify wiring with a short sample
+
+```sh
+pnpm perf matrix --base HEAD --current --suite gcra --stores redis74 --cell sat-1w-100-b1 --reps 1 --window 1s --warmup-ms 0 --drain-ms 100 --html
+```
+
+This is a descriptive integration sample. It does not establish performance
+nonregression. Explicitly shortened windows are labelled as samples and cannot
+support the normal minimum-slot claim. Choose repetitions and windows before
+starting a performance study.
+
+## Use the Sylvie comparison preset
+
+On a quiet Linux machine with at least three available physical cores in the
+fastest CPU class, Docker, delegated cgroup controls, and 4 GiB available RAM:
+
+```sh
+pnpm perf plan --profile sylvie
+pnpm perf:sylvie
+```
+
+The preset is named after the i5-12450H, 16 GB laptop used for calibration. It
+defaults to `HEAD` versus the current checkout and selects:
+
+- GCRA at 500/s with burst 1 and a global-lease workload with concurrency 8
+  and mean 20 ms async jobs;
+- two workers, 15-second windows, two-second warmups, 500 ms drains, and ten
+  fixed repetitions of base/A/A/head;
+- one separate correctness audit per workload: 62 trials in the default plan.
+
+The calibrated estimate is about 21 minutes on that laptop; use the estimate
+printed on your host. `pnpm perf:sylvie --suite gcra` retains the protocol with
+only the rate workload. `--base <ref>` changes the baseline;
+`--head HEAD` uses a committed candidate.
+
+Sylvie selects separate fast physical cores for workers and the server,
+requires authoritative execution, and caps the process scope at 3 GiB with
+swap disabled. Its guard allows at most 2 GiB process memory and requires
+4 GiB host headroom before a trial and 2 GiB during it.
+
+It creates a pinned Redis 7.4 container when needed and removes only the store
+it created. A matching registered store is reused. A mismatched CPU placement
+or active endpoint lock is refused. `--stores valkey8` selects Valkey instead.
+Completion still depends on A/A stability for performance conclusions.
+
+## Run an authoritative comparison
+
+Choose disjoint worker and server CPU lists after inspecting your machine's
+topology. Use separate physical cores; logical SMT siblings share resources.
+For example, **only if CPU 6 and CPU 4 are suitable on this host**:
+
+```sh
+pnpm perf infra up redis74 --cpuset 6
+pnpm perf matrix --profile targeted --suite gcra --cell sat-1w-100-b1 --stores redis74 --base HEAD --current --worker-cpus 4 --isolate --require-authoritative --html
+```
+
+`--isolate` re-executes through a transient `systemd-run --user` scope with
+memory limits and `MemorySwapMax=0`. Workers use `taskset`, containers need
+their declared CPU pinning, and Linux uses direct container addresses.
+`--require-authoritative` fails before trials if the resulting controls are
+insufficient. `doctor` alone does not make a later run authoritative.
+
+`infra up` can reuse an existing container. Inspect its placement; explicitly
+recreate a harness-owned container with `--recreate` when you intend to replace
+it. Do not assume `--cpuset` changes an already-running server.
+
+## Compare libraries
+
+```sh
+pnpm perf libs --category L1,L1-noop,L2,L3,L4,L5 --reps 5 --html
+pnpm perf libs --category D1,D2,D3 --stores redis74 --reps 5 --html
+```
+
+The distributed command needs a registered Redis store. Categories compare
+declared common features, not a single overall library ranking. Unsupported
+combinations are N/A. L4's Bottleneck mapping is approximate, identity rows
+measure the harness floor, and both remain raw-only. Exact competitor
+reservation clocks remain `UNVERIFIED`. See
+[Library comparison categories](/docs/benchmarking/cli/#library-comparison-categories).
+
+## Run soak and fault probes
+
+Provision `redis74` for the soak and `valkey8` for the restart example with
+`pnpm perf infra up redis74,valkey8`. Remove them with the corresponding
+`infra down` command after the probes.
+
+Inspect the exact command with `--dry-run` before starting long work:
+
+```sh
+pnpm perf soak --suite lease --stores redis74 --duration 4h --rate 2 --dry-run
+pnpm perf chaos --stores valkey8 --faults redis-restart --workers 2 --window 10s --warmup-ms 0 --drain-ms 500 --html
+```
+
+The soak defaults to two offered jobs/second and records continuous resource
+samples. Run the reviewed soak command without `--dry-run` and with `--yes`
+when its estimate exceeds an hour. Raw job/call streams each have a 64 MiB
+fleet budget per trial, and schedules cap at 250,000 arrivals. Exceeding a
+budget fails explicitly. A four-hour low-load soak is not an unrestricted
+high-rate stress test, and a short sample cannot establish leak behavior.
+
+Faults operate on disposable stores. A planned restart audit checkpoints logs
+outside the container behind a temporary write pause. This covers a controlled
+restart, not every unannounced crash. Recovery needs enough post-fault window
+to be observable.
+
+## Keep reports and resume compatible work
+
+Use the printed run ID to render reports:
+
+```sh
+pnpm perf report <run-id> --html
+```
+
+Archive the complete `.perf/runs/<run-id>/` directory, including its manifest,
+trial rows, and compressed payloads. Keep the referenced frozen artifacts under
+`.perf/builds/` if you need to rerun or resume locally. Rendering the saved
+summary does not rerun measurements or upgrade its evidence.
+
+For resumable real-time work, choose `--run-id <id>` on the original command.
+Rerun that command with the same ID and unchanged measurement inputs. Matching
+completed trials are reused; retained rows and the manifest must match the
+plan, builds, harness, fingerprint, server configuration, and seeds. A mismatch
+is refused. Start a new run ID when changing repetitions, windows, code, or
+controls; do not edit old evidence to make it compatible.
+
+## Troubleshooting
+
+| Symptom                               | Next action                                                                                                                                                                  |
+| ------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| No cells selected                     | Inspect `--dry-run`; relax selectors or budget, and provision required stores. Planning can list known catalog stores that execution still needs registered.                 |
+| Store unreachable or sentinel missing | Run `infra status`; check the owned container and local registry. Restore intended dedicated infrastructure before rerunning.                                                |
+| Direct container IP is inaccessible   | For portable use, set `VALVE_PERF_HOST_PORTS=1`; this changes the network path and prevents authoritative classification.                                                    |
+| Authoritative execution refused       | Read the reported reasons; check systemd user scopes, cgroup delegation, swap cap, CPU lists, container pinning, and direct networking.                                      |
+| Resource-invalid attempts             | Inspect retained reasons for background CPU, memory headroom, swap, or pressure. Quiet the host and use a new study when changing controls.                                  |
+| Generator saturation                  | Inspect submission lag; reduce offered load or change the setup in a new plan. Saturated trials are excluded from inference.                                                 |
+| A/A unstable or unresolved            | Plan a new experiment with longer windows or more repetitions, retaining margins and all prior evidence. More samples do not guarantee equivalence.                          |
+| Endpoint locked                       | Check the owner PID/run in `.perf/locks/`. Dead owners can be recovered automatically; live, inaccessible, or malformed owners fail closed. Never clear a live owner's lock. |
+
+Endpoint locks coordinate invocations sharing local state, not separate hosts
+or independent checkouts. Use separate stores for concurrent experiments and
+serialize infrastructure setup and cleanup.

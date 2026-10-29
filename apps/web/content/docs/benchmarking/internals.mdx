@@ -1,0 +1,320 @@
+---
+title: How the harness works
+description: Understand build snapshots, immutable plans, worker trials, Lua audits, admission models, resource guards, and extension points.
+---
+
+The harness measures built Valve artifacts through public interfaces. Its
+measurement code lives in `packages/perf`, separately from the library under
+test. It can build two revisions while applying one measurement implementation
+and dependency set to both.
+
+## Execution pipeline
+
+A real-time experiment moves through six stages:
+
+1. **Plan:** select workload cells and preregister metrics, margins, seeds,
+   replication looks, resource policy, and estimated cost.
+2. **Freeze:** build the baseline/candidate and snapshot their exact artifacts.
+3. **Identify:** capture the environment and write a hashed run manifest before
+   the first trial.
+4. **Execute:** run cold worker processes against fresh state with a shared
+   measurement epoch.
+5. **Check and analyze:** reconcile records, check safety, calculate per-trial
+   metrics, then pair valid replications at declared looks.
+6. **Retain:** append trial rows and save compressed evidence and reports,
+   including failures and exclusions.
+
+`plan` and `--dry-run` stop after selection and estimation. They do not create
+build worktrees, start stores, or execute trials.
+
+## Cells, profiles, and execution estimates
+
+A **cell** is one declared experiment configuration: mechanism, rules, store,
+library, workers, concurrency, arrival process, job attributes, timing,
+controls/faults, with applicable decision metrics declared by its suite. Its content hash identifies
+that configuration. A **suite** supplies related smoke, risk, and covering
+cells. A **profile** selects cells, audit policy, replication looks, and budget.
+
+Selection sorts by priority and ID. Budget truncation keeps complete cells
+whose estimated cost fits, recording the dropped cells and reasons. A plan
+includes performance arms and separate audit costs. It does not stop halfway
+through a random workload when the budget expires.
+
+`calibrate` measures host-local cold-process overhead. The estimate includes
+warmup, measurement, drain, worker-count-dependent overhead, resource-rejection
+allowance, cooldown, and setup/report costs. These are estimates; host load,
+builds, and infrastructure setup can change elapsed time. An estimated run
+over 60 minutes requires `--yes`.
+
+Ordinary rule-based cells choose windows covering at least 40 eligibility
+slots of the slowest rule, with minimums of 1.5 seconds for smoke and four
+seconds for matrix cells. Suites can specify their own timing. Explicit short
+overrides are labelled samples rather than silently retaining the default
+window's claim.
+
+## Build identity and frozen artifacts
+
+The current checkout is rebuilt and identified. Other refs resolve to exact
+commits and build in harness-owned detached worktrees under `.perf/worktrees/`.
+An optional patch is applied there and gets its own hash. Preparation records
+and cached identities allow interrupted builds to be recovered and verified.
+
+The harness freezes source, dist, package metadata, and lockfile together under
+`.perf/builds/artifacts/`. Identity includes git revision, dirty-checkout
+information where applicable, per-file source/dist hashes, aggregate hashes,
+lockfile hash, Lua SHA-1 values, and Node version. Snapshots are verified before
+reuse. Later edits to the working tree cannot silently change an in-flight arm.
+
+The current harness, adapters, and pinned benchmark dependencies measure both
+artifacts. The baseline's old benchmark implementation is not used, although
+its install and library build still execute code from that revision.
+
+The harness hashes its own TypeScript source and package metadata. Real-time
+trials check that identity and the measured dist files around execution.
+Changing measurement code during a run invalidates the evidence instead of
+silently mixing implementations.
+
+## Manifest and resumption
+
+`manifest.json` records build identities, environment fingerprint, server
+configuration, cells, arms, seeds, resource controls, and the decision plan.
+The fingerprint captures host/runtime characteristics such as CPU topology,
+kernel, Node, Docker/server images, and isolation capabilities.
+
+The plan hash binds the measurement inputs: harness, fingerprint, build
+source/dist/lock/Lua identities, authority classification, servers, runtime
+policy, arms, cells, repetitions, base seed, and statistical plan. Reusing a
+run ID with a different hash is refused. Saved rows also have their cell,
+arm/build, fingerprint, and expected seed checked before resumption.
+
+Matching completed trials can be reused, while attempts remain in the
+append-only row file. Changing a workload or the replication plan requires a
+new run. Re-rendering saved reports changes presentation, not provenance.
+
+## One real-time trial
+
+The supervisor first checks authoritative host headroom when applicable. It
+then verifies artifact identity, locks the endpoint, and prepares fresh state
+with either a guarded flush or a unique key prefix.
+
+Each worker is a fresh Node process that loads the selected frozen build
+through a library adapter. Warmup uses a **different quota ID**, warming
+connections, script cache, and JIT without spending the measured quota. Ready
+workers wait for the supervisor's shared `go` epoch. Workers remain warm
+inside a trial and are never reused between replications.
+
+At the window edges, the supervisor records resource and Redis/Valkey INFO
+snapshots. Workers record timestamps inside the actual callback, store-call
+start/reply times, outcomes, CPU, event-loop delay, and resource samples where
+requested. Event-loop monitoring normally uses 10 ms resolution to reduce
+observer interference. A drain follows the measurement window so terminal
+outcomes can be observed without counting those later events as in-window
+throughput. A watchdog bounds teardown when a worker fails to finish.
+
+The supervisor gathers records, fault logs, optional server audit events, and
+worker summaries. Analysis produces one trial record; raw data is packed into
+`payload.json.gz`. `--keep-raw` retains the intermediate NDJSON/config files
+that would otherwise be removed after packing. Early failures can produce a
+row without a complete payload.
+
+### Arrival processes
+
+Seeded open-loop schedules include Poisson, random-phase periodic, bursty
+on/off, cron surge, ramp, and uneven demand. Intended arrival times exist
+independently of replies, enabling offered-load and generator-lag checks.
+
+Maintained-backlog workers refill queued demand when jobs leave the backlog
+and record minimum depth. Finite-client workers wait for responses and think
+time before issuing again; their demand is endogenous. Job attributes can
+include duration, cost, scopes, deadlines, priority, cancellation, and failures.
+Seeds are derived per cell/replication, with common category seeds for
+competitor comparisons. Arm order rotates and cells shuffle per replication.
+
+### Bounded recording
+
+Job and call streams each have a 64 MiB fleet budget per trial, divided among
+workers. Disk buffering is bounded, and generated schedules cap at 250,000
+fleet arrivals. Limits fail explicitly instead of silently sampling records.
+These bounds make low-load long runs manageable; they also constrain which
+high-rate, long-window experiments can be recorded completely.
+
+## Public interfaces and correctness instrumentation
+
+The Valve adapter uses `createValve`, the public `Store` interface, and the
+`redisStore({ adapter })` evaluation seam. Memory-store calls can be observed
+through the public store interface. Redis performance arms use the shipped
+scripts without server-side audit logging.
+
+Correctness arms load the matching Lua source from the frozen build, verify
+its digests, and run instrumented copies that append server-clock decisions
+to an audit log. These traces support replay of rate, fixed-window, scoped,
+pause, and lease invariants. Client grants and callback starts are reconciled
+with logged grants to detect incomplete server evidence. Missing or incomplete
+logs withhold exact metrics and safety coverage.
+
+Client-side oracles apply in instrumented and ordinary arms. They check
+callback starts after abort, late starts relative to `maxWait`, lost outcomes,
+and callback overlap against local/global concurrency contracts. Deadline
+violations distinguish a reply before the deadline followed by a late callback
+from a late grant. They remain safety failures, regardless of throughput.
+
+Audit instrumentation changes server cost. Matrix `audit` and distributed
+library `valve-audit` trials are separate from timing/A/A comparisons. Their
+coverage belongs to those audit trials, not to an uninstrumented run.
+
+### Planned restart audits
+
+A restart without persistence would destroy its own server-side audit history.
+For planned correctness restarts, the harness atomically checkpoints the Lua
+log, pauses writes, saves the checkpoint outside the container, and restarts
+the server. Replay separates store generations using reset boundaries.
+
+A failed checkpoint, expired pause, or incomplete grant log cannot justify a
+pass. This mechanism establishes evidence for a declared restart with an audit
+barrier; it is not an audit of arbitrary unexpected crashes.
+
+## The admission-state model
+
+T1 implements a pure TypeScript admission-state model derived from the Lua
+semantics. State and time are explicit inputs. It covers GCRA/burst, aligned
+fixed windows, multiple atomic rules, weighted prefix grants, scoped sparse
+admission, leases/renewal/release, and shared pause.
+
+Static weighted admission grants a prefix and stops behind a blocked head
+job. Scoped admission checks each job atomically and can skip a denied job.
+The model preserves those differences instead of treating them as scheduling
+optimizations. Capacity and ideal-supply routines advance directly between
+eligibility, arrival, window, and lease events.
+
+The abstract-client simulator layers declared retry policy, sampled RTT/timer
+lateness, and client behavior on the model. Its results are labelled
+`abstract-client-model`. It is useful for exploring policies and testing
+oracles with known traces. It does not execute Valve's scheduler and cannot
+establish its real timing behavior.
+
+### Parity against real Lua
+
+The integration suite compares generated and boundary-targeted traces against
+real Redis/Valkey executing the matching shipped scripts with `TIME` replaced
+by an injected clock. Source hashes are verified first. Tests target exact
+eligibility, ±1 microsecond, fixed-window edges, expiry equality, lease renewal,
+and fractional/integer clocks.
+
+Injecting time does not replace Redis's own expiry engine. Test wrappers
+translate virtual pause/expiry behavior, persist trace-owned budget keys, and
+delete only keys that expired in virtual time before the next step. The
+renewal script consumes all arguments after TTL, so its appended clock needs
+a temporary sentinel member in the same wrapper to preserve validity for real
+lease tokens. These controls test admission decisions, not real expiry latency.
+
+The public memory store is compared separately and is not the oracle. Known
+differences in expiry representation, scoped retention/retry hints, fractional
+pause rounding, and Lua score-string precision are retained as explicit tests.
+The [model implementation notes](https://github.com/ksaurav24/valve/blob/master/packages/perf/src/model/README.md)
+describe these boundaries and test controls in detail.
+
+## Resource controls and invalid attempts
+
+Authoritative execution combines live cgroup verification, no-swap memory
+limits, worker affinity, pinned containers, direct addresses, and a resource
+guard. The default guard samples every 100 ms, requires 3 GiB available host
+memory before trials and 1.5 GiB during them, and allows at most 5 GiB measured
+process-scope memory. The default process scope cap is 6 GiB; Sylvie uses a
+3 GiB cap and its stricter 2 GiB guard. These are separate limits.
+
+The guard also checks swap, OOM, memory pressure, and background CPU activity.
+Preflight waits for a quiet period with a bounded wait. Trials rejected for
+resource conditions remain recorded and can be attempted up to three times
+total per cell/arm/replication. Safety findings from attempts that produced
+records remain part of aggregation. Performance uses successful,
+resource-valid, non-saturated trials and complete pairs; missing evidence
+blocks inference.
+
+These controls reduce interference. They do not make a short sample
+inferential or guarantee A/A equivalence. The
+[results guide](/docs/benchmarking/results/#paired-comparisons-and-aa)
+describes the statistical gates.
+
+## Store ownership and cleanup
+
+Harness-created containers carry `dev.valve.perf=1`. The registry under
+`.perf/infra.json` records ownership and a random token matching the live
+`__valve_perf_disposable__` sentinel. Database flushes require a verified
+disposable endpoint; adopted endpoints additionally start from an empty
+database. The harness never issues `FLUSHALL`.
+
+Other URLs use a unique trial prefix and cleanup with prefix-scoped
+`SCAN`/`UNLINK`. Faults require disposable infrastructure because server-wide
+actions cannot be isolated by a key prefix. Registry/sentinel checks fail
+closed instead of treating an arbitrary endpoint as disposable.
+
+Endpoint locks under `.perf/locks/` serialize local trials before flushes or
+faults. A complete stale lock is recovered only when its owner PID is confirmed
+dead. Live, inaccessible, malformed, or interrupted-recovery records are
+refused. These locks do not coordinate other hosts or independent checkouts.
+Keep infrastructure setup serialized and use separate stores for parallel work.
+
+## Source map and adding coverage
+
+All paths below are relative to `packages/perf/`.
+
+| Area                                    | Responsibility                                                                               |
+| --------------------------------------- | -------------------------------------------------------------------------------------------- |
+| `src/cli.ts`, `src/tiers/`              | Validation, portable commands, shared real-time execution, and Sylvie setup/cleanup.         |
+| `src/identity/`, `src/core/`            | Frozen builds, manifests, hashing, clocks, codec, and fingerprints.                          |
+| `src/plan/`                             | Suites, profiles, category plans, metrics/margins, covering arrays, and execution estimates. |
+| `src/driver/`, `src/workload/`          | Cold workers, bounded recording, seeded arrivals, and attributes.                            |
+| `src/adapters/`                         | Public-interface Valve/competitor implementations and capability contracts.                  |
+| `src/lua/`, `src/model/`, `src/oracle/` | Script identity/instrumentation, pure admission model/parity, and safety checks.             |
+| `src/supervisor/`, `src/infra/`         | Trials, resume, resource monitoring, isolation, endpoint ownership, networking, and faults.  |
+| `src/analyze/`, `src/report/`           | Per-trial metrics, survival/statistics, paired aggregation, and report formats.              |
+| `src/measure/`, `src/micro/`            | Diagnostic probes, size budgets, Tinybench, and group-memory checks.                         |
+| `test/`, `test/integration/`            | Portable model/statistical/contract tests and opt-in real-store verification.                |
+
+When extending coverage:
+
+1. State the question and observable contract. Use a real-time cell for
+   scheduling claims, a pure model test for admission math, or a descriptive
+   probe for diagnostics.
+2. Add cells to the owning suite and declare applicable metrics and practical
+   margins before collecting results. Preserve exogenous demand when claiming
+   ideal-bound efficiency.
+3. Use public interfaces. Keep benchmark-only dependencies and instrumentation
+   in `packages/perf`; do not add them to the library's runtime or tests.
+4. Add adapter capability checks for new libraries. Unsupported contracts are
+   N/A; approximate mappings and missing reservation traces remain labelled.
+5. Test oracle/model changes with known outcomes and boundary cases, then
+   exercise real stores where required. Add a small smoke cell before planning
+   a longer controlled study.
+
+Typical validation commands are:
+
+```sh
+pnpm --filter @valve/perf typecheck
+pnpm --filter @valve/perf test
+PERF_INTEGRATION=1 pnpm --filter @valve/perf test:integration
+pnpm perf quick
+```
+
+The perf test script builds Valve first. Provision the dedicated Redis/Valkey
+instances before the integration command. Run timing studies after validation
+has finished, with other work stopped.
+
+## CI ownership
+
+`perf-pr.yml` owns path-filtered portable tests, real-store correctness/C1 and
+scoped probes, deterministic footprint budgets, and descriptive startup/drift
+samples. Hosted timing samples do not establish release nonregression.
+
+`perf-nightly.yml` and `perf-decision.yml` remain manual until dedicated
+infrastructure is configured. Controlled performance jobs need a self-hosted
+Linux runner labelled `valve-perf` and disjoint `PERF_SERVER_CPUS` /
+`PERF_WORKER_CPUS` repository variables. They use isolation and require
+authoritative execution. Sylvie is a local preset, not a hosted CI profile.
+CI uploads run directories even after failures.
+
+Dedicated-runner revisions must be trusted and reviewed: installation and
+builds execute code with the runner account's permissions and Docker access.
+Cgroups constrain resource use, not filesystem, credential, or network access.
+Historical evidence and legacy golden replay remain separate from new runs;
+see the [reproduction guide](https://github.com/ksaurav24/valve/blob/master/packages/perf/REPRODUCING.md).

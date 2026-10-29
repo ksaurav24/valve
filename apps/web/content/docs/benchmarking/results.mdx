@@ -1,0 +1,203 @@
+---
+title: Read benchmark results
+description: Interpret safety coverage, throughput, latency, paired confidence intervals, A/A controls, and retained evidence.
+---
+
+A benchmark result consists of the measurement, its correctness coverage, and
+its execution conditions. Read the manifest and safety findings before using
+timings to judge a change. Exit 0 alone does not establish nonregression.
+
+## Safety and performance are independent
+
+| Safety status | Interpretation                                                                |
+| ------------- | ----------------------------------------------------------------------------- |
+| `PASS`        | Applicable checks were observed and passed for this trial's coverage.         |
+| `FAIL`        | An invariant or execution check failed. Inspect violation counts and samples. |
+| `UNVERIFIED`  | Required evidence or coverage was missing. This cannot be treated as a pass.  |
+
+Safety checks include rate/window/scoped admission, leases and concurrency,
+callbacks after cancellation or `maxWait`, and lost-job accounting. Every
+deadline violation is fatal to the run. Safety from recorded invalid attempts
+is retained; resource noise cannot turn a violation into a confidence interval.
+
+Distributed performance trials use unmodified Lua. Exact rate/window checks
+need server-side logs, so those rows can remain `UNVERIFIED` even when callback
+checks pass. A separate instrumented `audit` or library `valve-audit` can pass
+without changing the performance row's coverage.
+
+| Performance verdict | Interpretation                                                                                                     |
+| ------------------- | ------------------------------------------------------------------------------------------------------------------ |
+| `DESCRIPTIVE`       | Fewer than five independent paired repetitions; no confidence interval. Diagnostic probes also remain descriptive. |
+| `EQUIVALENT`        | The interval lies strictly inside both practical margins.                                                          |
+| `NONINFERIOR`       | The interval excludes regression beyond the negative margin.                                                       |
+| `IMPROVEMENT`       | The interval is entirely beyond the positive practical margin.                                                     |
+| `REGRESSION`        | The interval is entirely beyond the negative practical margin.                                                     |
+| `INCONCLUSIVE`      | The interval or available evidence cannot resolve the comparison.                                                  |
+| `UNSTABLE`          | The A/A control cannot meet repeatability requirements at its final look; candidate conclusions are withheld.      |
+
+These are per-metric, per-cell conclusions. The margin represents a practical
+difference, not simply whether the estimated change is above or below zero.
+
+## Throughput and admission metrics
+
+The measurement interval is `[start, end)`. An admission, callback start, and
+completion are different events and can fall in different windows. Weighted
+workloads also distinguish jobs from cost units.
+
+| Metric                      | Meaning                                                                                                                                         |
+| --------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------- |
+| `offeredPerSec`             | Cost scheduled to arrive per second during the window; `offeredJobsPerSec` counts jobs instead.                                                 |
+| `ruleCapacityPerSec`        | Long-run rule capacity in cost units/second, excluding the initial burst bank.                                                                  |
+| `idealBoundPerSec`          | Modelled zero-latency greedy supply for compatible offered demand and known starting state; unavailable when assumptions cannot be established. |
+| `idealBoundNonPrefixPerSec` | Corresponding skip-policy bound for supported weighted workloads; not a globally optimal weighted schedule.                                     |
+| `admittedPerSec`            | Admitted cost/second, using complete server logs in correctness arms or observable client grant costs in performance arms.                      |
+| `clientGrantsPerSec`        | Client-observed number of granted jobs/second.                                                                                                  |
+| `usefulStartsPerSec`        | Callbacks that actually began in the window, in jobs/second.                                                                                    |
+| `usefulStartCostPerSec`     | Cost of those started callbacks/second.                                                                                                         |
+| `completionsPerSec`         | Successful completions in the window, in jobs/second.                                                                                           |
+| `boundEfficiency`           | Admitted cost divided by the ideal bound.                                                                                                       |
+| `capacityUtilization`       | Admitted cost divided by long-run rule capacity over the window.                                                                                |
+| `goodput`                   | Started cost divided by offered cost for open-loop demand.                                                                                      |
+
+The ideal bound assumes zero RTT, timer error, and CPU cost. It is a reference
+bound, not attainable throughput. Current measured quota IDs start fresh because
+warmup uses separate IDs. Faulted/lifecycle cells, finite-client demand, and
+unsupported saturated weighted/scoped/lease streams withhold the bound instead
+of inventing a denominator. Independent memory-store workers have independent
+budgets; the analyzer accounts for their copies.
+
+Capacity utilization can exceed 1 in a short window because the long-run
+capacity excludes initial burst credit and fixed-window boundary effects.
+Inspect admission safety before interpreting that ratio.
+
+### Demand and generator validity
+
+Open-loop arrivals are generated from a seed independently of the system's
+responses. Submission lag is measured against intended arrival time. A maximum
+lag over 5 ms marks generator saturation and excludes the affected trial from
+performance inference while retaining safety evidence.
+
+Maintained-backlog cells track minimum backlog depth to show demand remained
+available. Finite-client closed loops generate new work after responses and
+think time, so demand depends on system performance. They have no exogenous
+ideal-bound ratio.
+
+## Latency and outcomes
+
+Always read the counts alongside latency. Started callbacks can complete or
+fail; non-starting jobs can expire, abort, reject, or remain unserved at the
+observation end. Unserved jobs are right-censored at their observed waiting
+time. A missing outcome after close is a lost-job safety issue, with declared
+worker-kill cases handled separately.
+
+Reports expose three time-to-start views for each applicable cohort:
+
+- **Conditional wait** (`waitP50`, `waitP99`, and related fields): percentiles
+  among callbacks that started. Fast values can coexist with many failures.
+- **Cumulative incidence** (`cifP50`, `cifP99`): Aalen–Johansen estimates for
+  starting, with expiry/rejection as competing risks and abort/unserved work
+  as censoring. A quantile is not reached if the estimated fraction starting
+  never reaches it. Treating aborts as non-informative censoring is an assumption.
+- **Failure-ranked wait** (`failureRankedP99`): non-starting outcomes rank
+  worse than every observed start. This is deliberately conservative.
+
+Waits use intended arrival times, so generator delay is visible. Deadline
+success instead checks whether a callback started within `maxWait` of actual
+submission. `deadlineSuccess` is the fraction of deadline-bearing jobs that
+met that condition, not the fraction that eventually completed.
+
+## Cost, fairness, and resource diagnostics
+
+| Metric family                                          | Interpretation                                                                                                                    |
+| ------------------------------------------------------ | --------------------------------------------------------------------------------------------------------------------------------- |
+| `callsPerGrant`, `zeroGrantPerGrant`                   | Acquisition calls or zero-grant calls per client grant.                                                                           |
+| `scriptsPerUsefulJob`                                  | Recorded store-script calls per callback start.                                                                                   |
+| `earlyZeroPerGrant`, `lostRacePerGrant`                | Attribution from sufficient server-log evidence; otherwise withheld.                                                              |
+| `redisCpuUsPerGrant`, `evalshaUsPerCall`, `redisCores` | Server CPU and script cost from Redis/Valkey INFO deltas.                                                                         |
+| `commandsPerSec`                                       | Server command-count deltas, excluding the sampler's INFO commands; commands inside scripts remain server work.                   |
+| `appCpuUsPerGrant`, `appCores`                         | Worker CPU cost; despite its name, `appCpuUsPerGrant` divides by callback starts.                                                 |
+| `eldP99Ms`, `maxRssMB`                                 | Worst worker event-loop p99 and maximum worker RSS; not aggregate fleet RSS.                                                      |
+| `jain`, `minShare`, `maxNoStartGapMs`                  | Equal-demand fairness and starvation diagnostics when applicable. Single-worker cells exclude Jain from decision metrics.         |
+| `recoveryMs`, `faultDipRatio`                          | Recovery toward 90% of pre-fault throughput and the observed dip. Missing recovery within the window remains unresolved.          |
+| Heap/RSS/server memory slopes                          | Soak trend diagnostics. Correlated time samples and GC behavior limit interpretation; a fitted slope alone does not prove a leak. |
+
+Correctness instrumentation adds work to Lua, including log appends. Its CPU,
+command counts, and timings must not be compared as ordinary performance arms.
+
+## Paired comparisons and A/A
+
+One replication is an independent cold trial for each arm, with fresh worker
+processes and fresh store state. Arms share a workload seed within a replication.
+The analyzer pairs **trial-level metric values**, not individual requests.
+Thousands of requests in one trial do not supply thousands of independent reps.
+
+Matrix arms are `base`, `aa` (the same baseline artifact run independently),
+and `head` (candidate). Trial order rotates across arms and cell order is
+shuffled deterministically per replication to reduce ordering bias.
+
+For each paired metric, the analyzer computes `candidate - baseline` and a
+Student-t interval on those differences. It orients lower-is-better metrics
+so improvement is positive when choosing the verdict; report differences
+remain in original units. Relative margins resolve against the baseline mean,
+with any declared absolute minimum margin.
+
+The manifest fixes the metric set, practical margins, alpha, and replication
+looks before execution. Ordinary targeted studies use a fixed look at five
+reps; decision studies use 5/10/20. Confidence statements require at least five
+complete pairs and a preregistered look. Missing, invalid, or nonfinite pairs
+withhold survivor-only inference.
+
+For matrix inference, the interval alpha is divided by the number of planned
+cell/metric comparisons in the suite and by the number of looks. This
+Bonferroni control includes the full declared family, including cells resolved
+earlier. Library comparisons allocate their own planned category/arm/metric
+families. Sign-flip permutation tests provide robustness diagnostics against
+zero difference: exact enumeration through 16 pairs, seeded Monte Carlo above
+that, with Holm-adjusted p-values across applicable families. These
+p-values do not replace the practical-margin interval decision. Bootstrap
+intervals are not reported in v1.
+
+### Why the A/A control can block a result
+
+The baseline's independent A/A measurement tests whether this experiment can
+reproduce its own baseline. At the final look, an A/A interval that excludes
+zero or extends outside the practical margins is `UNSTABLE`. A/A equivalence
+requires compatibility with zero and an interval strictly inside both margins.
+
+If any preregistered A/A metric is unresolved or unstable, the cell's
+inferential candidate verdicts become `INCONCLUSIVE`. Failed/aborted execution
+and incomplete evidence also withhold conclusions. A faster point estimate
+does not override these gates.
+
+Plan a new run with better isolation, longer windows, or more repetitions when
+precision is insufficient. Keep the original margins and evidence. Changing
+margins or deleting valid observations to force equivalence changes the claim.
+
+## Retained files
+
+For real-time runs, `.perf/runs/<run-id>/` contains:
+
+| File                                | Contents                                                                                                               |
+| ----------------------------------- | ---------------------------------------------------------------------------------------------------------------------- |
+| `manifest.json`                     | Harness/build identities, fingerprint, arms, cells, seeds, decision plan, resource controls, and plan hash.            |
+| `rows.jsonl`                        | Append-only trial records, including failed/resource-invalid attempts and safety findings.                             |
+| `trials/<trial-id>/trial.json`      | Detailed trial record when produced. Early setup/resource failures can exist only in the retained row.                 |
+| `trials/<trial-id>/payload.json.gz` | Packed jobs, calls, worker summaries, server events when available, INFO snapshots, faults, and samples when produced. |
+| `summary.json`                      | Aggregated metrics, safety, comparisons, exclusions, and warnings.                                                     |
+| `metrics.csv`                       | Arm-level absolute metrics.                                                                                            |
+| `comparisons.csv`                   | Paired differences, intervals, margins, and verdicts.                                                                  |
+| `report.md`, optional `report.html` | Human-readable presentation of the saved summary.                                                                      |
+
+Portable/diagnostic runs retain command-specific JSON and a manifest;
+diagnostic probes also write a short report. `report <run-id> --html` can
+render these local results. Nonfinite numeric values use tagged objects such
+as `{"$valveNumber":"Infinity"}`. Consumers should preserve this representation
+rather than coercing missing or unreached values to zero. See
+`src/core/codec.ts` for the encoding.
+
+When sharing a claim, include the complete run directory, source revision,
+build/patch identities, harness and plan hashes, environment fingerprint,
+server images, authority classification, safety status, performance verdicts,
+and excluded or invalid attempts. Do not pool runs across fingerprints or
+protocols. The same harness must measure both artifacts within a comparison;
+separately produced summaries are not a substitute for paired evidence.
