@@ -1,0 +1,143 @@
+---
+title: The Thundering Herd Problem in Redis-Backed Rate Limiters
+description: Why atomic Redis admission still attracts competing retries, how Valve schedules them, and how to measure the cost without overstating results.
+date: '2026-10-29'
+author: Saurav K.
+draft: false
+---
+
+Autoscaling workers can increase Redis traffic while leaving outbound throughput almost unchanged. Each new process brings another local queue, another connection, and another timer waiting for the same shared budget. The quota stays fixed.
+
+Consider this simplified illustration: 32 workers have queued unit-cost jobs under one GCRA rule with `burst: 1`. They learn roughly the same next eligibility time. Assume all 32 attempts reach Redis before a second grant becomes eligible.
+
+```text
+Before eligibility: workers wait for the same shared budget
+At eligibility:     32 workers attempt admission
+Redis execution:    one attempt receives one grant; 31 receive none
+After replies:     losing workers schedule another check
+```
+
+Those counts describe the assumptions of this illustration. They are neither a recorded Valve result nor a constant 32-attempt amplification factor. Real traffic depends on timer delivery, network delay, batch size, burst allowance, job cost, and how many workers remain backlogged.
+
+The engineering question is how much unsuccessful admission work the fleet performs for each useful grant, and what reducing that work does to waiting jobs.
+
+## Atomic denial still costs work
+
+An atomic admission prevents competing workers from spending the same capacity. It does not stop them asking. A denied acquisition still crosses the client connection, executes server logic, returns a result, and resumes JavaScript that must decide when to try again.
+
+Valve's [immutable admission script](https://github.com/ksaurav24/valve/blob/master/packages/valve/src/redis/acquire.lua) reads Redis time and shared state, evaluates the requested costs against every rule, and commits the granted prefix. A denied job spends no rate budget. Its evaluation still costs work, and a batch may contain both grants and denials. With several rules, spending is all-or-nothing per job within the configured Valve ID and Redis key slot.
+
+Network and host scheduling can dominate an individual call's duration. Redis's [latency diagnosis guide](https://redis.io/docs/latest/operate/oss_and_stack/management/optimization/latency/) separates communication overhead, intrinsic host latency, slow commands, and persistence effects. More denials can therefore raise fleet cost even when no individual script looks slow.
+
+Timing semantics also matter. A store grant, callback invocation, HTTP arrival, and external completion are different events. More grants do not establish more successful HTTP requests. A grant remains spent if its job is subsequently cancelled or fails; [atomic admission does not provide exactly-once execution](/articles/atomic-does-not-mean-exactly-once/).
+
+## How workers converge on the same deadline
+
+A retry hint describes eligibility under the state observed by that acquisition. It reserves no future turn. Another process can consume capacity before the waiting worker returns.
+
+Fixed polling creates a simple tradeoff. Short periods discover capacity promptly but generate checks while nothing can change. Longer periods reduce traffic and can leave available capacity idle. Identical periods can keep workers approximately synchronized, especially after a deployment or shared resume notice.
+
+Plain exponential backoff spaces successive attempts further apart, but clients following the same schedule can retain clusters of retries. Random jitter spreads them. The AWS article [Exponential Backoff and Jitter](https://aws.amazon.com/blogs/architecture/exponential-backoff-and-jitter/) demonstrates this with an optimistic-concurrency simulation. Its call-count results belong to that simulation, not to Valve or a Redis quota workload.
+
+A rate limiter needs care when applying that advice. Sampling anywhere between zero and a retry hint can deliberately wake before the budget is eligible. Adding positive jitter after eligibility avoids that early check but may delay the next grant. Under strict GCRA pacing, repeated late grants can accumulate delay. The [throughput implications of strict pacing](/articles/strict-rate-limiting-throughput/) deserve their own measurement.
+
+Collision-aware policies can widen a worker's retry window after repeated losses and shrink it after success. That makes delay responsive to contention, but it can also favor recent winners: a worker that keeps losing may progressively withdraw. Aggregate throughput alone will miss that failure.
+
+## What Valve currently schedules
+
+Valve's current unscoped scheduler separates rate waits from global-concurrency waits. These are implementation details to inspect when evaluating a change, not a public tuning API.
+
+For rate waits with local concurrency, it adds no random jitter. With an asynchronous store, it subtracts elapsed acquisition time from the returned retry delay before arming the next check. This estimate can wake early, especially when outbound latency was substantial. Every wake still requires authoritative admission.
+
+Global concurrency uses shared leases. For a lease-blocked wait, the scheduler caps the retry interval at 50 ms without subscription support, or one second with it, providing a fallback for missed release notices. The unscoped global retry path adds positive jitter bounded by the smaller of 25 ms and ten percent of the returned delay.
+
+Release notifications can wake every subscribed contender. Valve coalesces local scheduling requests and, after repeated lease denials, spreads notice-driven rechecks across a widening random window capped at 50 ms. This is intended to reduce synchronized rechecks. It does not select a fleet-wide winner, and its effect on collisions and fairness still needs measurement. See the [scheduler implementation](https://github.com/ksaurav24/valve/blob/master/packages/valve/src/valve.ts) and [guarantees](/docs/guarantees/).
+
+Scoped admission has a separate delayed-job path; do not assume every formula above applies to it. A store outage is also different from a healthy denial: the default `onStoreError: 'wait'` policy uses exponential backoff with jitter. A configured finite `maxWait` or cancellation can end the wait; the default has no deadline.
+
+Queues remain local and non-durable. Numeric concurrency limits one Valve instance; global concurrency requires the explicit lease configuration. Neither ordering inside a local queue nor randomized retries guarantees fairness across processes. Scoped rate identities also retain their Valve-ID feedback and global-concurrency domain.
+
+## Coordination changes the problem
+
+A release broadcast tells everyone that something changed. Coordinated winner selection would instead nominate a worker, reserve a future slot, or dispatch work through a shared scheduler. Those are alternative designs, not capabilities promised by Valve's current wakeup mechanism.
+
+A coordinator can reduce competing probes, but must recover a nomination when the chosen worker crashes. Reservations need expiry and may strand capacity while their owner is slow. A shared durable queue adds persistence and ownership machinery; it also needs a policy for ordering tenants, priorities, and expensive jobs.
+
+Partitioning a genuinely shared provider budget into worker budgets avoids some contention but introduces allocation problems. Idle workers can hold unused shares while busy workers wait. Creating independent group children does not enforce an additional shared parent quota. The budget model must survive the scheduling optimization.
+
+Even lease-based coordination only bounds ownership. Expiry cannot fence an external side effect from a paused worker that later resumes. Redis timeouts add another uncertainty: a command may have committed, or an offline queue may replay it after the caller stopped waiting. Check the [timeout and reconnection contract](/docs/reference/redis-store/#timeouts-and-reconnection) before interpreting retries as harmless failed attempts.
+
+## Measure useful grants and the work around them
+
+Start with a fixed policy and offered workload. Report the following together:
+
+| Metric                     | What to inspect                                                                  |
+| -------------------------- | -------------------------------------------------------------------------------- |
+| Grants per second          | Admission rate, separated from callback starts and completions                   |
+| Acquire attempts per grant | Logical admission calls divided by granted jobs                                  |
+| p95/p99 queue wait         | Conditional start latency alongside every terminal outcome                       |
+| Per-worker service         | Start counts, minimum share, and longest interval without a start                |
+| Redis CPU                  | Total CPU and CPU per grant, plus command traffic                                |
+| Collision proxies          | Zero-grant calls and clusters near eligibility or server-side release operations |
+
+Valve's [trial analyzer](https://github.com/ksaurav24/valve/blob/master/packages/perf/src/analyze/trial.ts) separates client grants, useful starts, completions, and resource costs. Logical calls are not wire-command counts: script-cache fallback, subscriptions, releases, and renewals can add traffic. Batching can produce fewer than one acquire call per granted job.
+
+Conditional wait percentiles describe jobs that started. If long-waiting jobs expire or remain unserved at observation end, those percentiles can improve while service deteriorates. Preserve counts for starts, expiry, rejection, abort, and unserved work. The harness also provides cumulative-incidence and failure-ranked views. Its censoring assumptions need scrutiny when aborts depend on waiting time.
+
+Treat zero grants as a proxy, not an explanation. They can reflect an early timer, another worker's grant, a pause, or an exhausted lease pool. The [server oracle](https://github.com/ksaurav24/valve/blob/master/packages/perf/src/oracle/server.ts) has a restricted single-rule GCRA classification; it cannot establish general collision attribution without the relevant timing and call correlation. Attributing a cluster to pub/sub delivery requires an added client event for notice receipt or wake reason. Current records support temporal correlation with server-side release operations.
+
+For fairness, use workers with equal offered demand and inspect their individual histories. A Jain index near one over a short interval cannot guarantee that a worker avoids long starvation gaps. Unequal demand needs a different service objective.
+
+## An experiment that can support a decision
+
+The retained [implementation record](https://github.com/ksaurav24/valve/blob/master/packages/perf/IMPLEMENTATION.md) documents `laptop-validation-node24`: an identical-build study with two workers, GCRA 500/s and a separate global-lease workload, ten repetitions per performance arm for base, A/A, and head plus a correctness audit per workload, and 15-second measurement windows on an isolated i5-12450H host using Redis 7.4. Rate utilization and lease fairness remained A/A-unstable, so candidate comparisons were inconclusive. This historical study does not establish current contention performance or an optimization benefit.
+
+A proposed retry change needs a fresh experiment. From a clean repository checkout with Node 24, pnpm 11.28.4, and Docker, first install and build outside measurement, then provision a dedicated disposable store:
+
+```sh
+pnpm install --frozen-lockfile
+pnpm --filter valvejs build
+pnpm perf doctor
+pnpm perf infra up redis74
+pnpm perf plan --profile targeted --suite gcra \
+  --cell sat-4w-500-b1 --stores redis74
+```
+
+This existing cell has four processes sharing GCRA 500/s, burst 1, with backlog and local concurrency 16 per process. Its [suite definition](https://github.com/ksaurav24/valve/blob/master/packages/perf/src/plan/suites.ts) makes the assumptions inspectable. It isolates rate contention from global lease contention.
+
+For a bounded wiring sample, inspect this dry run, then repeat without `--dry-run`:
+
+```sh
+pnpm perf matrix --profile targeted --suite gcra \
+  --cell sat-4w-500-b1 --stores redis74 \
+  --base HEAD --head HEAD --reps 1 --window 1s \
+  --warmup-ms 0 --drain-ms 100 --dry-run
+```
+
+The sample verifies execution and reporting. One repetition and a shortened window cannot support a performance verdict. It intentionally compares identical refs.
+
+For the study, use reviewed immutable base and candidate refs, preregister repetitions and windows, and run base, independent A/A, and head trials. Start with identical refs to test repeatability. Pin server and worker pools to separate physical cores, avoid SMT siblings, enforce cgroup memory limits with swap disabled, and keep builds, tests, and unrelated workloads outside measurement. Follow the [reproduction guide](https://github.com/ksaurav24/valve/blob/master/packages/perf/REPRODUCING.md) for `--worker-cpus`, `--isolate`, and `--require-authoritative`; CPU numbers depend on the host.
+
+On a separate study host, set `BASE_REF` and `CANDIDATE_REF` to those commit SHAs, and `PERF_SERVER_CPUS` and `PERF_WORKER_CPUS` to disjoint CPU lists chosen from its topology. With no existing `redis74` registration, this proposed fixed study provisions a pinned server and requires isolation:
+
+```sh
+pnpm perf infra up redis74 --cpuset "$PERF_SERVER_CPUS"
+pnpm perf matrix --profile targeted --suite gcra \
+  --cell sat-4w-500-b1 --stores redis74 \
+  --base "$BASE_REF" --head "$CANDIDATE_REF" \
+  --reps 10 --window 15s --warmup-ms 2000 --drain-ms 500 \
+  --worker-cpus "$PERF_WORKER_CPUS" --isolate --require-authoritative
+```
+
+Then examine the existing larger-worker GCRA cells and a separate lease suite with and without subscribers. Fixed-window boundary contention needs its own workload: these windows align to the UTC epoch, not a rolling interval. Managed-limit updates need dedicated workloads too. Keep fingerprints, server images, build hashes, seeds, raw records, invalid trials, and outcome counts with each run. Remove the disposable store afterward with `pnpm perf infra down redis74`. The [development guide](/docs/reference/testing/) lists the surrounding checks.
+
+The [aggregator](https://github.com/ksaurav24/valve/blob/master/packages/perf/src/analyze/aggregate.ts) withholds inferential candidate conclusions when a cell's A/A control is unresolved or unstable. More repetitions may improve precision; they do not guarantee resolution. Keep safety findings separate, and never pool audit timings with uninstrumented performance trials.
+
+A useful retry change should reduce acquisition work while preserving admission safety, acceptable wait outcomes, and per-worker service. If Redis CPU falls because fewer jobs receive grants, the fleet has merely become quieter. Decide which outcome you need before choosing how aggressively losing workers should sleep.
+
+## Further reading
+
+- [AWS: Exponential Backoff and Jitter](https://aws.amazon.com/blogs/architecture/exponential-backoff-and-jitter/)
+- [Redis: Diagnosing latency issues](https://redis.io/docs/latest/operate/oss_and_stack/management/optimization/latency/)
+- [Valve performance harness reproduction guide](https://github.com/ksaurav24/valve/blob/master/packages/perf/REPRODUCING.md)
+- [Valve admission and failure guarantees](/docs/guarantees/)

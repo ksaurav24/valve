@@ -1,0 +1,184 @@
+---
+title: 'Atomic vs Sequential Rate Limiting: Why All-or-Nothing Admission Matters'
+description: 'How sequential reservations spend quota before a request can run, and when one atomic admission is the right boundary.'
+date: '2026-10-29'
+author: Saurav K.
+draft: false
+---
+
+A message to recipient A passes the business-wide limiter, then stops at A's recipient limiter. No HTTP request leaves the process. The business budget has still paid for it.
+
+That accounting can be intentional at an ingress boundary, where every attempt should count. For an outbound quota shared by many recipients, it can spend capacity on work that cannot run while another recipient waits. Each limiter can be individually correct and still produce this result.
+
+The useful question is which budgets describe one admission decision. When a job needs all of them before it can proceed, checking and spending them together avoids partial reservations. When the charges describe independent events, sequential admission may express the policy more accurately.
+
+## One message, two budgets
+
+Consider an illustrative messaging policy, unrelated to any provider's published limits:
+
+- The business uses GCRA at 100 units per second with `burst: 1`, so unit-cost grants are at least 10 milliseconds apart.
+- Each recipient uses GCRA at one unit per six seconds with `burst: 1`.
+
+Both budgets begin fully available. A1 and A2 target recipient A; B1 targets B. There is no concurrency bottleneck. The following is an idealized logical timeline of admission decisions, ignoring command latency and event-loop delays. These numbers are arithmetic from the policy, not benchmark results.
+
+| Time  | Job | Sequential business-first admission                                  | Single atomic admission                            |
+| ----- | --- | -------------------------------------------------------------------- | -------------------------------------------------- |
+| 0 ms  | A1  | Business grants; A grants. Callback can start.                       | Business and A grant together. Callback can start. |
+| 10 ms | A2  | Business grants; A denies until 6000 ms. No message callback starts. | A denies; neither budget is spent.                 |
+| 11 ms | B1  | Business denies until 20 ms, despite B being available.              | Business and B grant together. Callback can start. |
+
+With immediate rejection configured, A2 rejects in both designs. B1 also rejects in the sequential design at 11 ms. If waiting is allowed instead, A2 can remain in the recipient queue after spending its business admission, and B1 must wait for business eligibility. The accounting difference exists before choosing whether to queue or reject.
+
+The sequential business grant at 10 ms advances that limiter's next eligibility to 20 ms. Atomic admission leaves it at 10 ms when A2 fails, so B1 fits at 11 ms. A busy recipient can therefore consume opportunities that other recipients could have used. How much that affects a real workload depends on arrivals, contention, queue policy, and timing.
+
+Here, “100 per second” includes a pacing constraint. A fixed-window counter allowing 100 units in each epoch-aligned second would behave differently. Increasing GCRA's burst would change the illustration too. [Modeling overlapping quotas](/articles/modeling-overlapping-quotas/) develops those policy choices, including why a fixed 24-hour window is not a rolling 24-hour limit.
+
+## A precheck cannot reserve capacity
+
+Checking every budget before making reservations sounds like a smaller fix. Separate reads leave a time-of-check/time-of-use race:
+
+```text
+Illustrative interleaving, with one recipient unit available:
+
+Worker 1: reads business and recipient availability; both pass
+Worker 2: spends the recipient's available unit
+Worker 1: tries to act on its earlier observations
+```
+
+If worker 1 updates without checking current state, it can overspend. If each reservation checks current state atomically, it avoids that stale update but can still reserve business capacity before discovering the recipient denial. Better reads do not make two committed reservations one decision.
+
+Sequential committed reservations solve a narrower problem: each individual limiter protects its own state. That is useful, but it leaves a period where one budget has admitted the job and the other has not.
+
+Redis can execute a conditional read-and-update script without another client's commands interleaving. Its [Lua scripting documentation](https://redis.io/docs/latest/develop/programmability/eval-intro/) describes that execution boundary. The script must still implement the right decision: inspect every applicable budget, then update them only when the job fits all of them. Putting unrelated writes in Lua does not automatically give them the intended admission semantics.
+
+## Put one operation behind one grant
+
+Valve's [scoped rate limits](/docs/guides/scoped-rate-limits/) put the shared business rule and the selected recipient rule in one admission. A scoped rule chooses a counter using the identity supplied with the job. The unscoped rule applies across the whole Valve ID.
+
+These examples assume Node.js 20 or later and unit-cost messages. Both use this application function; the endpoint is illustrative and needs your provider's URL and authentication:
+
+```ts
+async function postMessage(recipientId: string, signal?: AbortSignal) {
+  const response = await fetch('https://example.com/messages', {
+    method: 'POST',
+    headers: { 'content-type': 'application/json' },
+    body: JSON.stringify({ recipientId, text: 'Your report is ready' }),
+    signal: signal ?? null,
+  });
+  if (!response.ok) throw new Error(`Message API returned ${response.status}`);
+  return response.text();
+}
+```
+
+First, explicit sequential composition with independent Valve IDs:
+
+```ts
+import { createValve, runSequential } from 'valvejs';
+
+const business = createValve({
+  id: 'message-business-sequential',
+  rate: { limit: 100, interval: '1s', burst: 1 },
+  maxWait: 0,
+});
+const recipients = createValve({
+  id: 'message-recipients-sequential',
+  rate: {
+    name: 'spacing',
+    scope: 'recipient',
+    limit: 1,
+    interval: '6s',
+    burst: 1,
+  },
+  maxWait: 0,
+});
+
+try {
+  await runSequential(
+    [
+      { valve: business },
+      { valve: recipients, options: { scopes: { recipient: 'contact-a' } } },
+    ],
+    ({ signal }) => postMessage('contact-a', signal),
+    { signal: AbortSignal.timeout(5000) },
+  );
+} finally {
+  await Promise.all([business.close(), recipients.close()]);
+}
+```
+
+The helper admits outermost first. A denial at `recipients` leaves `business` spent. `maxWait: 0` makes a rate denial reject with `MAX_WAIT_EXCEEDED`; the code lets that rejection propagate. The timeout also bounds the operation through its signal, which the callback passes to `fetch`.
+
+The atomic form describes both requirements on one valve:
+
+```ts
+import { createValve } from 'valvejs';
+
+const messages = createValve({
+  id: 'message-business-atomic',
+  rate: [
+    { name: 'business', limit: 100, interval: '1s', burst: 1 },
+    {
+      name: 'spacing',
+      scope: 'recipient',
+      limit: 1,
+      interval: '6s',
+      burst: 1,
+    },
+  ],
+  maxWait: 0,
+});
+
+try {
+  await messages.run(({ signal }) => postMessage('contact-a', signal), {
+    scopes: { recipient: 'contact-a' },
+    signal: AbortSignal.timeout(5000),
+  });
+} finally {
+  await messages.close();
+}
+```
+
+These fragments demonstrate alternative configurations, each submitting one message. Keep the instances alive across submissions in a service; recreating private stores would reset their budgets. The default store is private to each instance, so each snippet limits submissions through that instance. Another instance with the same ID, even in the same process, gets a separate budget unless both receive the same explicit store. These examples do not require Redis.
+
+With Redis, the [scoped Lua implementation](https://github.com/ksaurav24/valve/blob/master/packages/valve/src/redis/scoped.lua) evaluates every referenced rule for each job. A denied job advances none of its rate counters. Granted jobs advance all their applicable counters. A batch can contain both granted and denied jobs: all-or-nothing applies per job, not to the entire batch.
+
+`cost` is shared across the applicable rules. GCRA requires it to fit each rule's burst capacity, so the example's recipient `burst: 1` accepts only unit-cost jobs. Raising cost to ten does not turn one spaced message into a batch of ten valid sends.
+
+## Reversing the order changes the reservation
+
+Recipient-first admission avoids spending business capacity on a recipient already blocked. It introduces the reverse case: the recipient grants, then the business denies or waits. Another message to that recipient can now be delayed even though the first message never reached the API.
+
+Ordering can reduce wasted reservations for a particular traffic distribution. It cannot eliminate the partial-consumption state when either budget can block.
+
+This applies to independent limiter chains too. Bottleneck's [documented `chain()` behavior](https://github.com/SGrondin/bottleneck/blob/master/README.md#chain) forwards ready work to another limiter. Its [clustering documentation](https://github.com/SGrondin/bottleneck/blob/master/README.md#clustering) describes atomic Redis state operations; a chain of independent limiters still has separate admissions. Its scheduling and independently configured limiters may be exactly what an application needs. [Bottleneck vs Valve](/articles/bottleneck-vs-valve/) discusses that choice beyond this one accounting difference.
+
+## When the first charge should stand
+
+An ingress policy might count every admitted attempt before consulting a tenant's outbound allowance. A tenant with no remaining allowance should still spend ingress capacity, because accepting and examining its attempts consumes resources. In that policy, a downstream denial is no reason to reverse the ingress charge.
+
+Valve keeps this model explicit through [`runSequential`](https://github.com/ksaurav24/valve/blob/master/packages/valve/src/sequential.ts). Earlier grants remain spent after a later rejection, timeout, or cancellation. Earlier jobs also remain running while later stages wait, holding their local concurrency slots or global leases. A number-valued concurrency limit is local; global concurrency requires the explicit global lease configuration.
+
+That wait can block unrelated work from acquiring an outer slot. Inconsistent nesting orders can also deadlock concurrency-limited stages. Each stage has its own `maxWait`; use a shared abort signal for an overall deadline. The [composition guide](/docs/guides/compose-valves/) covers these lifecycle and ordering consequences.
+
+Independent children created through `createValveGroup` from `valvejs/group` have independent budgets. They do not add a shared parent quota. For one operation that must charge both parent and child, keep those requirements in one scoped admission.
+
+## The grant ends at the limiter boundary
+
+For Redis sharing, workers need the same store namespace, Valve ID, and compatible policy. Valve places one ID's keys under one hash tag. [Redis Cluster's specification](https://redis.io/docs/latest/operate/oss_and_stack/reference/cluster-spec/#hash-tags) requires the keys of these multi-key operations to share a slot. This puts the quota domain on one shard; it does not create an atomic grant across arbitrary Valve IDs, databases, or external APIs.
+
+Recipient identities divide rate counters. They do not divide the Valve ID's feedback or global-concurrency domain. Queues remain local and non-durable, with no cross-worker fairness guarantee. Avoid interpreting B1's eligibility in the illustration as a promise about its position across workers.
+
+A grant precedes callback execution. The HTTP request reaches the provider later, and completion happens later still. Cancellation or callback failure after a successful grant does not refund quota. Even cancellation while acquisition is in flight can leave a spent grant without a callback start.
+
+A lost Redis reply adds uncertainty: the script may have committed even when the caller times out. The store timeout does not cancel the underlying client command, and an enabled offline queue can replay commands after reconnection. Disabling offline queuing reduces that exposure without resolving commands already sent. See [Redis timeout behavior](/docs/reference/redis-store/#timeouts-and-reconnection). Rate guarantees also require retained store state; fail-open skips shared rate checks.
+
+Likewise, lease expiry cannot fence external effects from a stalled worker. Atomic admission provides no exactly-once delivery guarantee. Durable job storage and provider-supported idempotency address delivery concerns beyond admission, as discussed in [Atomic does not mean exactly once](/articles/atomic-does-not-mean-exactly-once/).
+
+Choose the accounting boundary by asking what should remain charged when the next gate refuses work. If every budget describes permission for the same outbound operation, one grant keeps those charges consistent. If the first budget counts an attempt that already happened, preserve that charge and make the sequence explicit.
+
+## Further reading
+
+- [Redis: scripting with Lua](https://redis.io/docs/latest/develop/programmability/eval-intro/), for atomic script execution and its blocking behavior.
+- [Bottleneck: chaining](https://github.com/SGrondin/bottleneck/blob/master/README.md#chain), for composing independently configured limiters.
+- [Redis Cluster: hash tags](https://redis.io/docs/latest/operate/oss_and_stack/reference/cluster-spec/#hash-tags), for the slot boundary of multi-key operations.
+- [Valve: scoped admission source](https://github.com/ksaurav24/valve/blob/master/packages/valve/src/redis/scoped.lua), for per-job checks and committed counter updates.

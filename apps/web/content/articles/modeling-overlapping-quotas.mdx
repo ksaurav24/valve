@@ -1,0 +1,188 @@
+---
+title: 'One API Request, Multiple Rate Limits: Modeling Overlapping Quotas'
+description: Model shared, tenant, and recipient quotas with scoped rules, explicit bursts, and a daily counter.
+date: '2026-10-29'
+author: Saurav K.
+draft: false
+---
+
+A notification addressed to one recipient can consume four budgets. It uses the service's shared capacity, the tenant's allowance, the recipient's pacing allowance, and that recipient's daily allocation. A request with three available budgets still has to wait for the fourth.
+
+The interesting design question is which requests share each counter. Giving every tenant a separate limiter can accidentally multiply a shared allowance. Giving every recipient the same counter can make one busy conversation delay unrelated messages. The identities in the model determine which behavior you get.
+
+Consider an illustrative notification API with these policies. Every number here is invented for the example, not a Meta or other provider policy:
+
+| Budget           | Identity                         | Illustrative policy                 |
+| ---------------- | -------------------------------- | ----------------------------------- |
+| Shared service   | All requests in one quota domain | GCRA at 80 units/second, burst 8    |
+| Tenant           | Tenant ID                        | GCRA at 20 units/second, burst 4    |
+| Recipient pacing | Tenant-recipient pair            | GCRA at 1 unit/6 seconds, burst 1   |
+| Recipient daily  | Same tenant-recipient pair       | 100 units per UTC day, fixed window |
+
+Each message costs one unit from every applicable rule. The shared budget covers all tenants, including tenants running on other workers. Tenant and recipient counters subdivide that workload without creating extra shared capacity.
+
+## Choose the time model before writing the rules
+
+An allowance of 80 per second leaves a question unanswered: can eight messages start together after an idle period? Here the answer is yes. GCRA, the generic cell rate algorithm, tracks pacing debt. With this configuration, the shared rule allows eight immediate unit-cost admissions when fully recovered, then recovers one unit every 12.5 milliseconds. The tenant rule allows four immediately and recovers one every 50 milliseconds. Recipient pacing allows one, then requires six seconds before the next. For unit-cost jobs, the shared rule has an analytic upper bound of `80 + 8 - 1 = 87` admissions in any half-open one-second window. The 80/s value is its sustained recovery rate.
+
+These are admission constraints, not a claim that exactly 80 messages arrive at the provider in every moving second. Bursts affect the permitted short-term envelope, and network scheduling affects arrivals. Stripe's [2017 explanation of its rate limiters](https://stripe.com/blog/rate-limiters) describes allowing brief bursts and distinguishes request rate from concurrent requests. Those are separate policy choices even when an API exposes them under one rate-limiting feature.
+
+The daily counter has different semantics. Valve's `fixed-window` rule computes the window from the store's epoch clock. An interval of `'24h'` therefore resets at midnight UTC, regardless of the worker's timezone or startup time. `burst` has no effect on this algorithm.
+
+A fresh daily counter and the previous day's nearly exhausted counter sit on opposite sides of a boundary. Both can contribute admissions within a moving 24-hour period; the six-second pacing rule still applies across midnight. An exact rolling limit would retain enough history to count the preceding 24 hours at every decision. Valve does not support that exact rolling policy. Redis's [algorithm comparison](https://redis.io/tutorials/howtos/ratelimiting/) explains the fixed-window boundary effect and the timestamp history used by a sliding-window log. Valve's [algorithm guide](/docs/choosing-an-algorithm/) specifies its own implementation.
+
+## Put the overlapping budgets in one admission
+
+Use one Valve ID with named rules. A rule without `scope` applies to the whole ID. A scoped rule selects a counter using the identity supplied with each job. The two recipient rules share an identity dimension while their distinct names keep their state separate.
+
+The example uses Node's built-in `fetch` and a caller-owned ioredis 5 connection from `REDIS_URL`. The endpoint and all policy and queue values are illustrative. The example owns its Redis connection and store; a service would keep these objects alive while accepting work.
+
+```ts
+import { Redis } from 'ioredis';
+import { createValve } from 'valvejs';
+import { redisStore } from 'valvejs/redis';
+
+const redisUrl = process.env.REDIS_URL;
+if (!redisUrl) throw new Error('REDIS_URL is required');
+
+const redis = new Redis(redisUrl, {
+  lazyConnect: true,
+  enableOfflineQueue: false,
+  autoResendUnfulfilledCommands: false,
+  maxRetriesPerRequest: 1,
+});
+redis.on('error', (error) => console.error('Redis error', error));
+await redis.connect();
+
+const store = redisStore({ client: redis });
+const notifications = createValve({
+  id: 'notifications:account-42',
+  store,
+  rate: [
+    {
+      name: 'service',
+      algorithm: 'gcra',
+      limit: 80,
+      interval: '1s',
+      burst: 8,
+    },
+    {
+      name: 'tenantPacing',
+      scope: 'tenant',
+      algorithm: 'gcra',
+      limit: 20,
+      interval: '1s',
+      burst: 4,
+    },
+    {
+      name: 'recipientPacing',
+      scope: 'recipient',
+      algorithm: 'gcra',
+      limit: 1,
+      interval: '6s',
+      burst: 1,
+    },
+    {
+      name: 'recipientDaily',
+      scope: 'recipient',
+      algorithm: 'fixed-window',
+      limit: 100,
+      interval: '24h',
+    },
+  ],
+  concurrency: 16, // Local to this instance, not the entire worker fleet.
+  maxQueue: 1000,
+  maxWait: '30s',
+});
+
+type Message = {
+  tenantId: string;
+  recipientId: string;
+  text: string;
+};
+
+function sendNotification(message: Message) {
+  return notifications.run(
+    async ({ signal }) => {
+      const response = await fetch('https://api.example.com/messages', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(message),
+        signal: signal ?? null,
+      });
+      notifications.observe(response);
+      const body = await response.text();
+      if (!response.ok) throw new Error(`Provider returned ${response.status}`);
+      return body;
+    },
+    {
+      cost: 1,
+      scopes: {
+        tenant: message.tenantId,
+        recipient: JSON.stringify([message.tenantId, message.recipientId]),
+      },
+      signal: AbortSignal.timeout(35_000),
+    },
+  );
+}
+
+try {
+  console.log(
+    await sendNotification({
+      tenantId: 'tenant-a',
+      recipientId: 'contact-7',
+      text: 'Your report is ready',
+    }),
+  );
+} finally {
+  await notifications.close({ drain: true });
+  await store.close();
+  await redis.quit();
+}
+```
+
+Every worker must use the same Redis or Valkey deployment and logical database, key prefix, Valve ID, identity mapping, and policy. Omitting `store` gives each instance a private memory budget. Close all users of a supplied store before closing it, then close the client you own. Valve does not close supplied Redis clients.
+
+The store checks all four applicable counters together. When recipient pacing denies a message, that attempt spends no service, tenant, or daily allowance. A grant spends all four. The [scoped admission script](https://github.com/ksaurav24/valve/blob/master/packages/valve/src/redis/scoped.lua) checks a job's rules before updating its counters. All keys for one Valve ID share a Redis Cluster slot, so this atomic domain also concentrates that workload on one shard.
+
+`cost` applies equally to every rule. Raising it to two would fail here with `COST_EXCEEDS_LIMIT`: recipient pacing has GCRA burst capacity one. A batch representing two messages cannot be admitted as one cost-two job under this policy.
+
+## Decide whether recipients belong to tenants
+
+The code treats `contact-7` in tenant A as a different recipient budget from `contact-7` in tenant B. `JSON.stringify([tenantId, recipientId])` makes the pair unambiguous. Concatenating strings with `:` could collapse `['a:b', 'c']` and `['a', 'b:c']` into the same identity.
+
+If the policy limits one recipient across every tenant, supply a stable globally unique recipient ID instead. Setting both jobs' recipient scope to that ID makes their pacing and daily counters shared, even though their tenant scopes differ. Valve does not combine dimensions automatically.
+
+Use short opaque application IDs, not phone numbers or credentials. Scope values must be nonempty valid Unicode strings of at most 256 UTF-16 code units, including the encoded tuple. Encoding prevents ambiguity; it does not anonymize the value. Changing the mapping selects fresh budgets, so identity changes deserve the same care as quota changes. Missing or extra scope dimensions reject before enqueueing. The [scoped-rule guide](/docs/guides/scoped-rate-limits/) documents these constraints.
+
+## Let unrelated recipients make progress
+
+This simplified admission timeline illustrates the code's tenant-local mapping. Assume recovered pacing budgets, available daily allowance, spare local concurrency, no pause, and no competing workers. Times are relative to the first grant. Rows at zero represent candidates considered at the same store time, not measured callback starts.
+
+| Store time     | Candidate                       | Admission result                              |
+| -------------- | ------------------------------- | --------------------------------------------- |
+| 0              | A to contact-7, message 1       | Grant; spend all four budgets                 |
+| 0              | A to contact-7, message 2       | Wait for recipient pacing; spend nothing      |
+| 0              | A to contact-8                  | Grant; another recipient has capacity         |
+| 0              | B to contact-7                  | Grant; the tenant-recipient pair is different |
+| At or after 6s | Retry A to contact-7, message 2 | Eligible if every budget remains available    |
+
+Scoped admission continues considering later candidates after a denial. A saturated recipient therefore need not stop all eligible recipients behind it. This does not remove every scheduling constraint: local concurrency can be full, the shared rule can be exhausted, and batches and competing workers affect which job gets the next grant. Retry times are hints followed by another authoritative check. Queues are local and non-durable, with no cross-worker fairness guarantee.
+
+A daily-exhausted recipient may wait longer than `maxWait`, which rejects that queued job. Persist deferred notifications in application storage if they must survive that rejection or a process restart.
+
+## Keep shared and independent domains deliberate
+
+An independent group created with `createValveGroup` from `valvejs/group` gives each key its own child Valve. It fits separate credentials or policy tiers with independent cooldowns. Configuring 80/s on every child would give every child that allowance; it would not create an 80/s parent shared across tenants. See [independent groups](/docs/guides/independent-groups/).
+
+`runSequential` intentionally admits through separate Valve IDs in order. Earlier charges remain spent while later stages wait or reject. That can model a separately charged ingress attempt, but this notification policy requires all four budgets together. [Atomic versus sequential admission](/articles/atomic-vs-sequential-rate-limiting/) covers that choice.
+
+Rate identities also leave feedback and global concurrency under the Valve ID. In the example, observing a recipient's 429 can pause every tenant in `notifications:account-42`. Valve cannot infer the exhausted scope from a generic response. Numeric concurrency is local; configuring global concurrency would share one lease domain across the ID, not allocate a separate pool per recipient.
+
+Finally, admission, callback start, HTTP arrival, and provider completion are different events. Cancellation or failure after a grant does not refund quota. A Redis timeout can have an unknown committed outcome; disabling offline queues reduces replay opportunities without cancelling commands already sent. Atomic counter mutation cannot provide exactly-once message delivery. Choose durable work storage and provider-supported idempotency around the model, as discussed in [atomic admission and exactly-once effects](/articles/atomic-does-not-mean-exactly-once/). The practical review is to trace one message through every identity, reset boundary, and failure path before putting production traffic behind those counters.
+
+## Further reading
+
+- [Stripe: Scaling your API with rate limiters](https://stripe.com/blog/rate-limiters), historical context for bursts and concurrent-request limits.
+- [Redis: Rate-limiting algorithm comparison](https://redis.io/tutorials/howtos/ratelimiting/), fixed-window boundaries and sliding-window alternatives.
+- [Valve's scoped-rule guide source](https://github.com/ksaurav24/valve/blob/master/apps/web/content/docs/guides/scoped-rate-limits.mdx), current identity, admission, and feedback behavior.

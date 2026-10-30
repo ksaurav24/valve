@@ -103,6 +103,8 @@ documentation links and `/api/...` for the TypeDoc reference.
 ## Add articles
 
 Articles use MDX and the same code highlighting and components as the docs.
+Follow the [engineering article checklist](editorial/STYLE.md) for voice,
+technical evidence, and publication review.
 Add `content/articles/your-article.mdx` with this frontmatter, followed by the
 article body:
 

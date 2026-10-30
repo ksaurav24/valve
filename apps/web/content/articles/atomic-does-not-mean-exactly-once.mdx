@@ -1,0 +1,160 @@
+---
+title: "Atomic Doesn't Mean Exactly Once: What Distributed Rate Limiters Actually Guarantee"
+description: 'Where atomic Redis admission ends, how timeouts and leases fail, and what applications need for recoverable external work.'
+date: '2026-10-29'
+author: Saurav K.
+draft: false
+---
+
+A worker times out while waiting for Redis. Its log says the job failed. Redis may already have spent the quota, even though the callback never ran. Retrying the job can require another grant.
+
+Later in the same workflow, an HTTP request can time out after the provider created the order. Retrying that request can create another order. Both failures leave the caller uncertain, but they require different recovery decisions: one concerns admission accounting, the other concerns an external effect.
+
+Atomic admission gives the limiter a precise boundary. Building a recoverable workflow means identifying what happens on either side of it.
+
+## What the Lua script makes atomic
+
+Redis executes a Lua script without another client's commands interleaving with it. A limiter can read the applicable counters, decide whether a job fits, and spend the counters during that execution. Another worker cannot reserve the last unit between the check and the update. This is the isolation described in the [Redis scripting documentation](https://redis.io/docs/latest/develop/programmability/eval-intro/).
+
+Valve checks all applicable rate rules together. With global concurrency configured, it also acquires the job's lease in that admission. For a normal rate denial, none of that job's rate budgets are spent. A batch can grant some jobs and deny others; all-or-nothing applies per job. [Atomic versus sequential admission](/articles/atomic-vs-sequential-rate-limiting/) explains when those charges should belong together and when sequential consumption is intentional.
+
+The domain is one configured Valve ID. Its Redis keys share a hash tag and therefore one Cluster slot. Independent Valve IDs, including independent group children, do not become one multi-budget grant. Scoped identities subdivide rate counters within the ID; they do not split its feedback or global-concurrency domain. See the [scoped rate-limit guide](/docs/guides/scoped-rate-limits/).
+
+Atomic execution also needs a qualification about errors. An earlier write in a Lua script can remain after a later runtime error. Lua supplies no general undo mechanism for every write the script has already made. Redis separately documents that its [transactions do not support rollbacks](https://redis.io/docs/latest/develop/using-commands/transactions/#what-about-rollbacks). Valve's admission logic checks eligibility before committing rate state, but that design should not be generalized into a promise that any script failure leaves every key untouched.
+
+The script cannot include a JavaScript callback or the provider's database commit. A grant, callback start, HTTP arrival, and external completion are separate events. Network delays can bunch provider arrivals even when grants were spaced correctly.
+
+## A timeout leaves two possible histories
+
+Consider this simplified failure timeline. It illustrates one possible execution, not a measurement:
+
+| Event | What happens                                                                          | What the caller knows                  |
+| ----- | ------------------------------------------------------------------------------------- | -------------------------------------- |
+| 1     | The client sends an admission request to Redis.                                       | A command was submitted.               |
+| 2     | Redis executes the script and spends the budget.                                      | The caller is still waiting.           |
+| 3     | The reply is lost or delayed; Valve's store timeout expires.                          | The store call failed locally.         |
+| 4     | The client cannot distinguish that execution from a command that never reached Redis. | The admission outcome is unknown.      |
+| 5     | After reconnection, client replay or a new admission attempt can execute later.       | Earlier execution has not been undone. |
+
+Valve's Redis store defaults to a two-second timeout. Its [`execute` implementation](https://github.com/ksaurav24/valve/blob/master/packages/valve/src/redis/index.ts) races the command promise against a timer. Losing that race does not cancel the client command or remove it from the client's queue.
+
+The timed-out command's late result cannot start the callback. With `onStoreError: 'throw'`, the job rejects. With `'wait'`, it may be requeued and start after a separate successful admission. If Redis spent quota on the timed-out command, that charge remains. These unused grants reduce usable throughput while the retained rate history continues to constrain admissions. A global lease acquired by an abandoned command can occupy a slot until expiry; its TTL begins when Redis executes it.
+
+Cancellation has a similar accounting boundary. A job cancelled while acquisition is in flight does not run, but Redis can still grant it. Cancellation or callback failure after a grant does not refund quota either. Valve cannot infer whether the provider counted a request from the callback's final result.
+
+The current [guarantees page](/docs/guarantees/#grants-and-cancellation) states these cases explicitly. Treating every rejected promise as an unspent admission would give an application's counters a different history from Redis.
+
+## Choose how store errors affect admission
+
+Valve's policies make an availability decision when acquisition fails:
+
+| `onStoreError`        | Admission behavior                                                                                                                    |
+| --------------------- | ------------------------------------------------------------------------------------------------------------------------------------- |
+| `'wait'`, the default | Retry queued jobs with backoff. A finite `maxWait`, abort, or shutdown rejection can end the wait; `maxWait` is unlimited by default. |
+| `'throw'`             | Reject affected jobs with `STORE_UNAVAILABLE`.                                                                                        |
+| `'open'`              | Start jobs without the shared rate checks. Shared rate bounds no longer hold.                                                         |
+
+Global concurrency rejects `'open'`, because bypassing the store would bypass lease ownership. A reported shared-configuration mismatch rejects with `INVALID_OPTIONS` under every policy. A timeout can hide that response, so fail-open cannot be relied on to enforce configuration compatibility during an outage.
+
+These policies do not resolve an unknown outcome. `throw` returns the decision to the application; `wait` can make another acquisition attempt. `open` accepts the risk of uncoordinated starts. None turns the original timeout into evidence that Redis did nothing.
+
+## Control replay at the client boundary
+
+Redis client reconnection is another source of delayed mutations. With offline queuing enabled, a command submitted while disconnected can survive Valve's timeout and execute after reconnection. Automatic resend of an unfulfilled command adds another retry path. Valve accepts your client as supplied and does not reconfigure it.
+
+For ioredis 5, the current [Redis store reference](/docs/reference/redis-store/#timeouts-and-reconnection) recommends disabling offline queuing and automatic resending, and bounding request retries. The [ioredis 5 reconnection documentation](https://github.com/redis/ioredis/blob/v5.8.2/README.md#auto-reconnect) describes those separate controls.
+
+This example assumes Node.js with built-in `fetch`, ioredis 5, and `REDIS_URL`. The endpoint and limits are illustrative. It owns the client and store:
+
+```ts
+import { Redis } from 'ioredis';
+import { createValve } from 'valvejs';
+import { redisStore } from 'valvejs/redis';
+
+const redisUrl = process.env.REDIS_URL;
+if (!redisUrl) throw new Error('REDIS_URL is required');
+
+const client = new Redis(redisUrl, {
+  lazyConnect: true,
+  enableOfflineQueue: false,
+  autoResendUnfulfilledCommands: false,
+  maxRetriesPerRequest: 1,
+  retryStrategy: (attempt) => Math.min(attempt * 100, 1000),
+});
+client.on('error', (error) => console.error('Redis error', error));
+await client.connect();
+
+const store = redisStore({ client, timeout: '2s' });
+const reports = createValve({
+  id: 'reports:credential-7',
+  store,
+  rate: { limit: 10, interval: '1s', burst: 1 },
+  concurrency: 4,
+  maxWait: '20s',
+  onStoreError: 'throw',
+});
+
+try {
+  const body = await reports.run(
+    async ({ signal }) => {
+      const response = await fetch('https://api.example.com/reports/42', {
+        signal: signal ?? null,
+      });
+      if (!response.ok) throw new Error(`HTTP ${response.status}`);
+      return response.text();
+    },
+    { signal: AbortSignal.timeout(30_000) },
+  );
+  console.log(body);
+} finally {
+  await reports.close({ drain: true });
+  await store.close();
+  await client.quit();
+}
+```
+
+The numeric concurrency limit is local to this Valve instance. Workers sharing the ID and Redis namespace share rate state, not these four local slots. The callback consumes the response body before settling. Shutdown closes the valve before the supplied store, then the connection; neither Valve nor the store closes a client you provided.
+
+Disabling offline queuing rejects commands issued while disconnected. It cannot retract commands already sent or prove they never executed. For node-redis 4/5, the corresponding setting is [`disableOfflineQueue: true`](https://github.com/redis/node-redis/blob/master/docs/client-configuration.md); use Valve's reference for the complete client-specific setup.
+
+Replay also affects control operations. A late `pause` can establish a cooldown after its caller saw an error; a late `resume` can remove one. Renewal only extends existing, unexpired lease tokens, and release removes only the supplied tokens. An old token cannot release its replacement. After a control-operation timeout, settle pending commands or discard the original connection before applying a correction through a healthy connection. Otherwise a queued older command can arrive afterward.
+
+The repository's [replay-test coverage](/docs/reference/testing/#test-against-redis-and-valkey) uses a local TCP proxy and a healthy observer to check post-timeout mutations and callback counts. Those probes cover specific client and reconnection cases. They do not establish behavior for every partition, Cluster failover, or race between control commands on different clients.
+
+## A healthy Redis can have lost the history
+
+A reconnecting client and a restarted server are different failure cases. Even perfectly isolated scripts cannot enforce a history that disappeared.
+
+Eviction can remove live rate, pause, or lease keys under memory pressure. A restart without persistence loses state; restoring a snapshot or AOF can still lose writes inside its durability window. Asynchronous replication can leave a promoted replica missing admissions acknowledged by the old primary. Redis's [replication documentation](https://redis.io/docs/latest/operate/oss_and_stack/management/replication/) also warns that `WAIT` does not make failover lossless.
+
+Freshly missing counters look like available budget. The provider's accounting has not reset. Redis can answer successfully while Valve admits more than the intended external allowance, so `onStoreError: 'throw'` provides no protection against this silent state loss.
+
+Use `maxmemory-policy noeviction`, leave memory headroom, and monitor eviction and OOM errors. Under `noeviction`, an acquisition that needs more memory can fail visibly with OOM instead of Redis evicting live quota keys. Acquisition failures follow `onStoreError`; pause, resume, managed-limit, renewal, and release failures retain their separate documented behavior. Redis describes the available [eviction policies](https://redis.io/docs/latest/develop/reference/eviction/).
+
+Choose persistence and failover settings for the loss you can tolerate. [AOF persistence](https://redis.io/docs/latest/operate/oss_and_stack/management/persistence/) with `appendfsync everysec` may lose up to about one second of recent writes in a disaster; it is not an exactly-once setting. Stronger persistence choices still need an explicit failover analysis. These measures reduce exposure without recovering forgotten quota or reversing provider effects.
+
+## Lease expiry cannot stop an external write
+
+Valve's [global concurrency](/docs/guides/global-concurrency/) uses renewable leases. They renew every `leaseTtl / 3` and release when the callback settles. If renewal fails or ownership expires, Valve aborts the job's signal and rejects with `LEASE_LOST` after the callback settles. A late renewal response cannot restore ownership already marked lost in the [lease manager](https://github.com/ksaurav24/valve/blob/master/packages/valve/src/leases.ts).
+
+A stalled worker can outlive its lease. Another worker takes the available slot, then the first resumes and sends a write before it processes the abort. A callback that ignores the signal can continue too. Passing the signal to an HTTP client enables cooperative cancellation, but it cannot undo a request already committed remotely.
+
+Martin Kleppmann's [lease and fencing discussion](https://martin.kleppmann.com/2016/02/08/how-to-do-distributed-locking.html) explains how a resource can reject stale owners by checking monotonically increasing fencing tokens on writes. That requires enforcement by the resource itself. Valve's lease tokens identify ownership for renewal and release; they are not an advertised external fencing protocol. The article supplies context for the failure model, not evidence that Valve implements Redlock.
+
+## Recover the work beyond admission
+
+Valve's job queues are local and non-durable. A process crash loses queued callbacks, and shared Redis counters do not reconstruct them. There is no cross-worker fairness guarantee. Put work that must survive restarts in a durable job queue and invoke Valve inside its workers.
+
+Durability introduces redelivery: a worker can complete an external operation and crash before acknowledging its queue item. Keep a stable operation ID in the durable record. Where the provider supports idempotency, reuse the same key and required payload across retries. Check retention, parameter matching, and error behavior. For example, [Stripe's API v1 contract](https://docs.stripe.com/api/idempotent_requests) saves results after endpoint execution begins, compares parameters, and allows pruning keys after at least 24 hours. That is a provider-specific deduplication contract with boundaries.
+
+Valve's `wrapFetch` does not retry network errors. It retries eligible rate-limit responses, and POST/PATCH require explicit opt-in even when an idempotency header is present. Review the [provider-feedback guide](/docs/guides/respect-retry-after/#requests-with-side-effects) before enabling retries for writes.
+
+For uncertain external outcomes, reconcile against provider status or a durable application record before issuing another write. A spent admission, an attempted request, and a confirmed result should be distinguishable in that record. Then recovery can choose whether to wait for quota, query an existing operation, or safely replay it without pretending a timeout supplied an answer.
+
+## Further reading
+
+- [Redis scripting](https://redis.io/docs/latest/develop/programmability/eval-intro/): execution isolation and script errors.
+- [Redis transactions](https://redis.io/docs/latest/develop/using-commands/transactions/): error handling and lack of rollback.
+- [ioredis 5 reconnection](https://github.com/redis/ioredis/blob/v5.8.2/README.md#auto-reconnect): resending and offline queues.
+- [Redis persistence](https://redis.io/docs/latest/operate/oss_and_stack/management/persistence/): durability choices and loss windows.
+- [Kleppmann on distributed locking](https://martin.kleppmann.com/2016/02/08/how-to-do-distributed-locking.html): stalled owners and resource-enforced fencing.
