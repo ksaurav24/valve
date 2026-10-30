@@ -5,14 +5,15 @@ One statically exported Next.js app. Marketing pages use shadcn/ui with
 flavor); `/docs` uses Fumadocs. Both read the same theme tokens. Dark is the
 default theme.
 
-| URL               | Purpose                                  | Source                                  |
-| ----------------- | ---------------------------------------- | --------------------------------------- |
-| `/`               | Install, features, usage, recent changes | `app/(marketing)/page.tsx`              |
-| `/docs`           | Guides and reference                     | `content/docs/*.mdx` and subdirectories |
-| `/changelog`      | Changes for plain-numbered versions      | `packages/valve/CHANGELOG.md`           |
-| `/releases`       | Versions npm lists, with release notes   | CHANGELOG + npm + GitHub Releases       |
-| `/contributors`   | Contributors and the contribution guide  | GitHub API + root `CONTRIBUTING.md`     |
-| `/api/index.html` | Generated TypeDoc declarations           | Generated during the build              |
+| URL               | Purpose                                  | Source                                      |
+| ----------------- | ---------------------------------------- | ------------------------------------------- |
+| `/`               | Install, features, usage, recent changes | `app/(marketing)/page.tsx`                  |
+| `/docs`           | Guides and reference                     | `content/docs/*.mdx` and subdirectories     |
+| `/articles`       | Article index and individual articles    | `content/articles/*.mdx` and subdirectories |
+| `/changelog`      | Changes for plain-numbered versions      | `packages/valve/CHANGELOG.md`               |
+| `/releases`       | Versions npm lists, with release notes   | CHANGELOG + npm + GitHub Releases           |
+| `/contributors`   | Contributors and the contribution guide  | GitHub API + root `CONTRIBUTING.md`         |
+| `/api/index.html` | Generated TypeDoc declarations           | Generated during the build                  |
 
 ## Work locally
 
@@ -99,17 +100,57 @@ Create an MDX file in `content/docs` with a `title` and `description` in
 frontmatter, and add it to the directory's `meta.json`. Use `/docs/...` for
 documentation links and `/api/...` for the TypeDoc reference.
 
-## Enable the blog later
+## Add articles
 
-The blog has no route. The empty `content/blog` collection and page scaffolds
-in `scaffolds/blog` remain: move `scaffolds/blog/index.tsx` to
-`app/(marketing)/blog/page.tsx` and `scaffolds/blog/article.tsx` to
-`app/(marketing)/blog/[slug]/page.tsx`, add posts, then add `blog` to
-`lib/nav.ts`.
+Articles use MDX and the same code highlighting and components as the docs.
+Follow the [engineering article checklist](editorial/STYLE.md) for voice,
+technical evidence, and publication review.
+Add `content/articles/your-article.mdx` with this frontmatter, followed by the
+article body:
+
+```mdx
+---
+title: Your article title
+description: A short description for the index and social previews.
+date: '2026-10-29'
+author: Your name
+draft: true
+---
+
+## First section
+
+Write the article here. Markdown, fenced code blocks, and the shared MDX
+components are supported.
+```
+
+`title`, `description`, and a valid `YYYY-MM-DD` date are required. Quote the
+date as shown. `author` is optional. `draft` is a boolean and defaults to
+`false`; remove it or set it to `false` to publish. Drafts are excluded from
+the index, detail routes, and sitemap, including in development. Dates control
+display and newest-first sorting, not scheduled publication. Equal dates sort
+by URL for a stable order.
+
+The filename becomes the URL: `your-article.mdx` is
+`/articles/your-article/`. Nested files work too:
+`content/articles/engineering/shared-budgets.mdx` becomes
+`/articles/engineering/shared-budgets/`. Do not create a root `index.mdx`;
+the article index is provided by the page template.
+
+The index shows an empty state until the first published article. Individual
+pages render the MDX body, title, description, date, optional author, and a
+desktop table of contents generated from headings. Canonical/social metadata
+and the sitemap use only published articles. There is no `/blog` route or
+separate blog collection.
+
+Run `pnpm docs:dev` after adding content. For publication, commit the MDX file
+and rebuild with `pnpm docs:build`; article routes are statically exported.
+The optional catch-all route at `app/(marketing)/articles/[[...slug]]/page.tsx`
+exports the index even when the collection is empty. The index and reading
+templates live in `components/articles/`.
 
 ## Preserve old links
 
 `app/[...slug]/page.tsx` exports a client redirect for each former docs URL,
 keeping query strings and anchors. These pages are `noindex`. On a host with
 HTTP redirects, add permanent redirects for former docs paths to `/docs`,
-excluding `/`, `/changelog`, `/releases`, `/contributors`, and `/api`.
+excluding `/`, `/articles`, `/changelog`, `/releases`, `/contributors`, and `/api`.

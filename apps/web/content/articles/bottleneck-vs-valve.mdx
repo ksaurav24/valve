@@ -1,0 +1,295 @@
+---
+title: 'Bottleneck vs Valve: Two Different Philosophies of Rate Limiting'
+description: Compare scheduler composition with atomic provider-budget admission, including pacing, groups, concurrency, retries, and Redis ownership.
+date: '2026-10-29'
+author: Saurav K.
+draft: false
+---
+
+Before replacing a rate limiter, write down what its queue represents. Is it a
+queue of independent tasks that happen to need throttling? Or does each task
+need permission from several counters describing the same provider request?
+Those applications can have identical requests-per-second settings and need
+different admission behavior.
+
+Bottleneck is comfortable as a general task scheduler: independent limiters,
+reservoirs, queues, chains, and batching. Valve organizes outbound calls around
+a provider-budget ID, with several rules evaluated together and provider
+feedback attached to that ID. Both can coordinate through Redis. The choice
+depends on whether independent scheduling stages are useful work boundaries or
+an awkward representation of one overlapping quota.
+
+## The same request can have different reservations
+
+Consider an illustrative contact API: one request per 100 ms across a business,
+and one per six seconds for each contact. These are example policies, not a
+provider's published limits. The URL below is illustrative too.
+
+Bottleneck's [Group](https://github.com/SGrondin/bottleneck/blob/master/README.md#group)
+and [chaining](https://github.com/SGrondin/bottleneck/blob/master/README.md#chain) APIs
+can express that intention with a keyed scheduler feeding a shared scheduler:
+
+```ts
+import Bottleneck from 'bottleneck';
+
+const business = new Bottleneck({ minTime: 100, maxConcurrent: 5 });
+const contacts = new Bottleneck.Group({ minTime: 6000, maxConcurrent: 1 });
+business.on('error', console.error);
+contacts.on('error', console.error);
+contacts.on('created', (limiter) => {
+  limiter.on('error', console.error);
+  limiter.chain(business);
+});
+
+const contactId = 'contact-42';
+try {
+  const body = await contacts
+    .key(contactId)
+    .schedule({ priority: 1 }, async () => {
+      const response = await fetch(
+        `https://api.example.com/contacts/${contactId}`,
+        {
+          signal: AbortSignal.timeout(5000),
+        },
+      );
+      if (!response.ok) throw new Error(`HTTP ${response.status}`);
+      return response.text();
+    });
+  console.log(body);
+} finally {
+  await Promise.all(
+    contacts
+      .limiters()
+      .map(({ limiter }) => limiter.stop({ dropWaitingJobs: false })),
+  );
+  await business.stop({ dropWaitingJobs: false });
+  await contacts.disconnect();
+  await business.disconnect();
+}
+```
+
+The contact limiter admits first, then the business limiter admits. If the
+business queue waits, the contact stage has already reserved capacity and holds
+its concurrency slot. Reversing the chain changes which stage reserves first.
+That follows directly from Bottleneck's
+[job execution path](https://github.com/SGrondin/bottleneck/blob/master/lib/Job.js),
+which schedules into the chained limiter inside the outer job.
+
+Valve represents the overlapping budgets in one configuration:
+
+```ts
+import { createValve } from 'valvejs';
+
+const contacts = createValve({
+  id: 'contacts:business-42',
+  rate: [
+    { name: 'business', limit: 1, interval: '100ms' },
+    { name: 'contact', scope: 'contact', limit: 1, interval: '6s' },
+  ],
+  concurrency: 5,
+  maxQueue: 1000,
+  maxWait: '30s',
+});
+
+const contactId = 'contact-42';
+try {
+  const body = await contacts.run(
+    async ({ signal }) => {
+      const timeout = AbortSignal.timeout(5000);
+      const response = await fetch(
+        `https://api.example.com/contacts/${contactId}`,
+        {
+          signal: signal ? AbortSignal.any([signal, timeout]) : timeout,
+        },
+      );
+      contacts.observe(response);
+      if (!response.ok) throw new Error(`HTTP ${response.status}`);
+      return response.text();
+    },
+    { scopes: { contact: contactId }, priority: 4 },
+  );
+  console.log(body);
+} finally {
+  await contacts.close({ drain: true });
+}
+```
+
+Both examples use local memory and modern Node.js with built-in `fetch`. Both
+hold their running slots through response-body consumption. The Valve example
+also observes responses, applying cooldown feedback across the scoped identities
+under that local Valve ID; neither example retries.
+The queue bounds and timeout policies differ deliberately. Bottleneck also has
+a per-contact concurrency slot; Valve's scoped rate rule supplies no such slot.
+A contact request lasting over six seconds exposes that difference. This is
+equivalent intention, not equivalent execution or a drop-in migration.
+
+Valve checks every applicable rule before spending any of that job's budgets.
+A contact denial spends no business quota. An eligible contact can proceed
+while another waits, subject to the shared rule and available concurrency.
+The [scoped admission script](https://github.com/ksaurav24/valve/blob/master/packages/valve/src/redis/scoped.lua)
+shows the same per-job check-then-spend structure for Redis.
+
+Bottleneck's Redis operations **are atomic**. Its
+[clustering documentation](https://github.com/SGrondin/bottleneck/blob/master/README.md#clustering)
+describes that explicitly. Chaining independent limiter instances creates
+separate admissions, rather than one atomic multi-budget grant. Sharing a Redis
+server does not merge those operations.
+
+Sequential consumption can be intentional. An ingress budget might count an
+attempt even when a downstream tenant budget refuses it. Valve's current
+`runSequential` API supports that model with separate IDs and queues; earlier
+admissions remain spent, and outer concurrency stays held while inner stages
+wait. See [Compose valves](/docs/guides/compose-valves/) and
+[Atomic vs sequential rate limiting](/articles/atomic-vs-sequential-rate-limiting/)
+for that choice in detail.
+
+## Similar numbers can describe different clocks
+
+Bottleneck's [`minTime`](https://github.com/SGrondin/bottleneck/blob/master/README.md#constructor)
+spaces scheduled starts. Valve's default GCRA rule spaces admissions using
+`interval / limit`, with `burst: 1`. For unit-cost jobs, `minTime: 100` and
+`{ limit: 10, interval: '1s' }` express the same pacing intention.
+
+A grant, callback start, HTTP arrival, and request completion are distinct
+events. Redis latency, an event loop stall, and connection pooling can separate
+them. Neither configuration proves that a provider observes exactly 100 ms
+between requests. The [throughput article](/articles/strict-rate-limiting-throughput/)
+examines why that distinction also matters when interpreting measurements.
+
+Reservoir mappings need more care. Bottleneck's
+[refresh interval](https://github.com/SGrondin/bottleneck/blob/master/README.md#reservoir-intervals)
+replaces the reservoir periodically. For a new local limiter, its documented
+interval begins at creation. Valve's fixed-window rule counts within epoch-aligned store windows.
+With Redis, that clock is Redis server time.
+
+Translating a refresh of 100 every minute into
+`{ limit: 100, interval: '1m', algorithm: 'fixed-window' }` therefore changes
+reset timing. Both can admit near adjacent boundaries; add pacing if the
+provider requires it. A Valve `'24h'` fixed window resets at UTC midnight. It
+does not enforce a rolling 24-hour policy.
+
+An increasing reservoir adds discrete chunks. Valve GCRA restores eligibility
+smoothly. For example, two units each second up to 40 and
+`{ limit: 2, interval: '1s', burst: 40 }` share an average-rate and burst
+intention, but differ between refill ticks. Initial reservoir settings can
+differ too. Choosing one changes the policy, not merely its spelling.
+
+Valve's `cost` spends the same positive integer against every applicable rate
+rule and counts as one concurrent job. Under GCRA it must fit within each
+rule's `burst`; the default burst of one cannot admit a cost-two job.
+Bottleneck's `weight` affects both reservoir consumption and concurrency.
+The current [Valve types](https://github.com/ksaurav24/valve/blob/master/packages/valve/src/types.ts)
+and [migration guide](/docs/migration/from-bottleneck/) spell out these boundaries.
+
+## A group is a set of independent budgets
+
+Bottleneck's Group returns a limiter for each key, with a `created` event for
+configuration. Valve's equivalent concept is
+`createValveGroup` from `valvejs/group`, using a synchronous `resolve(key)` for
+per-key options. `get(key)` returns a reusable member that remains safe after
+local child eviction. It is a different API with its own cache bounds and
+lifecycle, described in [Independent keyed groups](/docs/guides/independent-groups/).
+
+Use that independence for separate provider credentials: each needs its own
+queue, policy, cooldown, and possibly global concurrency limit. A response
+observed by a Valve group member pauses that member's ID across workers sharing
+the store. Other keys continue under their own budgets. Eviction frees local
+children without resetting their stored budgets or cooldowns.
+
+A group does not create a shared parent allowance across its children. If all
+credentials spend one account allowance, independent children alone model the
+quota incorrectly. One Valve with scoped rules can combine a shared account
+budget and per-credential counters atomically.
+
+That choice also couples feedback. Scoped identities select rate counters;
+they do not split the Valve-ID feedback or global-concurrency domain. A 429
+observed for one identity can pause every identity under that ID. Valve cannot
+infer the provider's quota scope from a generic response. Per-identity policy
+values are also uniform within a scoped rule, unlike independent group children.
+See [Modeling overlapping quotas](/articles/modeling-overlapping-quotas/) before
+choosing the keys.
+
+## Distributed admission still leaves queues local
+
+Without Redis, Bottleneck's `maxConcurrent` is local. With clustering it is
+shared by limiter ID. Valve's numeric `concurrency: 5` stays local even with a
+Redis store. Shared ownership requires
+`concurrency: { limit: 5, scope: 'global', leaseTtl: '30s' }`.
+Workers sharing an immutable Valve ID must agree on normalized rate rules and
+global-concurrency settings. Managed workers share the rule structure and
+global-concurrency settings, while the store holds authoritative numeric rate values.
+
+Valve acquires a global lease with the rate grant, renews it while the job runs,
+and releases it on settlement. After a crash it expires. Lost renewal aborts
+the job signal; once the callback settles, the job rejects with `LEASE_LOST`.
+A callback that ignores cancellation can keep causing effects after ownership
+expires. A lease provides no fencing at the external API. Bottleneck recommends
+per-job `expiration` for clustered crash recovery. These lifecycle mechanisms
+have different timeout semantics; see [Global concurrency](/docs/guides/global-concurrency/).
+
+Neither library persists queued JavaScript jobs in Redis. A process exit loses
+its waiting work. Priorities and queue order are local, with no cross-worker
+fairness guarantee. Bottleneck runs lower priority numbers first; Valve runs
+higher numbers first. The mapping `5 - bottleneckPriority` preserves ordering
+and maps Bottleneck's default 5 to Valve's default 0. It cannot reproduce queue
+behavior that depends on different readiness or overflow policies.
+
+Bottleneck normally manages command and pub/sub connections and also supports
+shared connections or an existing client through its
+[connection API](https://github.com/SGrondin/bottleneck/blob/master/README.md#managing-redis-connections).
+Valve requires your connected client through `redisStore({ client })`; a
+subscriber is optional and must be separate. Close all valves or groups first,
+then the supplied store, then your subscriber and command client. Valve never
+closes those supplied clients.
+
+A Valve store timeout leaves the command's outcome unknown. Redis may have
+spent quota even though the caller never received the grant. Disable offline
+queues and bound client retries as the [Redis guide](/docs/reference/redis-store/)
+describes; that still cannot cancel an already-sent command. Atomic mutation
+does not provide exactly-once delivery. Failure or cancellation after a grant
+does not refund quota, and provider side effects need their own idempotency
+contract. Redis state loss can also restore spent capacity. For clustered
+atomic admission, one Valve ID's keys share one Redis Cluster slot, concentrating
+that ID's Redis admission load on one shard.
+
+## Retry policy changes scheduling too
+
+Bottleneck's [`failed` retry handler](https://github.com/SGrondin/bottleneck/blob/master/README.md#retries)
+returns a delay. The job keeps its executing slot while waiting and does not
+re-enter the queue; that delay ignores `minTime`.
+
+Valve has no general failed-job retry hook. Its `wrapFetch` observes responses
+and retries eligible 429s, using fallback backoff without a usable provider delay.
+A 503 retries only with a valid `Retry-After`. Between attempts, it releases
+concurrency and re-enters the queue to reacquire every rate budget. GET, HEAD,
+OPTIONS, PUT, and DELETE retry by default; POST and PATCH require explicit opt-in
+after checking provider idempotency. Network errors are not retried. The
+[feedback guide](/docs/guides/respect-retry-after/) covers method and body replay
+restrictions. A custom retry loop around `run` remains application policy.
+
+## Choose by what should happen to waiting work
+
+Bottleneck is the better fit when the scheduler features are the requirement.
+Its [batcher](https://github.com/SGrondin/bottleneck/blob/master/README.md#batching)
+emits groups by size or time for bulk APIs. It does not throttle the resulting
+work; pair it with a limiter when the bulk call also needs scheduling. Its
+[overflow strategies](https://github.com/SGrondin/bottleneck/blob/master/README.md#strategies)
+can evict queued work or block intake. Valve's `maxQueue` rejects new work;
+its admission `batch` option does not aggregate HTTP payloads. Independent
+chains also remain useful when separate reservations and lifecycles match the
+application.
+
+Valve fits a provider request that must spend overlapping budgets together,
+with shared feedback and explicit global leases. That fit says nothing about
+which library is faster. Compare a migration under the actual policy: exhausted
+contacts, slow responses, queue overflow, worker failure, and ambiguous Redis
+timeouts. Decide which reservations should remain spent and which calls may
+proceed in each case. Those answers give a more useful migration specification
+than an option-renaming table.
+
+## Further reading
+
+- [Bottleneck maintainer documentation](https://github.com/SGrondin/bottleneck/blob/master/README.md)
+- [Valve's Bottleneck migration guide](https://github.com/ksaurav24/valve/blob/master/apps/web/content/docs/migration/from-bottleneck.mdx)
+- [Valve scoped rate-limit guide](/docs/guides/scoped-rate-limits/)
+- [Valve global-concurrency guide](/docs/guides/global-concurrency/)

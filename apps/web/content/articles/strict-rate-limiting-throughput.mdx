@@ -1,0 +1,151 @@
+---
+title: Why Strict Rate Limiting Can Reduce Throughput
+description: How strict GCRA pacing turns scheduling delays into lost capacity, and how to measure the difference without weakening the quota.
+date: '2026-10-29'
+author: Saurav K.
+draft: false
+---
+
+A configuration that says `100` requests per second can leave a saturated queue waiting while fewer than 100 jobs start. There may be nothing wrong with the quota accounting. A strict pacing rule sets an upper bound, and the runtime still has to reach each admission opportunity on time.
+
+For Valve's default GCRA rule, `limit: 100`, `interval: '1s'`, and `burst: 1` mean unit-cost admissions must be at least 10 ms apart. That is configured capacity. Achieved throughput depends on when the scheduler actually asks for the next grant, whether the store grants it, and whether the callback runs. Treating those as one event makes both debugging and benchmarking harder.
+
+## A missed opportunity moves the next one
+
+GCRA tracks a theoretical arrival time, or TAT. [Brandur's explanation of GCRA](https://brandur.org/rate-limiting) describes this time-based accounting and why a common clock matters when several processes share a limit. Valve's [admission math](https://github.com/ksaurav24/valve/blob/master/packages/valve/src/algorithms.ts) uses the following update after a successful grant:
+
+```text
+step = interval / limit
+next TAT = max(previous TAT, store time now) + step * cost
+```
+
+With cost 1 and burst 1, the next job cannot pass before the existing TAT. Once it does pass, the update starts from the actual admission time. There is no backlog of unused 10 ms slots to spend later.
+
+Consider this synthetic illustration. Times are grant times on the store clock, relative to the first grant. Assume a continuously waiting queue, no competing worker, no other quota, and available concurrency.
+
+| Admission | Analytic ideal | Synthetic 3 ms lateness on every subsequent grant |
+| --------- | -------------- | ------------------------------------------------- |
+| First     | 0 ms           | 0 ms                                              |
+| Second    | 10 ms          | 13 ms                                             |
+| Third     | 20 ms          | 26 ms                                             |
+| Fourth    | 30 ms          | 39 ms                                             |
+| Fifth     | 40 ms          | 52 ms                                             |
+
+The ideal sequence has a long-run rate of 100/s. Under the explicitly assumed repeated lateness, each gap is 13 ms, giving `1000 / 13`, approximately 76.9/s. This is arithmetic for a declared model, not a Valve measurement or a prediction for your deployment.
+
+More generally, for unit-cost grants with gaps `10 ms + lateness[i]`, the rate across N gaps is `1000 * N / (10 * N + sum(lateness))`. Initial and final window boundaries affect finite-window counts, so a short observation need not equal that long-run expression.
+
+If the second admission happened at 13 ms, allowing the third at 20 ms would create a 7 ms gap. It would violate burst-1 pacing. Valve instead makes the next eligible time 23 ms; the synthetic table assumes another 3 ms delay on top of that. A single late wakeup shifts the schedule. Repeated late wakeups reduce its sustained rate.
+
+## Where the lateness comes from
+
+A timer makes work eligible to run; it cannot reserve CPU time. Synchronous JavaScript, garbage collection, other callbacks, and host scheduling can all delay the next admission attempt. Node's [timer documentation](https://nodejs.org/api/timers.html#settimeoutcallback-delay-args) explicitly declines to guarantee exact callback timing.
+
+An asynchronous store adds another path through the scheduler, socket, server, and response handling. Redis's [latency guide](https://redis.io/docs/latest/operate/oss_and_stack/management/optimization/latency/) separates network and system latency from command execution. A short Lua script can still sit behind other work or return to a busy client event loop.
+
+Adding the entire store round-trip time to every 10 ms gap would overstate the cost. Some acquisition time can overlap the eligibility wait. For asynchronous unscoped acquisition without global leases, Valve's [scheduler](https://github.com/ksaurav24/valve/blob/master/packages/valve/src/valve.ts) subtracts client-side acquisition elapsed time from the returned retry hint. An early estimate still goes through authoritative admission.
+
+Other workers can also win a shared opportunity. Adding workers may keep Redis supplied with attempts, but it can increase contention and store traffic. Valve offers no ordering or fairness guarantee across workers. [The thundering-herd problem](/articles/thundering-herd-redis-rate-limiters/) needs separate analysis from the spacing rule itself.
+
+## Decide which timestamp answers your question
+
+For Redis-backed admission, the pacing bound uses server time inside the atomic grant. A callback timestamp is downstream of that decision. An HTTP request's arrival at the provider is downstream again, after application work, connection management, and network transport. Variable delays between stages can bunch arrivals even when grants obey the rule. Burst 1 cannot promise perfectly spaced 10 ms arrivals at an upstream API.
+
+Valve's `stats()` reports local queue and running counts, plus cumulative job counters. Its waiting queue lives in this process and is lost on exit. `totals.started` helps explain scheduling progress, but it does not provide an authoritative Redis grant log. A grant can be spent before cancellation prevents its callback from running. Callback failure also does not refund quota. A timed-out store command may have executed with an unknown outcome. These can reduce useful throughput while preserving admission bounds under the default wait policy. Atomic grants do not establish exactly-once external delivery. [Atomic admission and exactly-once effects](/articles/atomic-does-not-mean-exactly-once/) covers that boundary.
+
+## A bounded local probe
+
+This probe offers 300 no-op jobs and counts events in exactly the half-open interval `[t0, t0 + 2000 ms)`, with no warmup. It assumes a stable host epoch clock. The memory-store clock hook captures the time used for admission; the wrapper records successful grants. Callback starts are recorded separately. Everything stays in one process with local concurrency 16 and an explicitly owned memory store.
+
+Save it as `strict-probe.ts` in a project with the current `valvejs` package and `tsx` installed, then run `pnpm exec tsx strict-probe.ts`. The finite job count and two-second observation keep it small. Timer delays can extend wall-clock runtime, so filtering uses the declared endpoint even if cleanup starts late.
+
+```ts
+import { setTimeout as sleep } from 'node:timers/promises';
+import { createValve, memoryStore, type Store } from 'valvejs';
+
+const windowMs = 2000;
+let storeTime = 0;
+const grants: number[] = [];
+const starts: number[] = [];
+const memory = memoryStore({
+  clock: () => (storeTime = Date.now()),
+});
+const acquire = memory.acquireSync;
+if (!acquire) throw new Error('Expected memory-store sync acquisition');
+
+const store: Store = {
+  ...memory,
+  acquireSync(request) {
+    const result = acquire(request);
+    for (let i = 0; i < result.granted; i++) grants.push(storeTime);
+    return result;
+  },
+};
+const valve = createValve({
+  id: 'strict-local-probe',
+  store,
+  rate: { limit: 100, interval: '1s', burst: 1 },
+  concurrency: 16, // Local to this Valve instance.
+  maxQueue: 300,
+});
+const t0 = Date.now();
+const inWindow = (t: number) => t >= t0 && t < t0 + windowMs;
+const jobs = Array.from({ length: 300 }, () =>
+  valve.run(({ signal }) => {
+    signal?.throwIfAborted();
+    starts.push(Date.now());
+  }),
+);
+// Attach rejection handlers before close rejects jobs still waiting.
+const settled = Promise.allSettled(jobs);
+
+try {
+  await sleep(Math.max(0, t0 + windowMs - Date.now()));
+  const admitted = grants.filter(inWindow);
+  const invoked = starts.filter(inWindow);
+  const gaps = admitted.slice(1).map((t, i) => t - admitted[i]!);
+  console.log({
+    windowMs,
+    grantsInWindow: admitted.length,
+    callbacksInWindow: invoked.length,
+    grantsPerSecond: (admitted.length * 1000) / windowMs,
+    minGrantGapMs: gaps.length ? Math.min(...gaps) : null,
+    meanGrantGapMs: gaps.length
+      ? gaps.reduce((sum, gap) => sum + gap, 0) / gaps.length
+      : null,
+    maxGrantGapMs: gaps.length ? Math.max(...gaps) : null,
+    sampledLateByMs: Math.max(0, Date.now() - (t0 + windowMs)),
+    statsAtReadTime: valve.stats(),
+  });
+} finally {
+  try {
+    await valve.close(); // Reject queued jobs; let running jobs settle.
+    await settled;
+  } finally {
+    await store.close(); // The caller supplied and owns this store.
+  }
+}
+```
+
+The output contains observations, without a hard-coded expected throughput. Minimum gap checks the observed lower spacing; mean and maximum gaps help describe lateness without identifying its cause. The filtered counts use the declared endpoint. `statsAtReadTime` can include later activity when `sampledLateByMs` is positive, so it supplies scheduling context rather than an endpoint-aligned snapshot.
+
+At most 200 unit-cost grants fit this half-open two-second window. With 300 offered jobs, at least 100 must remain unstarted at that endpoint under the stated assumptions. An empty queue at a timely read would call the clock, wrapper, policy, or measurement code into question. A late stats read may instead show jobs that started afterward. Compare grants and callback counts, then investigate long gaps while work was waiting.
+
+Instrumentation has a cost, and this short memory-store probe establishes no distributed result. Redis validation needs grant evidence on its own clock, separate from client callback timing. For performance comparisons, keep workload and build fixed, replicate trials, and use A/A controls to learn whether the host's noise can resolve the difference. The [performance harness README](https://github.com/ksaurav24/valve/blob/master/packages/perf/README.md) distinguishes those evidence levels.
+
+## Burst tolerance changes the contract
+
+Allowing a burst gives GCRA room to admit nearby jobs after idle time or a delayed wakeup. `burst: 5` can admit five unit-cost jobs together when fully recovered. At 100/s, Valve's upper bound becomes 104 cost units in any half-open one-second window, rather than 100. It can absorb some scheduling irregularity, but that extra allowance is a semantic change. Weighted jobs also need their cost to fit the configured burst.
+
+Stripe's [2017 engineering account](https://stripe.com/blog/rate-limiters) describes intentionally permitting brief bursts and treats concurrent requests separately from request rate. That is historical design context, not permission to assume a provider accepts your chosen burst today. If its contract requires strict spacing or forbids the wider window bound, keep burst 1. Valve's [algorithm guide](/docs/choosing-an-algorithm/) explains the alternatives, including the different boundaries of fixed windows.
+
+Before changing a quota, check whether concurrency is the actual constraint. In a simplified steady-state workload with every callback holding a slot for 200 ms, local concurrency 10 has an analytic ceiling of 50 completions/s even with a 100/s rate budget. That numeric concurrency limit applies to one Valve instance; a global limit requires explicit shared leases. Faster wakeups cannot remove that ceiling.
+
+For a strict provider contract, the useful work is to reduce avoidable scheduling delay and store latency, keep enough permitted concurrency, and measure the stage the provider actually counts. Accepting some unused admission capacity can be the correct consequence of preserving its pacing requirement.
+
+## Further reading
+
+- [Brandur: Rate Limiting, Cells, and GCRA](https://brandur.org/rate-limiting), for the theoretical arrival-time model.
+- [Node.js timers](https://nodejs.org/api/timers.html#settimeoutcallback-delay-args), for callback timing guarantees.
+- [Redis latency diagnosis](https://redis.io/docs/latest/operate/oss_and_stack/management/optimization/latency/), for separating command time from end-to-end latency.
+- [Valve guarantees](/docs/guarantees/), for admission bounds, cancellation, and store-failure behavior.

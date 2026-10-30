@@ -22,6 +22,7 @@ export default function Layout({ children }: { children: ReactNode }) {
       sidebar={{ defaultOpenLevel: 1 }}
       slots={{ themeSwitch: AnimatedThemeToggler }}
       links={[
+        { text: 'Articles', url: '/articles' },
         { text: 'Changelog', url: '/changelog' },
         { text: 'Releases', url: '/releases' },
         { text: 'Contributors', url: '/contributors' },
