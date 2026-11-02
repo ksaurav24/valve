@@ -1,0 +1,4 @@
+interface:
+  display_name: 'Design valve quotas'
+  short_description: 'Model scoped budgets, tenant tiers, and runtime limits'
+  default_prompt: 'Use $valve-quota-design. Design the valvejs quota model for this application.'

@@ -1,0 +1,4 @@
+interface:
+  display_name: 'Diagnose valve problems'
+  short_description: 'Trace 429s, stalled queues, and Redis config drift'
+  default_prompt: 'Use $valve-troubleshooting. Diagnose this valvejs issue using the project code and errors.'

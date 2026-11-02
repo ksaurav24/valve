@@ -1,0 +1,4 @@
+interface:
+  display_name: 'Set up valve'
+  short_description: 'Integrate valvejs with the right quota and store'
+  default_prompt: 'Use $valve-setup to integrate valvejs into this project.'

@@ -1,0 +1,4 @@
+interface:
+  display_name: 'Valve performance harness'
+  short_description: 'Run baselines and interpret safety and performance'
+  default_prompt: 'Use $valve-perf-harness. Choose and run the appropriate valve performance checks.'

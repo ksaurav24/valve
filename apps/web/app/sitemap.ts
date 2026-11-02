@@ -10,6 +10,7 @@ export default function sitemap(): MetadataRoute.Sitemap {
     '/changelog',
     '/releases',
     '/contributors',
+    '/skills',
     ...source.getPages().map((page) => page.url),
   ];
   return [...new Set(paths.map(siteUrl))].map((url) => ({ url }));

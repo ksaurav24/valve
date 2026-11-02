@@ -55,6 +55,8 @@ jobs:
       - run: pnpm install --frozen-lockfile
       - name: Test CI and release scripts
         run: node --test scripts/*.test.mjs
+      - name: Validate agent skills
+        run: pnpm check:skills
       - name: Validate PR title
         if: github.event_name == 'pull_request'
         env:
