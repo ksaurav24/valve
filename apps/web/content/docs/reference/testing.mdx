@@ -5,7 +5,8 @@ description: Build valve, run its test suites and benchmarks, and work on these 
 
 ## Set up
 
-Use Node.js 24 and pnpm 11.
+Use the latest Node.js 24 LTS (at least 24.11 for the current build tools) and
+the repository's pinned pnpm 11.28.4.
 
 ```sh
 pnpm install
@@ -94,20 +95,23 @@ pnpm perf startup --base master     # Cold import and initialization samples
 pnpm perf:sylvie                    # Quiet-laptop comparison preset
 ```
 
-Use `pnpm perf libs` for library comparisons after provisioning dedicated
-harness-owned stores. See the [harness guide](https://github.com/ksaurav24/valve/tree/master/packages/perf)
-for setup, statistical rules, scoped admission, and drift probes. Measurements
-and manifests are written under `.perf/`. Historical reports live in
-`packages/perf/docs/history/` and retain their original revision references.
+See [Performance harness](/docs/benchmarking/) for the evidence tiers,
+[Run benchmarks](/docs/benchmarking/running/) for setup and comparisons,
+[CLI reference](/docs/benchmarking/cli/) for commands and options,
+[Read benchmark results](/docs/benchmarking/results/) for statistical rules,
+and [How the harness works](/docs/benchmarking/internals/) for its underlying
+mechanism. Measurements and manifests are written under `.perf/`. Historical
+reports live in `packages/perf/docs/history/` and retain their original
+revision references.
 
 ## Work on the docs
 
 The site is built with Next.js and Fumadocs. Pages are MDX files in
-`docs/content/docs/`.
+`apps/web/content/docs/`.
 
 ```sh
 pnpm docs:dev    # http://127.0.0.1:4321
-pnpm docs:build  # Static export to docs/out, including TypeDoc
+pnpm docs:build  # Static export to apps/web/out, including TypeDoc
 ```
 
 Browser tests run against the built site:
