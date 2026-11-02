@@ -29,9 +29,7 @@ export default function MarketingLayout({ children }: { children: ReactNode }) {
               valve_
             </Link>
             <p className="max-w-sm text-sm leading-relaxed text-muted-foreground">
-              One rate limit for every worker.
-              <br />
-              Apache 2.0, built in the open.
+              A TypeScript rate limiter, licensed under Apache 2.0.
             </p>
           </div>
           <nav

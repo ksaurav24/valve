@@ -17,6 +17,16 @@ worker sharing that budget pauses. A memory store supports single-process use.
 
 ## Quickstart
 
+To use Valve with a coding agent, run the interactive skill installer in your
+project:
+
+```sh
+npx skills add ksaurav24/valve
+```
+
+Choose the skills you need and your coding agent. The [skills](skills/) cover
+setup, Bottleneck migration, reviews, quota design, and troubleshooting.
+
 **Beta until 1.0.** APIs may change between releases. Published versions use
 plain version numbers and install through npm’s default channel.
 

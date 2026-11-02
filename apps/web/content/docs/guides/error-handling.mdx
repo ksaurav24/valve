@@ -1,6 +1,6 @@
 ---
 title: Handle errors
-description: Tell valve's own failures apart from your job's errors and respond to each one.
+description: Handle job errors, admission failures, and store outages.
 ---
 
 A job's promise rejects for one of two reasons:
@@ -62,7 +62,8 @@ createValve({ id: 'crm', rate, store, onStoreError: 'wait' });
   concurrency still applies. Only use it when exceeding the provider's quota
   is better than not calling it.
 
-Every store failure emits a `store-error` event, whatever the policy.
+Store failures increment the local error counter under every policy.
+`store-error` events are limited to one per second.
 
 A reported shared Redis configuration mismatch rejects affected jobs with
 `INVALID_OPTIONS` under every policy. It cannot fail open or retry indefinitely

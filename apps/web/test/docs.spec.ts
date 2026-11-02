@@ -90,7 +90,7 @@ test('home page leads with install, usage, and documentation', async ({
 }) => {
   await page.goto('/');
   await expect(page.getByRole('heading', { level: 1 })).toHaveText(
-    'Many workers. One rate limit.',
+    'Rate limiting for outbound APIs.',
   );
   await expect(
     page.getByRole('link', { name: 'Read quickstart', exact: true }),
@@ -130,7 +130,7 @@ test('home page leads with install, usage, and documentation', async ({
     );
   }
   await expect(
-    page.getByText('Beta until 1.0. APIs may change between releases.', {
+    page.getByText('Valve is in beta. APIs may change before 1.0.', {
       exact: true,
     }),
   ).toBeVisible();
@@ -143,17 +143,17 @@ test('home page leads with install, usage, and documentation', async ({
     "scopes: { recipient: 'contact-A' }",
   );
   const rulesTrigger = page.getByRole('button', {
-    name: 'Shared rate rules',
+    name: 'Rate rules',
     exact: true,
   });
   const scopedFeature = page.locator('#features .capability').filter({
     has: page.getByRole('button', {
-      name: 'Shared and scoped budgets',
+      name: 'Scoped quotas',
       exact: true,
     }),
   });
   const scopedTrigger = scopedFeature.getByRole('button', {
-    name: 'Shared and scoped budgets',
+    name: 'Scoped quotas',
     exact: true,
   });
   await rulesTrigger.focus();
@@ -192,7 +192,7 @@ test('home page leads with install, usage, and documentation', async ({
   await expect(
     page
       .getByRole('heading', { level: 2 })
-      .getByRole('link', { name: release.version, exact: true }),
+      .getByRole('link', { name: `v${release.version}`, exact: true }),
   ).toBeVisible();
   await expect(page.getByRole('heading', { level: 2 })).not.toContainText([
     '-beta',
@@ -200,7 +200,7 @@ test('home page leads with install, usage, and documentation', async ({
   await expect(
     page
       .getByRole('heading', { level: 2 })
-      .getByRole('link', { name: '0.3.0', exact: true }),
+      .getByRole('link', { name: 'v0.3.0', exact: true }),
   ).toBeVisible();
   await expect(
     page
@@ -218,6 +218,25 @@ test('home page leads with install, usage, and documentation', async ({
   ).toBeVisible();
 });
 
+for (const [anchor, title] of [
+  ['patch-changes', 'Patch'],
+  ['patch-changes-1', 'Patch'],
+  ['minor-changes-1', 'Minor'],
+  ['patch-changes-8', 'Patch'],
+  ['patch-changes-11', 'Patch'],
+] as const) {
+  test(`legacy changelog link #${anchor} targets its heading`, async ({
+    page,
+  }) => {
+    await page.goto(`/changelog/#${anchor}`);
+    const target = page.locator(`[id="${anchor}"]`);
+    await expect(target).toHaveCount(1);
+    const heading = target.locator('xpath=ancestor-or-self::h3');
+    await expect(heading).toContainText(title);
+    await expect(heading).toBeInViewport({ ratio: 1 });
+  });
+}
+
 test('releases list only published versions', async ({ page }) => {
   await page.goto('/releases/');
   await expect(page.getByRole('heading', { level: 1 })).toHaveText('Releases');
@@ -226,12 +245,12 @@ test('releases list only published versions', async ({ page }) => {
   );
   if (published.length === 0) {
     await expect(
-      page.getByRole('heading', { name: 'No plain-version releases yet' }),
+      page.getByRole('heading', { name: 'No published releases yet' }),
     ).toBeVisible();
     await expect(page.locator('main')).not.toContainText('latest');
   } else {
     await expect(
-      page.getByRole('heading', { name: 'No plain-version releases yet' }),
+      page.getByRole('heading', { name: 'No published releases yet' }),
     ).toHaveCount(0);
     for (const entry of published) {
       await expect(
@@ -338,10 +357,10 @@ test('contributors page renders people and the root guide', async ({
 }) => {
   await page.goto('/contributors/');
   await expect(page.getByRole('heading', { level: 1 })).toHaveText(
-    'Built in the open',
+    'Contributors',
   );
   await expect(
-    page.getByRole('link', { name: /contribution/ }).first(),
+    page.getByRole('link', { name: 'CONTRIBUTING.md', exact: true }),
   ).toBeVisible();
   await expect(
     page.getByRole('heading', { name: 'Commit conventions', level: 2 }),

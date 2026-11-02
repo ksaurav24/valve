@@ -66,6 +66,7 @@ export function classifyChanges(paths, versionOnly = false) {
         checks.changeset = true;
     } else if (
       path.startsWith('apps/web/') ||
+      path === 'skills/catalog.json' ||
       path === 'CONTRIBUTING.md' ||
       path === 'README.md'
     ) {
@@ -75,6 +76,11 @@ export function classifyChanges(paths, versionOnly = false) {
       path.startsWith('scripts/ci-changes')
     ) {
       Object.assign(checks, all);
+    } else if (
+      path.startsWith('skills/') ||
+      path.startsWith('.claude/skills/')
+    ) {
+      // Installable instructions and references are validated as repository tooling.
     } else if (
       path.startsWith('.github/') ||
       /^\.changeset\/(?:pre\/)?[^/]+\.md$/.test(path) ||

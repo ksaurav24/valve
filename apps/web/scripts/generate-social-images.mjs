@@ -74,8 +74,8 @@ try {
     .flow svg { width: 100%; height: 100%; font-family: Mono, monospace; font-size: 18px; }
   </style></head><body>
     <header><div class="brand">${icon}<span>valve_</span></div><div class="stack">TypeScript · Redis · Valkey</div></header>
-    <h1>Many workers<span>.</span><br>One rate limit<span>.</span></h1>
-    <p class="description">One shared budget for outbound API calls.</p>
+    <h1>Rate limiting for<br>outbound APIs<span>.</span></h1>
+    <p class="description">Queue requests with shared quotas and provider backoff.</p>
     <div class="flow">${flow}</div>
   </body></html>`);
   await page.evaluate('document.fonts.ready');

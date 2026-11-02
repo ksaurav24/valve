@@ -33,14 +33,13 @@ indefinitely.
 ## run rejects with COST_EXCEEDS_LIMIT
 
 Under GCRA, a job's `cost` must be at most the rule's `burst`, which defaults to
-
-1. Raise `burst` on that rule, or lower the cost.
+`1`. Raise `burst` on that rule if the provider permits it, or lower the cost.
 
 ## Another process resumed, but this one is still paused
 
 Without a subscriber, a process only notices a `resume()` on its next store call,
 which may be when its cached pause ends. Pass a dedicated `subscriber` to
-`redisStore` for immediate wakeups. See [Share a concurrency limit](/docs/guides/global-concurrency/#wake-queues-with-a-subscriber).
+`redisStore` to notify waiting valves when shared state changes. See [Share a concurrency limit](/docs/guides/global-concurrency/#wake-queues-with-a-subscriber).
 
 ## The process does not exit
 
@@ -61,6 +60,5 @@ need in-process concurrency, they are simpler.
 
 ## How is valve different from an inbound rate limiter?
 
-Inbound limiters protect **your** server by accepting or rejecting requests.
-valve protects **someone else's** API by queuing your outbound calls until they
-are allowed.
+Inbound limiters accept or reject requests to your server. Valve queues
+outbound calls until its configured rate and concurrency limits allow them.

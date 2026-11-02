@@ -26,11 +26,12 @@ export function InstallCli({ published }: { published: boolean }) {
     ? managers
     : [{ label: 'source', command: fromSource }, ...managers];
   const [selected, setSelected] = useState(0);
+  const [flash, setFlash] = useState(0);
   const tab = tabs[selected]!;
   const pending = !published && tab.label !== 'source';
 
   return (
-    <div data-ui className="overflow-hidden rounded-lg bg-background">
+    <div data-ui className="rounded-lg bg-background">
       <div className="flex items-center justify-between gap-2 border-b border-border px-2 py-1.5">
         <TabsSubtle
           selectedIndex={selected}
@@ -42,36 +43,47 @@ export function InstallCli({ published }: { published: boolean }) {
             <TabsSubtleItem key={label} index={index} label={label} />
           ))}
         </TabsSubtle>
-        <CopyButton value={tab.command} label={`Copy ${tab.label} command`} />
+        <CopyButton
+          key={tab.label}
+          value={tab.command}
+          label={`Copy ${tab.label} command`}
+          onCopied={() => setFlash((n) => n + 1)}
+        />
       </div>
       <div
         id={`install-panel-${selected}`}
         role="tabpanel"
         aria-labelledby={`install-tab-${selected}`}
-        className="flex gap-3 overflow-x-auto px-4 py-4 font-mono text-[13px] leading-6"
+        className="relative flex gap-3 overflow-x-auto px-4 py-4 font-mono text-[13px] leading-6"
       >
+        {flash > 0 && (
+          <span key={flash} aria-hidden="true" className="copy-sweep" />
+        )}
         <Terminal
           aria-hidden="true"
           className="mt-1 size-3.5 shrink-0 text-muted-foreground"
         />
-        <pre className="whitespace-pre text-foreground">
+        <pre
+          key={selected}
+          className="panel-swap whitespace-pre text-foreground"
+        >
           {tab.command.split('\n').map((line) => (
             <div key={line}>
               <span className="select-none text-muted-foreground">$ </span>
-              {line}
+              <span className="select-all">{line}</span>
             </div>
           ))}
           {pending && (
             <div className="text-muted-foreground">
-              # not on npm yet; available from the first release
+              # this version is not published on npm
             </div>
           )}
         </pre>
       </div>
       {!published && (
         <p className="border-t border-border px-4 py-2.5 text-xs text-muted-foreground">
-          The package is unreleased. Install the tarball with your package
-          manager.{' '}
+          This version is not on npm. Build from source, then install the
+          tarball in your project.{' '}
           <Link
             href="/docs/installation"
             className="text-foreground underline decoration-ring underline-offset-4 hover:decoration-foreground"

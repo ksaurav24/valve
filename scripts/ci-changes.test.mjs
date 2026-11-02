@@ -86,6 +86,29 @@ test('version-only release PRs keep package and website validation', () => {
   );
 });
 
+test('skill instructions skip library suites while the website catalogue rebuilds', () => {
+  for (const path of [
+    'skills/valve-setup/SKILL.md',
+    'skills/valve-setup/agents/openai.yaml',
+    '.claude/skills/valve-perf-harness/references/commands.md',
+  ]) {
+    assert.deepEqual(classifyChanges([path]), {
+      library: false,
+      package: false,
+      website: false,
+      benchmarks: false,
+      changeset: false,
+    });
+  }
+  assert.deepEqual(classifyChanges(['skills/catalog.json']), {
+    library: false,
+    package: false,
+    website: true,
+    benchmarks: false,
+    changeset: false,
+  });
+});
+
 test('code changes mixed into a version PR still require all suites and a changeset', () => {
   const result = classifyChanges(
     ['packages/valve/package.json', 'packages/valve/src/valve.ts'],

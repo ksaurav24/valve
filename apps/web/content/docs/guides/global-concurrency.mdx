@@ -54,8 +54,8 @@ The memory store forgets an id's settings once its rate and lease state expire.
 
 If renewal fails or a lease expires, valve aborts the job's `signal`. After the
 callback settles, the job rejects with `LEASE_LOST`. Pass the signal to your
-HTTP client so the request stops when ownership is lost. `wrapFetch` does this
-for you.
+HTTP client so it can cancel the request when ownership is lost. `wrapFetch`
+passes the signal for you; cancellation cannot undo a remote commit.
 
 <Callout type="warn" title="Leases bound ownership, not side effects">
   An event loop stall, a network partition, or a callback that ignores the
@@ -70,19 +70,18 @@ the store would bypass lease ownership.
 ## Wake queues with a subscriber
 
 Without a subscriber, a process notices shared changes on its next store call,
-and waiters for a global slot poll at most every 50ms. With a subscriber,
-pause, resume, and slot release publish a notification. Waiting valves recheck
-the store after a short random delay, so one release does not send every waiter
-to the store at once. A valve that keeps losing slots to others waits up to
-50ms before it rechecks. Waits caused by rate rules follow the store's retry
-hint in both cases.
+and global-slot waiters poll with a 50ms cap before jitter. With a subscriber,
+pause, resume, and slot release publish a notification. Valve adds a short
+random delay to notice-driven rechecks to spread competing attempts. Repeated
+lease denials widen that delay, up to 50ms. Waits caused by rate rules follow
+the store’s retry hint in both cases.
 
 - The subscriber must be a **separate** connection. Passing the command client
   is rejected.
 - With node-redis, call `connect()` on the duplicate before passing it in.
-- Notifications are hints. Redis remains the source of truth. Global-slot
-  waiters still recheck at least once a second, so a missed message delays a
-  wake by about a second at most.
+- Notifications are hints; admission still checks Redis. Global-slot waiters
+  also use a one-second fallback polling interval before jitter. Timers can
+  fire late, so neither polling interval is a wall-clock deadline.
 
 ```ts
 // node-redis

@@ -6,7 +6,7 @@ export const socialImage = {
   width: 1200,
   height: 630,
   type: 'image/png',
-  alt: 'valve: Many workers. One rate limit. Three workers share one outbound API budget.',
+  alt: 'Three workers queue API requests against a shared rate limit in valve.',
 };
 
 /** Match canonical URLs to the static export's trailing-slash routes. */

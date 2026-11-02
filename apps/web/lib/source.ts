@@ -1,14 +1,14 @@
 import { loader } from 'fumadocs-core/source';
-import { blog, changelog, contributing, docs } from '../.source/server';
+import { articles, changelog, contributing, docs } from '../.source/server';
 
 export const source = loader({
   baseUrl: '/docs',
   source: docs.toFumadocsSource(),
 });
 
-export const blogSource = loader({
-  baseUrl: '/blog',
-  source: blog.toFumadocsSource(),
+export const articlesSource = loader({
+  baseUrl: '/articles',
+  source: articles.toFumadocsSource(),
 });
 
 export const changelogSource = loader({

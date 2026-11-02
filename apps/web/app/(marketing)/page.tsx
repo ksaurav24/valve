@@ -10,10 +10,16 @@ import { ValveFlow } from '@/components/marketing/valve-flow';
 import { HeroActions } from '@/components/marketing/hero-actions';
 import { HeroHeading, HeroReveal } from '@/components/marketing/hero-reveal';
 import { InstallCli } from '@/components/marketing/install-cli';
+import { CopyButton } from '@/components/shared/copy-button';
 import { highlight } from '@/components/shared/highlight';
 import { VersionBadge } from '@/components/shared/version-badge';
 import { contributors } from '@/lib/github';
-import { changelogEntries, current, versionState } from '@/lib/releases';
+import {
+  changelogAnchor,
+  changelogEntries,
+  current,
+  versionState,
+} from '@/lib/releases';
 import { pageMetadata } from '@/lib/metadata';
 import { site } from '@/lib/site';
 
@@ -22,6 +28,8 @@ export const metadata: Metadata = pageMetadata({
   path: '/',
   absoluteTitle: true,
 });
+
+const skillsInstallCommand = 'npx skills add ksaurav24/valve';
 
 const samples = [
   {
@@ -134,18 +142,19 @@ export default async function HomePage() {
         <div className="page-gutter hero-layout">
           <div className="hero-copy">
             <h1 className="hero-title">
-              <HeroHeading lines={['Many workers.', 'One rate limit.']} />
+              <HeroHeading lines={['Rate limiting for', 'outbound APIs.']} />
             </h1>
             <HeroReveal delay={0.16}>
               <p className="hero-description">
-                A TypeScript library for outbound API calls. Share one rate
-                budget and provider pauses across every worker.
+                Queue API requests with rate and concurrency limits. Share
+                provider quotas and cooldowns across workers using Redis or
+                Valkey.
               </p>
             </HeroReveal>
             <HeroReveal delay={0.26} className="space-y-5">
               <HeroActions />
               <p className="text-sm text-muted-foreground">
-                Beta until 1.0. APIs may change between releases.
+                Valve is in beta. APIs may change before 1.0.
               </p>
             </HeroReveal>
           </div>
@@ -176,15 +185,15 @@ export default async function HomePage() {
         <div className="readme-layout">
           <HeroReveal onView className="readme-note">
             <h2 id="readme-title" className="section-title">
-              <code className="font-mono">README.md</code>
+              Usage
             </h2>
             <p className="mt-6 max-w-[28ch] text-2xl leading-snug tracking-tight">
-              Start local. Share when needed.
+              Use the same API locally or across workers.
             </p>
             <p className="section-copy mt-6">
-              Start with an in-memory store for a script. Add Redis or Valkey
-              when calls span processes. Same API, same guarantees: rate bounds
-              apply at atomic store admission.
+              Use the default memory store for a script or a single service.
+              Connect Redis or Valkey when several processes need to share a
+              quota.
             </p>
             <InlineLink href="/docs/installation">
               Installation guide
@@ -198,8 +207,8 @@ export default async function HomePage() {
               <CodeTabs tabs={tabs} />
             </div>
             <p className="max-w-[64ch] text-sm leading-relaxed text-muted-foreground">
-              The Redis example expects your connected client. valve does not
-              open or close it.{' '}
+              The Redis example uses a connected client supplied by your
+              application. You own the connection and its shutdown.{' '}
               <Link
                 href="/docs/guides/share-a-quota"
                 className="text-foreground underline decoration-ring underline-offset-4"
@@ -212,6 +221,46 @@ export default async function HomePage() {
       </section>
 
       <section
+        id="agent-skills"
+        aria-labelledby="agent-skills-title"
+        className="page-gutter scroll-mt-24 py-10 sm:py-12"
+      >
+        <div className="readme-layout items-center">
+          <div>
+            <h2
+              id="agent-skills-title"
+              className="text-2xl font-medium tracking-tight"
+            >
+              Agent skills
+            </h2>
+            <p className="mt-3 max-w-md text-sm leading-relaxed text-muted-foreground">
+              Add Valve skills to your coding agent. Choose the ones you need in
+              the CLI.
+            </p>
+          </div>
+          <div
+            data-ui
+            className="flex min-w-0 items-center gap-3 rounded-lg border border-border bg-background py-2 pl-4 pr-2"
+          >
+            <span
+              aria-hidden="true"
+              className="font-mono text-sm text-muted-foreground"
+            >
+              $
+            </span>
+            <code className="min-w-0 flex-1 break-words font-mono text-[13px] leading-6 select-all">
+              {skillsInstallCommand}
+            </code>
+            <CopyButton
+              value={skillsInstallCommand}
+              label="Copy skills install command"
+              showLabel
+            />
+          </div>
+        </div>
+      </section>
+
+      <section
         id="features"
         aria-labelledby="features-title"
         className="page-gutter section-space"
@@ -219,13 +268,13 @@ export default async function HomePage() {
         <div className="capabilities-layout">
           <HeroReveal onView className="capabilities-intro">
             <h2 id="features-title" className="section-title">
-              Control the
+              Rate limits
               <br />
-              shared budget.
+              and queues.
             </h2>
             <p className="section-copy mt-6">
-              Space starts, share quotas, and respect the provider’s backoff.
-              Keep the scheduling rules in one place.
+              Configure request pacing, concurrency, and queue limits to match
+              the APIs you call.
             </p>
             <InlineLink href="/docs/guarantees">Read the guarantees</InlineLink>
           </HeroReveal>
@@ -242,7 +291,7 @@ export default async function HomePage() {
       >
         <HeroReveal onView className="section-heading-row">
           <h2 id="changelog-title" className="section-title">
-            Changes, in the open.
+            Recent changes
           </h2>
           <InlineLink href="/changelog">All changes</InlineLink>
         </HeroReveal>
@@ -251,7 +300,7 @@ export default async function HomePage() {
             <li key={entry.version} className="release-row">
               <HeroReveal onView>
                 <Link
-                  href="/changelog"
+                  href={`/changelog#${changelogAnchor(entry.version)}`}
                   className="font-mono text-xl tracking-tight hover:text-live-foreground"
                 >
                   v{entry.version}
@@ -278,11 +327,11 @@ export default async function HomePage() {
         <div className="community-layout">
           <HeroReveal onView>
             <h2 id="contributors-title" className="section-title">
-              Built in the open.
+              Contribute to valve
             </h2>
             <p className="section-copy mt-5">
-              Code, docs, benchmarks, and careful bug reports. Every
-              contribution counts.
+              Report bugs, improve the documentation, or help with development
+              on GitHub.
             </p>
           </HeroReveal>
           <HeroReveal
@@ -304,25 +353,21 @@ export default async function HomePage() {
         <div className="next-layout">
           <HeroReveal onView>
             <h2 id="next-title" className="section-title">
-              Make your first call.
+              Documentation
             </h2>
-            <p className="section-copy mt-5">
-              Start with a limited fetch. Keep the same API as your workload
-              grows.
-            </p>
           </HeroReveal>
           <HeroReveal onView delay={0.08} className="docs-index">
             <NextLink href="/docs/quickstart" title="Read the quickstart">
-              A limited fetch in five minutes.
+              Configure a valve and send your first request.
             </NextLink>
             <NextLink href="/docs/guarantees" title="Understand the guarantees">
-              What valve promises, and where the bounds apply.
+              Rate bounds, cancellation, and store failure behavior.
             </NextLink>
             <NextLink
               href="/docs/migration/from-bottleneck"
-              title="Moving from Bottleneck?"
+              title="Migrate from Bottleneck"
             >
-              Map options and behavior one to one.
+              Compare APIs and behavior before migrating.
             </NextLink>
           </HeroReveal>
         </div>

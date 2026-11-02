@@ -3,10 +3,9 @@ title: Queue workers
 description: Share one provider quota across BullMQ worker processes, and let the job queue own retries.
 ---
 
-A durable job queue and valve solve different problems. The queue keeps jobs
-safe across restarts and retries failed ones. valve makes sure every worker
-together stays under the provider's quota. Use both: put valve around the
-outbound calls inside each job.
+Use a durable job queue to retain work across restarts and manage job retries.
+Inside each worker, route outbound API calls through Valve to share the
+provider budget.
 
 This example uses [BullMQ](https://docs.bullmq.io). The same pattern applies to
 any queue.
@@ -60,8 +59,8 @@ process.on('SIGTERM', async () => {
 });
 ```
 
-Run as many copies of this worker as you like. Together they start at most 190
-HubSpot requests per 10 seconds, and a 429 seen by one pauses all of them.
+Workers using this configuration share a budget of 190 admissions per
+10 seconds. A 429 observed by one establishes a shared cooldown.
 
 ## Why not the queue's own rate limiter
 

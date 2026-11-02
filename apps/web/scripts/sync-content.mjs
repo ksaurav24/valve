@@ -29,7 +29,11 @@ function parse(text) {
       const [heading, ...rest] = chunk.split('\n');
       const sections = [];
       let current;
+      let blank = false;
       for (const line of rest) {
+        // A blank line inside an item starts a new paragraph of the same change.
+        const paragraph = blank;
+        blank = !line.trim();
         const title = line.match(/^### (.+)$/)?.[1];
         if (title) {
           current = { title, items: [] };
@@ -43,7 +47,8 @@ function parse(text) {
         const item = line.match(/^- (?:[0-9a-f]{7,40}: )?(.*)$/)?.[1];
         if (item !== undefined) current.items.push(item);
         else if (line.trim() && current.items.length)
-          current.items[current.items.length - 1] += ' ' + line.trim();
+          current.items[current.items.length - 1] +=
+            (paragraph ? '\n\n' : ' ') + line.trim();
         else if (line.trim()) current.items.push(line.trim());
       }
       return {

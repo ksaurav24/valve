@@ -165,3 +165,28 @@ through `pnpm check:size`). Use `pnpm perf:sylvie` for Sylvie, or the matrix and
 library commands for other comparisons. Read [the harness guide](packages/perf/README.md)
 and [the migration map](packages/perf/docs/OWNERSHIP.md) for store setup and coverage.
 Run measurements without builds or tests competing for CPU.
+
+## Agent skills
+
+The public skills in [`skills/`](skills/) cover setup, Bottleneck migration,
+reviews, quota design, and troubleshooting. Copy the install command from
+the [homepage](https://valvejs.vercel.app/#agent-skills) and choose skills in the CLI.
+
+For work on this repository, install the internal contribution and performance
+skills from your checkout:
+
+```sh
+INSTALL_INTERNAL_SKILLS=1 npx skills add . --skill valve-contributing valve-perf-harness
+```
+
+The command uses POSIX shell syntax. In PowerShell, set
+`$env:INSTALL_INTERNAL_SKILLS = '1'` before running `npx skills add`.
+Choose your agent in the installer. Claude Code also discovers these skills
+directly under `.claude/skills/`; other agents can use the installed copies.
+
+When changing public APIs, defaults, errors, or guarantees, update the relevant
+skills and their bundled references in the same PR. When changing skill names,
+paths, or prompts, update `skills/catalog.json`. Run `pnpm check:skills`,
+`pnpm lint`, and `pnpm check:source`. Skills and website documentation alone do
+not need a package changeset. Behavioral skill evaluations are separate from
+these structural checks and can be run when requested.

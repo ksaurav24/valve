@@ -1,0 +1,58 @@
+[
+  {
+    "name": "valve-setup",
+    "title": "Set up Valve",
+    "description": "Add rate limits and provider feedback to outbound API calls.",
+    "internal": false,
+    "path": "skills/valve-setup",
+    "prompt": "Read https://github.com/ksaurav24/valve/blob/master/skills/valve-setup/SKILL.md and only the linked references needed for this task. If you cannot access them, say so before proceeding.\n\nSet up valvejs in this project. Inspect every outbound call and the deployment topology. Confirm the provider quota and its scope before choosing rules. Use one stable id per shared quota, Redis or Valkey across processes, provider feedback, bounded waiting where needed, and orderly shutdown. Replace existing throttling only where it overlaps. Typecheck and run relevant tests; explain any assumptions."
+  },
+  {
+    "name": "valve-best-practices",
+    "title": "Review an integration",
+    "description": "Check quota sharing, retries, queue bounds, and shutdown.",
+    "internal": false,
+    "path": "skills/valve-best-practices",
+    "prompt": "Read https://github.com/ksaurav24/valve/blob/master/skills/valve-best-practices/SKILL.md and only the linked references needed for this task. If you cannot access them, say so before proceeding.\n\nReview this project's valvejs integration for concrete production risks. Check quota scope, shared stores, call-site coverage, weighted costs, feedback, retry idempotency, waiting bounds, global concurrency, and shutdown. Give file and line references, impact, and fixes. Say what is already correct; do not change code unless asked."
+  },
+  {
+    "name": "valve-migrate-from-bottleneck",
+    "title": "Migrate from Bottleneck",
+    "description": "Translate pacing, reservoirs, groups, and concurrency.",
+    "internal": false,
+    "path": "skills/valve-migrate-from-bottleneck",
+    "prompt": "Read https://github.com/ksaurav24/valve/blob/master/skills/valve-migrate-from-bottleneck/SKILL.md and only the linked references needed for this task. If you cannot access them, say so before proceeding.\n\nMigrate this project from Bottleneck to valvejs. Inventory limiter options and call sites first. Preserve priority ordering, clustered concurrency, weighted calls, feedback, and shutdown. Explain reservoir timing and unsupported queue strategies. Use scoped rules for atomic parent and per-key quotas. Plan a cutover without overlapping independent budgets, then typecheck and run relevant tests."
+  },
+  {
+    "name": "valve-quota-design",
+    "title": "Design quotas",
+    "description": "Model shared and per-tenant budgets, scopes, and runtime limits.",
+    "internal": false,
+    "path": "skills/valve-quota-design",
+    "prompt": "Read https://github.com/ksaurav24/valve/blob/master/skills/valve-quota-design/SKILL.md and only the linked references needed for this task. If you cannot access them, say so before proceeding.\n\nDesign the valvejs quota model for this project. Confirm which provider budgets each request spends and what they are keyed by. Choose between layered rules, atomic scoped rules, independent keyed groups, or sequential admission with its non-atomic semantics. Address per-key cooldowns, plan tiers, runtime limit changes, capacity, shared stores, and safe policy rollout where relevant."
+  },
+  {
+    "name": "valve-troubleshooting",
+    "title": "Troubleshoot Valve",
+    "description": "Diagnose 429 responses, stalled queues, and Redis failures.",
+    "internal": false,
+    "path": "skills/valve-troubleshooting",
+    "prompt": "Read https://github.com/ksaurav24/valve/blob/master/skills/valve-troubleshooting/SKILL.md and only the linked references needed for this task. If you cannot access them, say so before proceeding.\n\nDiagnose this project's valvejs issue from the actual code, configuration, and errors. Check shared ids and stores, per-call construction, feedback, rules, queue bounds, leases, and Redis health. Do not delete budgets or reset ids as a workaround. Make the smallest supported fix and verify it with local tests or synthetic responses."
+  },
+  {
+    "name": "valve-contributing",
+    "title": "Prepare a contribution",
+    "description": "Follow repository conventions, changesets, and required checks.",
+    "internal": true,
+    "path": ".claude/skills/valve-contributing",
+    "prompt": "Read https://github.com/ksaurav24/valve/blob/master/.claude/skills/valve-contributing/SKILL.md and only the linked references needed for this task. If you cannot access them, say so before proceeding.\n\nPrepare the requested change in the valve repository. Read AGENTS.md and CONTRIBUTING.md, inspect the implementation, update the relevant docs and skills, add a changeset only when required, sync the website when changesets change, and run the appropriate checks. Summarize the change, validation, and a proposed PR title. Do not publish a package."
+  },
+  {
+    "name": "valve-perf-harness",
+    "title": "Benchmark Valve",
+    "description": "Run the perf harness and interpret safety and performance results.",
+    "internal": true,
+    "path": ".claude/skills/valve-perf-harness",
+    "prompt": "Read https://github.com/ksaurav24/valve/blob/master/.claude/skills/valve-perf-harness/SKILL.md and only the linked references needed for this task. If you cannot access them, say so before proceeding.\n\nUse the valve repository's performance harness for the requested change. Start with doctor, quick, and footprint --check. Read safety separately from performance and label portable results as descriptive. Recommend any further targeted comparison with its cost and prerequisites. Use only disposable harness-owned stores for real-store or fault checks; do not start long runs without a task that calls for them."
+  }
+]

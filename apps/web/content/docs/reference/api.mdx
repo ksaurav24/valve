@@ -308,9 +308,9 @@ function createValveGroup<K extends string = string>(
 ): ValveGroup<K>;
 ```
 
-Creates independent keyed valves with a bounded local cache. This opt-in
-subpath is not exported from `valvejs`, keeping the core entry within its
-17.5 KB gzip budget. Invalid group configuration throws `INVALID_OPTIONS`.
+Creates independent keyed valves with a bounded local cache. Import it from
+`valvejs/group`; it is not exported from `valvejs`. Invalid group
+configuration throws `INVALID_OPTIONS`.
 See [Independent keyed groups](/docs/guides/independent-groups/).
 
 ### ValveGroupOptions

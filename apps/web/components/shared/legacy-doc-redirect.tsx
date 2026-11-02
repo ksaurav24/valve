@@ -14,7 +14,7 @@ export function LegacyDocRedirect({ url }: { url: string }) {
     <main className="mx-auto max-w-xl p-8">
       <h1>Documentation has moved.</h1>
       <p>
-        <Link href={url}>Continue to this page in /docs.</Link>
+        <Link href={url}>Open the updated documentation.</Link>
       </p>
     </main>
   );

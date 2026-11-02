@@ -534,6 +534,427 @@ body {
   color: var(--shiki-dark);
 }
 
+/* Published-state markers use the same accent as the valve favicon. */
+.live-dot {
+  display: inline-block;
+  width: 0.5rem;
+  height: 0.5rem;
+  flex-shrink: 0;
+  border-radius: 999px;
+  background: var(--live);
+}
+.live-dot-sm {
+  width: 0.375rem;
+  height: 0.375rem;
+}
+
+/* Cards and rows: one link covers the whole surface. */
+.stretched-link::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+  border-radius: inherit;
+}
+.stretched-link:focus-visible {
+  outline: none;
+}
+.stretched-link:focus-visible::after {
+  outline: 2px solid var(--focus-ring, var(--ring));
+  outline-offset: 2px;
+}
+
+/* Articles index */
+.article-feature {
+  position: relative;
+  overflow: hidden;
+  border-radius: calc(var(--radius) + 4px);
+  background: var(--card);
+  box-shadow: var(--shadow-2);
+  transition:
+    box-shadow 180ms ease-out,
+    transform 180ms cubic-bezier(0.22, 1, 0.36, 1);
+}
+.article-feature:is(:hover, :focus-within) {
+  box-shadow: var(--shadow-4);
+  transform: translateY(-2px);
+}
+.article-feature:focus-within {
+  outline: 2px solid var(--focus-ring, var(--ring));
+  outline-offset: 4px;
+}
+.article-feature-grid {
+  position: absolute;
+  inset: 0;
+  mask-image: radial-gradient(120% 90% at 100% 0%, black, transparent 70%);
+  opacity: 0.9;
+  transition: opacity 180ms ease-out;
+}
+.article-feature:hover .article-feature-grid {
+  opacity: 1;
+}
+.article-cta-icon {
+  display: grid;
+  width: 2.5rem;
+  height: 2.5rem;
+  place-items: center;
+  border-radius: 999px;
+  background: var(--foreground);
+  color: var(--background);
+  transition: transform 180ms cubic-bezier(0.22, 1, 0.36, 1);
+}
+.article-feature:is(:hover, :focus-within) .article-cta-icon {
+  transform: translateX(4px);
+}
+.article-list {
+  border-top: 1px solid var(--border);
+}
+.article-row {
+  position: relative;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  isolation: isolate;
+  align-items: start;
+  gap: 0.5rem 1rem;
+  border-bottom: 1px solid var(--border);
+  padding: 1.75rem 0;
+}
+.article-row::before {
+  z-index: -1;
+  content: '';
+  position: absolute;
+  inset: 0 -1rem;
+  border-radius: var(--radius);
+  background: var(--hover);
+  opacity: 0;
+  transform: scaleY(0.96);
+  transition:
+    opacity 180ms ease-out,
+    transform 180ms cubic-bezier(0.22, 1, 0.36, 1);
+}
+.article-row:is(:hover, :focus-within)::before {
+  opacity: 1;
+  transform: none;
+}
+.article-row h3 {
+  transition: color 160ms ease-out;
+}
+.article-row-arrow {
+  position: absolute;
+  top: 2rem;
+  right: 0;
+  color: var(--muted-foreground);
+  opacity: 0;
+  transform: translate(-6px, 6px);
+  transition:
+    opacity 180ms ease-out,
+    transform 180ms cubic-bezier(0.22, 1, 0.36, 1);
+}
+.article-row:hover .article-row-arrow,
+.article-row:focus-within .article-row-arrow {
+  opacity: 1;
+  transform: none;
+  color: var(--foreground);
+}
+@media (min-width: 64rem) {
+  .article-row {
+    grid-template-columns: minmax(0, 1fr) 11rem;
+    gap: 2.5rem;
+    padding: 2.25rem 2.5rem 2.25rem 0;
+  }
+}
+
+/* Releases and changelog timeline */
+.release-log {
+  position: relative;
+  min-width: 0;
+}
+.release-log::before {
+  content: '';
+  position: absolute;
+  top: 0.9rem;
+  bottom: 0;
+  left: 0.3125rem;
+  width: 1px;
+  background: linear-gradient(to bottom, var(--border) 85%, transparent);
+}
+.release-entry {
+  position: relative;
+  padding-left: 2rem;
+}
+.release-entry + .release-entry {
+  margin-top: clamp(3rem, 5vw, 4.5rem);
+}
+.release-node {
+  position: absolute;
+  top: 0.8rem;
+  left: 0;
+  width: 0.6875rem;
+  height: 0.6875rem;
+  border-radius: 999px;
+  border: 2px solid var(--background);
+  background: var(--muted-foreground);
+  box-shadow: 0 0 0 1px var(--border);
+}
+.release-node-muted {
+  background: var(--background);
+  box-shadow: 0 0 0 1px var(--ring);
+}
+.release-node-live {
+  background: var(--live);
+  box-shadow: none;
+}
+.release-card {
+  border-radius: calc(var(--radius) + 2px);
+  background: var(--card);
+  box-shadow: var(--shadow-1);
+  padding: 1.5rem;
+  transition: box-shadow 180ms ease-out;
+}
+.release-entry:hover .release-card {
+  box-shadow: var(--shadow-3);
+}
+@media (min-width: 40rem) {
+  .release-entry {
+    padding-left: 2.75rem;
+  }
+  .release-card {
+    padding: 2rem;
+  }
+}
+.change-kind {
+  display: inline-flex;
+  height: 1.375rem;
+  align-items: center;
+  border-radius: 0.3125rem;
+  background: var(--muted);
+  padding-inline: 0.5rem;
+  color: var(--foreground);
+  letter-spacing: 0.1em;
+}
+.change-kind-major,
+.change-kind-minor {
+  background: color-mix(in oklab, var(--live) 14%, transparent);
+  color: var(--live-foreground);
+}
+.change-list {
+  display: grid;
+  gap: 1rem;
+  max-width: 72ch;
+  font-size: 0.975rem;
+  line-height: 1.7;
+  color: color-mix(in oklab, var(--foreground) 86%, var(--background));
+}
+.change-list > li {
+  position: relative;
+  padding-left: 1.125rem;
+  text-wrap: pretty;
+}
+.change-list > li::before {
+  content: '';
+  position: absolute;
+  top: 0.72em;
+  left: 0;
+  width: 0.375rem;
+  height: 1px;
+  background: var(--muted-foreground);
+}
+.change-list > li > p + p {
+  margin-top: 0.75rem;
+}
+.version-rail a[aria-current] {
+  font-weight: 500;
+}
+
+:root {
+  --icon-swap-dur: 250ms;
+  --icon-swap-blur: 2px;
+  --icon-swap-start-scale: 0.25;
+  --icon-swap-ease: ease-in-out;
+}
+
+.t-icon-swap {
+  position: relative;
+  display: inline-grid;
+}
+.t-icon-swap .t-icon {
+  grid-area: 1 / 1;
+  transition:
+    opacity var(--icon-swap-dur) var(--icon-swap-ease),
+    filter var(--icon-swap-dur) var(--icon-swap-ease),
+    transform var(--icon-swap-dur) var(--icon-swap-ease);
+  /* No will-change: it would freeze each icon's raster at its 0.25 start
+     scale, so a large icon scales up blurry and pixelated. */
+}
+.t-icon-swap[data-state='a'] .t-icon[data-icon='a'],
+.t-icon-swap[data-state='b'] .t-icon[data-icon='b'] {
+  opacity: 1;
+  filter: blur(0);
+  transform: scale(1);
+}
+.t-icon-swap[data-state='a'] .t-icon[data-icon='b'],
+.t-icon-swap[data-state='b'] .t-icon[data-icon='a'] {
+  opacity: 0;
+  filter: blur(var(--icon-swap-blur));
+  transform: scale(var(--icon-swap-start-scale));
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .t-icon-swap .t-icon {
+    transition: none !important;
+  }
+}
+
+/* Copy feedback: icon morph lives in CopyButton; ring, tip, and sweep here. */
+.copy-button {
+  --icon-swap-dur: 180ms;
+  --icon-swap-blur: 1px;
+  --icon-swap-start-scale: 0.65;
+  transition-property: color, background-color, transform;
+  transition-duration: 140ms;
+}
+@keyframes copy-ring {
+  from {
+    opacity: 0.7;
+    transform: scale(0.6);
+  }
+  to {
+    opacity: 0;
+    transform: scale(1.6);
+  }
+}
+.copy-ring {
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  box-shadow: 0 0 0 1.5px var(--live);
+  pointer-events: none;
+  animation: copy-ring 400ms cubic-bezier(0.22, 1, 0.36, 1) forwards;
+}
+.copy-tip {
+  position: absolute;
+  bottom: calc(100% + 6px);
+  right: 0;
+  z-index: 20;
+  white-space: nowrap;
+  border-radius: 0.375rem;
+  background: var(--foreground);
+  color: var(--background);
+  padding: 0.25rem 0.5rem;
+  font-size: 0.75rem;
+  font-weight: 500;
+  line-height: 1rem;
+  pointer-events: none;
+  box-shadow: var(--shadow-3);
+  animation: copy-tip-in 140ms ease-out;
+}
+@keyframes copy-sweep {
+  from {
+    opacity: 1;
+    transform: translateX(-100%);
+  }
+  to {
+    opacity: 0.2;
+    transform: translateX(100%);
+  }
+}
+.copy-sweep {
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+  pointer-events: none;
+  background: linear-gradient(
+    90deg,
+    transparent,
+    color-mix(in oklab, var(--foreground) 7%, transparent) 45%,
+    color-mix(in oklab, var(--live) 10%, transparent) 55%,
+    transparent
+  );
+  animation: copy-sweep 350ms cubic-bezier(0.4, 0, 0.2, 1) forwards;
+}
+@keyframes panel-swap {
+  from {
+    opacity: 0;
+    transform: translateY(3px);
+    filter: blur(2px);
+  }
+}
+.panel-swap {
+  animation: panel-swap 180ms cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+/* Fumadocs code blocks (docs and articles) share the same copy feedback. */
+@keyframes copy-pop {
+  0% {
+    transform: scale(0.4) rotate(-45deg);
+    opacity: 0;
+    filter: blur(2px);
+  }
+  60% {
+    transform: scale(1.15);
+    opacity: 1;
+    filter: none;
+  }
+  100% {
+    transform: none;
+  }
+}
+@keyframes copy-tip-in {
+  from {
+    opacity: 0;
+    translate: 4px 0;
+  }
+}
+figure.shiki button[aria-live] {
+  position: relative;
+  transition:
+    color 140ms ease-out,
+    background-color 140ms ease-out,
+    transform 140ms ease-out;
+}
+figure.shiki button[aria-live]:active {
+  transform: scale(0.9);
+}
+figure.shiki button[data-checked] {
+  color: var(--live-foreground);
+}
+figure.shiki button[data-checked] svg {
+  animation: copy-pop 340ms cubic-bezier(0.22, 1, 0.36, 1);
+}
+figure.shiki button[data-checked]::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  box-shadow: 0 0 0 1.5px var(--live);
+  pointer-events: none;
+  animation: copy-ring 400ms cubic-bezier(0.22, 1, 0.36, 1) forwards;
+}
+figure.shiki button[data-checked]::after {
+  content: 'Copied';
+  position: absolute;
+  top: 50%;
+  right: calc(100% + 6px);
+  translate: 0 -50%;
+  white-space: nowrap;
+  border-radius: 0.375rem;
+  background: var(--foreground);
+  color: var(--background);
+  padding: 0.125rem 0.45rem;
+  font-family: var(--font-sans);
+  font-size: 0.6875rem;
+  font-weight: 500;
+  line-height: 1rem;
+  pointer-events: none;
+  animation: copy-tip-in 200ms cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  html {
+    scroll-behavior: smooth;
+  }
+}
+
 /* Interactive feedback stays inside the 100-180ms budget. */
 a,
 button {
@@ -551,6 +972,19 @@ button {
     animation-iteration-count: 1 !important;
     transition-duration: 0.01ms !important;
     scroll-behavior: auto !important;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .panel-swap,
+  .copy-ring,
+  .copy-sweep,
+  .copy-tip {
+    animation: none !important;
+  }
+  .article-feature,
+  .article-cta-icon,
+  .article-row-arrow {
+    transform: none !important;
   }
 }
 

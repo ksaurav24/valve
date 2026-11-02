@@ -1,23 +1,48 @@
 import type { Metadata } from 'next';
 import Link from 'next/link';
 import { PageHeader } from '@/components/marketing/page-header';
+import { ReleaseLog } from '@/components/marketing/release-log';
 import { VersionBadge } from '@/components/shared/version-badge';
-import { changelogSource } from '@/lib/source';
-import { getMDXComponents } from '@/mdx-components';
+import {
+  changelogAnchor,
+  changelogEntries,
+  releases,
+  versionState,
+} from '@/lib/releases';
 import { site } from '@/lib/site';
 import { pageMetadata } from '@/lib/metadata';
+import { changelogSource } from '@/lib/source';
 
 export const metadata: Metadata = pageMetadata({
   title: 'Changelog',
-  description:
-    'Version history and package changes for valve, generated from the package changelog.',
+  description: 'Release notes and unreleased changes for valve.',
   path: '/changelog',
 });
 
 export default function ChangelogPage() {
   const page = changelogSource.getPage([]);
   if (!page) throw new Error('Run the content sync before building the site.');
-  const Content = page.data.body;
+  // Reuse MDX's IDs so punctuation and duplicate-heading suffixes stay compatible.
+  const headingText = new Map(
+    page.data.structuredData.headings.map(({ id, content }) => [
+      `#${id}`,
+      content,
+    ]),
+  );
+  const sectionAnchors = new Map<string, string[]>();
+  let version = '';
+  for (const heading of page.data.toc) {
+    const title = headingText.get(heading.url);
+    if (title === undefined) continue;
+    if (heading.depth === 2) version = title;
+    else if (heading.depth === 3) {
+      const key = `${version}:${title}`;
+      sectionAnchors.set(key, [
+        ...(sectionAnchors.get(key) ?? []),
+        heading.url.slice(1),
+      ]);
+    }
+  }
   return (
     <>
       <PageHeader
@@ -26,39 +51,45 @@ export default function ChangelogPage() {
         aside={<VersionBadge />}
       >
         <p>
-          Changes for plain-numbered versions, generated from{' '}
+          Release notes and unreleased changes. The{' '}
           <a
             className="text-foreground underline decoration-ring underline-offset-4 hover:decoration-foreground"
             href={`${site.source}/packages/valve/CHANGELOG.md`}
           >
-            packages/valve/CHANGELOG.md
-          </a>
-          . Preview-only history is grouped under plain headings and marked as
-          historical notes. Other versions npm does not list are development
-          versions. Original build versions remain in the full package
-          changelog.
+            full changelog
+          </a>{' '}
+          includes the original preview builds. Entries marked unreleased are
+          not yet available on npm; historical notes collect earlier preview
+          releases.
         </p>
       </PageHeader>
-      <div className="page-gutter grid items-start gap-10 py-14 lg:grid-cols-[minmax(0,1fr)_minmax(0,2fr)] lg:gap-16">
-        <aside className="max-w-sm space-y-5 lg:sticky lg:top-24">
-          <h2 className="text-2xl font-medium tracking-tight">
-            Release history
-          </h2>
-          <p className="text-base leading-relaxed text-muted-foreground">
-            The package changelog is the source of truth. Published versions and
-            development notes keep their original order.
-          </p>
+      <ReleaseLog
+        path="/changelog/"
+        railLabel="Versions"
+        railFooter={
           <Link
             href="/releases"
-            className="inline-flex min-h-11 items-center text-sm font-medium hover:text-live-foreground"
+            className="inline-flex min-h-9 items-center text-muted-foreground hover:text-foreground"
           >
-            View published releases
+            Published releases
           </Link>
-        </aside>
-        <div className="prose changelog-body min-w-0 max-w-[75ch]">
-          <Content components={getMDXComponents()} />
-        </div>
-      </div>
+        }
+        entries={changelogEntries.map((entry) => ({
+          id: changelogAnchor(entry.version),
+          version: entry.version,
+          state: versionState(entry.version),
+          publishedAt:
+            releases.find((release) => release.version === entry.version)
+              ?.publishedAt ?? null,
+          sections: entry.sections.map((section) => ({
+            ...section,
+            anchors: sectionAnchors.get(`${entry.version}:${section.title}`),
+          })),
+          ...(entry.sourceVersions
+            ? { sourceVersions: entry.sourceVersions }
+            : {}),
+        }))}
+      />
     </>
   );
 }

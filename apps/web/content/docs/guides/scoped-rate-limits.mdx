@@ -8,8 +8,7 @@ budget tied to a recipient, tenant, model, or resource. Define the rules once,
 then supply the identities with each job. Valve spends every applicable
 budget together, or spends none when admission is denied.
 
-This API is included in the 0.4 series.
-It requires the matching memory or Redis store, or a
+Scoped admission requires the built-in memory or Redis store, or a
 custom store implementing `acquireScoped`.
 
 ## Define shared and recipient budgets
@@ -81,7 +80,7 @@ reject with `INVALID_OPTIONS` before enqueueing. Valve copies identities, so
 later changes to your object do not reroute queued work. Missing-identity errors
 name the required dimension. Identities are mandatory because omitting one would
 otherwise skip a quota or combine unrelated callers into a fallback budget.
-Rules cannot be optional or conditional in this release; do not use placeholder
+Rules cannot be optional or conditional; do not use placeholder
 identities to bypass them.
 
 Use stable opaque application IDs. Redis keys encode identity values to avoid
@@ -193,7 +192,7 @@ Already reserved quota is not refunded if a job is cancelled after admission.
 `pause`, `resume`, `observe`, and `wrapFetch` feedback apply to the entire Valve
 ID, including all recipients. `stats().pausedUntil` and pause events describe
 that shared pause; a scoped rate denial does not emit a pause event. Targeted
-pause/resume is not included in this release. Valve does not infer which quota
+pause/resume is not supported. Valve does not infer which quota
 a generic 429 refers to. A 429 or `Retry-After` response observed for one
 recipient can therefore pause work for every recipient under that Valve ID.
 
@@ -215,8 +214,8 @@ worker contention. Try batches of 8 or 16 when shard latency matters; increase
 only when measured round-trip savings justify longer script execution.
 
 All Redis keys for one Valve share its hash tag. This allows one atomic Lua
-operation in Redis Cluster, but places that quota domain on one shard. A hot
-business remains a hot slot. Key cardinality grows with active identities and
+operation in Redis Cluster, but places that quota domain on one shard. Traffic
+for one Valve ID cannot be distributed across shards. Key cardinality grows with active identities and
 scoped rules. **Inactive scopes expire automatically; do not manually delete
 their Redis keys.** GCRA keys expire when their stored theoretical arrival time
 is reached and the burst capacity is fully restored. Scoped fixed-window keys

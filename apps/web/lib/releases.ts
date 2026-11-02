@@ -7,6 +7,8 @@ import { npmVersionState } from './release-state.mjs';
 export interface ChangelogSection {
   title: string | null;
   items: string[];
+  /** Original MDX heading IDs, including aliases for merged preview sections. */
+  anchors?: string[];
 }
 
 export interface ChangelogEntry {
@@ -47,6 +49,9 @@ export const releases: Release[] = changelogEntries
     npmUrl: `${site.npm}/v/${entry.version}`,
     githubUrl: githubUrl(entry.version),
   }));
+
+/** Matches the former heading slugs (`#012` for 0.1.2), so old links still land. */
+export const changelogAnchor = (version: string) => version.replaceAll('.', '');
 
 export function versionState(version: string): VersionState {
   return npmVersionState(

@@ -1,11 +1,11 @@
 ---
 title: Compose valves
-description: Choose between atomic scoped admission, explicit sequential admission, and separate workflow stages, and know what each guarantees.
+description: Choose atomic admission for overlapping quotas or sequential admission for independent charges.
 ---
 
-A job sometimes touches more than one budget. Valve offers several ways to model
-that. They differ in what happens when one budget admits the job and another
-does not, so pick by the guarantee you need.
+When a job needs several budgets, decide whether a denial should leave any
+earlier charge spent. That determines whether to use one atomic admission or
+separate sequential stages.
 
 ## Choose a model
 
