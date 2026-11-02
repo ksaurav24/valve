@@ -10,6 +10,7 @@ import { ValveFlow } from '@/components/marketing/valve-flow';
 import { HeroActions } from '@/components/marketing/hero-actions';
 import { HeroHeading, HeroReveal } from '@/components/marketing/hero-reveal';
 import { InstallCli } from '@/components/marketing/install-cli';
+import { AgentSkillInstaller } from '@/components/marketing/agent-skill-installer';
 import { highlight } from '@/components/shared/highlight';
 import { VersionBadge } from '@/components/shared/version-badge';
 import { contributors } from '@/lib/github';
@@ -214,6 +215,25 @@ export default async function HomePage() {
               </Link>
             </p>
           </HeroReveal>
+        </div>
+      </section>
+
+      <section
+        aria-labelledby="agent-skills-title"
+        className="page-gutter section-space"
+      >
+        <div className="readme-layout">
+          <div>
+            <h2 id="agent-skills-title" className="section-title">
+              Set up with your agent.
+            </h2>
+            <p className="section-copy mt-6">
+              Give your coding agent the API, quota patterns, and operational
+              details it needs to add valve to your project.
+            </p>
+            <InlineLink href="/skills">Setup, migrations, and more</InlineLink>
+          </div>
+          <AgentSkillInstaller compact />
         </div>
       </section>
 

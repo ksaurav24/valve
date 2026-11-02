@@ -13,6 +13,7 @@ export default function sitemap(): MetadataRoute.Sitemap {
     '/contributors',
     '/articles',
     ...getArticles().map((page) => page.url),
+    '/skills',
     ...source.getPages().map((page) => page.url),
   ];
   return [...new Set(paths.map(siteUrl))].map((url) => ({ url }));

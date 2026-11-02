@@ -1,0 +1,4 @@
+interface:
+  display_name: 'Contribute to valve'
+  short_description: 'Prepare code, docs, changesets, and PR checks'
+  default_prompt: 'Use $valve-contributing. Prepare this change for a PR in the valve repository.'

@@ -1,0 +1,4 @@
+interface:
+  display_name: 'Migrate from Bottleneck'
+  short_description: 'Preserve scheduling semantics when moving to valve'
+  default_prompt: 'Use $valve-migrate-from-bottleneck. Migrate this Bottleneck integration to valvejs.'

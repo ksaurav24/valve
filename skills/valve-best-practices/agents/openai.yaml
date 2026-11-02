@@ -1,0 +1,4 @@
+interface:
+  display_name: 'Review valve usage'
+  short_description: 'Find quota sharing, retries, and lifecycle risks'
+  default_prompt: 'Use $valve-best-practices. Review this valvejs integration for production risks.'
