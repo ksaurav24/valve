@@ -189,15 +189,15 @@ universal flags for portable commands.
 
 | Option                | Range/default and meaning                                                                                    |
 | --------------------- | ------------------------------------------------------------------------------------------------------------ |
-| `--reps N`            | 1–100 independent repetitions; otherwise use profile looks.                                                  |
-| `--seed N`            | Integer 0–4294967295; real-time default 42. Derives workload and ordering seeds.                             |
-| `--workers N`         | 1–64 processes; overrides selected cells. Sylvie allows at most two.                                         |
+| `--reps N`            | 1-100 independent repetitions; otherwise use profile looks.                                                  |
+| `--seed N`            | Integer 0-4294967295; real-time default 42. Derives workload and ordering seeds.                             |
+| `--workers N`         | 1-64 processes; overrides selected cells. Sylvie allows at most two.                                         |
 | `--window DURATION`   | Override measurement window; bare numbers are seconds, or use `2s`, `40m`, `4h`. Positive, at most 12 hours. |
 | `--duration DURATION` | Alias for `--window`; also used for continuous soak duration.                                                |
-| `--window-ms N`       | Window in milliseconds, 1–43200000. Supply only one window spelling.                                         |
-| `--warmup-ms N`       | 0–3600000 ms; otherwise the cell's warmup.                                                                   |
-| `--drain-ms N`        | 0–3600000 ms after the window to observe outcomes; otherwise the cell's drain.                               |
-| `--rate N`            | Soak's total offered jobs/second, 0.001–10000; default 2.                                                    |
+| `--window-ms N`       | Window in milliseconds, 1-43200000. Supply only one window spelling.                                         |
+| `--warmup-ms N`       | 0-3600000 ms; otherwise the cell's warmup.                                                                   |
+| `--drain-ms N`        | 0-3600000 ms after the window to observe outcomes; otherwise the cell's drain.                               |
+| `--rate N`            | Soak's total offered jobs/second, 0.001-10000; default 2.                                                    |
 | `--budget DURATION`   | Positive, at most 12 hours. Select complete cells that fit the estimated budget.                             |
 
 Window overrides scale fault times to keep the requested fault within a

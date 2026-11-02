@@ -94,7 +94,7 @@ Reports expose three time-to-start views for each applicable cohort:
 
 - **Conditional wait** (`waitP50`, `waitP99`, and related fields): percentiles
   among callbacks that started. Fast values can coexist with many failures.
-- **Cumulative incidence** (`cifP50`, `cifP99`): Aalen–Johansen estimates for
+- **Cumulative incidence** (`cifP50`, `cifP99`): Aalen-Johansen estimates for
   starting, with expiry/rejection as competing risks and abort/unserved work
   as censoring. A quantile is not reached if the estimated fraction starting
   never reaches it. Treating aborts as non-informative censoring is an assumption.
