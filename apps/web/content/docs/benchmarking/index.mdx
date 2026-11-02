@@ -1,0 +1,114 @@
+---
+title: Performance harness
+description: Choose the right Valve benchmark, from portable checks to controlled performance comparisons.
+---
+
+`@valve/perf` is Valve's private performance and correctness workspace at
+`packages/perf`. Contributors use it to measure built Valve revisions, check
+admission invariants, compare libraries, and retain reproducible evidence. It
+is not published with `valvejs` and adds no runtime dependencies to the library.
+
+Run commands from a repository checkout. Installing `valvejs` from npm does
+not install the harness.
+
+## Choose the evidence you need
+
+| Question                                                  | Command                                   | What the result establishes                                                                                  |
+| --------------------------------------------------------- | ----------------------------------------- | ------------------------------------------------------------------------------------------------------------ |
+| Does the harness work locally?                            | `pnpm perf quick`                         | Portable admission-model/oracle checks and reduced microbenchmarks.                                          |
+| What does an in-process operation cost?                   | `pnpm perf micro`                         | Tinybench samples for operations such as admission, headers, and groups.                                     |
+| Are the built library and real stores behaving correctly? | `pnpm perf smoke`                         | Short real-time correctness trials with explicit coverage and skipped cells.                                 |
+| Did a revision change performance?                        | `pnpm perf matrix --base HEAD --current`  | Paired baseline/candidate trials with an independent A/A control; stronger claims require a controlled host. |
+| How do equivalent library features compare?               | `pnpm perf libs`                          | Category-specific comparisons with explicit unsupported and approximate cases.                               |
+| Does the package fit its size budgets?                    | `pnpm perf footprint --check`             | Deterministic source-entry gzip budget checks and bundle attribution.                                        |
+| What changed in startup, pacing, or scoped admission?     | `pnpm perf startup`, `drift`, or `scoped` | Descriptive diagnostic samples with artifact identities.                                                     |
+| What happens over a long window or during a fault?        | `pnpm perf soak` or `chaos`               | Continuous resource observations or declared fault/recovery scenarios.                                       |
+| Is the late-start deadline regression fixed?              | `pnpm perf c1`                            | A focused proof that an overdue queued callback rejects without running.                                     |
+
+Start with:
+
+```sh
+pnpm install --frozen-lockfile
+pnpm --filter valvejs build
+pnpm perf doctor
+pnpm perf quick
+```
+
+Use the latest Node.js 24 LTS (at least 24.11 for the current build tools) and
+the repository's pinned pnpm 11.28.4. The portable
+commands do not need Docker. Follow [Run benchmarks](/docs/benchmarking/running/)
+to provision real stores or compare revisions.
+
+## Five evidence tiers
+
+The harness separates different kinds of evidence so a fast local check does
+not accidentally become a release performance claim.
+
+| Tier                | Commands         | Scope                                                                                                                            |
+| ------------------- | ---------------- | -------------------------------------------------------------------------------------------------------------------------------- |
+| T0: micro           | `micro`          | In-process JavaScript costs; no distributed or Lua claims.                                                                       |
+| T1: model           | `model`          | Pure admission-state math, bounds, parity controls, and abstract-client simulation. Real Lua parity needs the integration suite. |
+| T2: smoke           | `smoke`          | Real timers, processes, and stores; normally one replication and descriptive performance.                                        |
+| T3: comparison      | `matrix`, `libs` | Independent paired trials, preregistered metrics and margins, and A/A repeatability checks.                                      |
+| T4: soak and faults | `soak`, `chaos`  | Long observations and fault scripts; full runs are manual.                                                                       |
+
+`quick` combines T1 with reduced T0 work. Footprint, startup, drift, and scoped
+probes complement these tiers. Startup, drift, and scoped samples do not
+produce statistical performance verdicts.
+
+## Read safety before speed
+
+Reports keep two conclusions separate:
+
+- **Safety:** `PASS`, `FAIL`, or `UNVERIFIED` for the invariants the trial can
+  observe. Missing instrumentation is `UNVERIFIED`, not a pass.
+- **Performance:** a verdict per metric and cell, such as `EQUIVALENT`,
+  `REGRESSION`, or `INCONCLUSIVE`. A short sample is `DESCRIPTIVE`.
+
+A completed command can still contain unresolved evidence. A passing separate
+correctness audit does not verify the uninstrumented timing trial, and an
+unstable A/A control withholds the candidate's performance conclusions. See
+[Read benchmark results](/docs/benchmarking/results/).
+
+## Portable and authoritative execution
+
+Portable runs are useful for development and correctness checks. Authoritative
+performance execution additionally requires Linux, delegated cgroup v2 CPU and
+memory controls, a protected process scope with swap disabled, worker CPU
+pinning, pinned server containers on separate CPUs, direct container IPs, and
+resource checks during trials. The manifest records the actual classification
+and the reasons for missing controls.
+
+`--require-authoritative` refuses execution when those controls are unavailable.
+Authority describes the execution environment; replication counts, complete
+pairs, and stable A/A still determine whether a metric supports inference.
+Compare artifacts within one controlled experiment and environment fingerprint.
+
+## Current coverage limits
+
+The current workloads use immutable policies. They do not establish the cost
+of `limits: 'managed'`, runtime updates, subscriber wakeups for those updates,
+polling rechecks, or scoped lazy migration. Those features need dedicated
+workloads before performance claims can be made.
+
+The admission model does not reproduce JavaScript timers, promise ordering,
+sockets, or Valve's runtime scheduler. Scheduler evidence comes from real-time
+trials. Redis Cluster performance, Sentinel, TLS, multi-host fleets, and more
+than 64 worker processes are outside the harness's v1 performance scope.
+
+## Documentation map
+
+- [Run benchmarks](/docs/benchmarking/running/): setup, smoke, comparisons,
+  isolation, faults, evidence retention, and troubleshooting.
+- [CLI reference](/docs/benchmarking/cli/): commands, profiles, suites,
+  selection and timing options, environment variables, and exit codes.
+- [Read benchmark results](/docs/benchmarking/results/): metrics, latency
+  outcomes, confidence intervals, A/A, and report files.
+- [How the harness works](/docs/benchmarking/internals/): build snapshots,
+  worker execution, Lua audits, the model, and adding coverage.
+
+The repository also retains the [design RFC](https://github.com/ksaurav24/valve/blob/master/packages/perf/RFC.md),
+[implementation and historical verification record](https://github.com/ksaurav24/valve/blob/master/packages/perf/IMPLEMENTATION.md),
+and [benchmark ownership map](https://github.com/ksaurav24/valve/blob/master/packages/perf/docs/OWNERSHIP.md).
+Historical reports describe their recorded revisions and protocols; use the
+current CLI for new measurements.
