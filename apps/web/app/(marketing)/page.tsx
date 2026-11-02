@@ -13,7 +13,12 @@ import { InstallCli } from '@/components/marketing/install-cli';
 import { highlight } from '@/components/shared/highlight';
 import { VersionBadge } from '@/components/shared/version-badge';
 import { contributors } from '@/lib/github';
-import { changelogEntries, current, versionState } from '@/lib/releases';
+import {
+  changelogAnchor,
+  changelogEntries,
+  current,
+  versionState,
+} from '@/lib/releases';
 import { pageMetadata } from '@/lib/metadata';
 import { site } from '@/lib/site';
 
@@ -251,7 +256,7 @@ export default async function HomePage() {
             <li key={entry.version} className="release-row">
               <HeroReveal onView>
                 <Link
-                  href="/changelog"
+                  href={`/changelog#${changelogAnchor(entry.version)}`}
                   className="font-mono text-xl tracking-tight hover:text-live-foreground"
                 >
                   v{entry.version}

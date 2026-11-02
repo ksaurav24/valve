@@ -48,6 +48,9 @@ export const releases: Release[] = changelogEntries
     githubUrl: githubUrl(entry.version),
   }));
 
+/** Matches the former heading slugs (`#012` for 0.1.2), so old links still land. */
+export const changelogAnchor = (version: string) => version.replaceAll('.', '');
+
 export function versionState(version: string): VersionState {
   return npmVersionState(
     version,

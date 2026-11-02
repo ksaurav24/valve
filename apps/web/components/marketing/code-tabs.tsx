@@ -12,12 +12,13 @@ export interface CodeTab {
   html: string;
 }
 
-/** Only the tab indicator moves; panels swap without animation. */
+/** The tab indicator slides; panels cross-fade in under 200ms. */
 export function CodeTabs({ tabs }: { tabs: CodeTab[] }) {
   const [selected, setSelected] = useState(0);
+  const [flash, setFlash] = useState(0);
   const tab = tabs[selected]!;
   return (
-    <div data-ui className="overflow-hidden rounded-lg bg-background">
+    <div data-ui className="rounded-lg bg-background">
       <div className="flex items-center justify-between gap-2 border-b border-border px-2 py-1.5">
         <TabsSubtle
           selectedIndex={selected}
@@ -35,16 +36,27 @@ export function CodeTabs({ tabs }: { tabs: CodeTab[] }) {
             />
           ))}
         </TabsSubtle>
-        <CopyButton value={tab.code} label={`Copy ${tab.file}`} />
+        <CopyButton
+          key={tab.file}
+          value={tab.code}
+          label={`Copy ${tab.file}`}
+          onCopied={() => setFlash((n) => n + 1)}
+        />
       </div>
-      <div
-        id={`code-panel-${selected}`}
-        role="tabpanel"
-        aria-labelledby={`code-tab-${selected}`}
-        aria-label={tab.file}
-        className="code-html overflow-x-auto px-4 py-4 text-[13px] leading-6"
-        dangerouslySetInnerHTML={{ __html: tab.html }}
-      />
+      <div className="relative overflow-hidden rounded-b-lg">
+        {flash > 0 && (
+          <span key={flash} aria-hidden="true" className="copy-sweep" />
+        )}
+        <div
+          key={selected}
+          id={`code-panel-${selected}`}
+          role="tabpanel"
+          aria-labelledby={`code-tab-${selected}`}
+          aria-label={tab.file}
+          className="code-html panel-swap overflow-x-auto px-4 py-4 text-[13px] leading-6"
+          dangerouslySetInnerHTML={{ __html: tab.html }}
+        />
+      </div>
     </div>
   );
 }
