@@ -1,6 +1,6 @@
 ---
 title: Why Strict Rate Limiting Can Reduce Throughput
-description: How strict GCRA pacing turns scheduling delays into lost capacity, and how to measure the difference without weakening the quota.
+description: How strict GCRA pacing turns scheduling delays into unused capacity, with a local probe for measuring grants and callback starts.
 date: '2026-10-29'
 author: Saurav K.
 draft: false
@@ -8,7 +8,7 @@ draft: false
 
 A configuration that says `100` requests per second can leave a saturated queue waiting while fewer than 100 jobs start. There may be nothing wrong with the quota accounting. A strict pacing rule sets an upper bound, and the runtime still has to reach each admission opportunity on time.
 
-For Valve's default GCRA rule, `limit: 100`, `interval: '1s'`, and `burst: 1` mean unit-cost admissions must be at least 10 ms apart. That is configured capacity. Achieved throughput depends on when the scheduler actually asks for the next grant, whether the store grants it, and whether the callback runs. Treating those as one event makes both debugging and benchmarking harder.
+For Valve's default GCRA rule, `limit: 100`, `interval: '1s'`, and `burst: 1` mean unit-cost admissions must be at least 10 ms apart. That is configured capacity. Achieved throughput depends on when the scheduler actually asks for the next grant, whether the store grants it, and whether the callback runs. Measure those events separately when investigating low throughput.
 
 ## A missed opportunity moves the next one
 
@@ -141,7 +141,7 @@ Stripe's [2017 engineering account](https://stripe.com/blog/rate-limiters) descr
 
 Before changing a quota, check whether concurrency is the actual constraint. In a simplified steady-state workload with every callback holding a slot for 200 ms, local concurrency 10 has an analytic ceiling of 50 completions/s even with a 100/s rate budget. That numeric concurrency limit applies to one Valve instance; a global limit requires explicit shared leases. Faster wakeups cannot remove that ceiling.
 
-For a strict provider contract, the useful work is to reduce avoidable scheduling delay and store latency, keep enough permitted concurrency, and measure the stage the provider actually counts. Accepting some unused admission capacity can be the correct consequence of preserving its pacing requirement.
+If the provider requires strict spacing, keep that rule while investigating scheduler delay, store latency, and concurrency. Some capacity may remain unused because a late grant cannot be followed by an early one to recover the missed time.
 
 ## Further reading
 

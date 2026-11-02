@@ -3,9 +3,9 @@ title: Guarantees
 description: The exact bounds valve provides, and the cases where they do not apply.
 ---
 
-All bounds describe the total **cost of jobs started**, measured on the
-store's clock at atomic admission. They do not describe when jobs finish, when
-requests reach the provider, or how the provider counts.
+Rate bounds apply to the cost granted by the store, measured on its clock at
+atomic admission. Callback execution and request delivery happen later. The
+bounds do not describe completion times or the provider's own accounting.
 
 ## Rate bounds
 
@@ -38,10 +38,10 @@ Timers can fire late. Under GCRA with `burst: 1`, the next start follows the
 actual previous start, so small delays add up over a saturated queue. valve
 never catches up by starting jobs closer together than the rule allows.
 
-With local concurrency, rate waits add no random jitter. For asynchronous
-stores, the scheduler subtracts elapsed acquisition time from the store's
-suggested delay. Every wakeup still asks the store, and another worker may
-have spent the budget first.
+For unscoped rate waits without global leases, the scheduler adds no random
+jitter. With an asynchronous store, it subtracts elapsed acquisition time from
+the store’s suggested delay. Every wakeup still asks the store, and another
+worker may have spent the budget first.
 
 A start is a grant from the store. A delayed callback or network write can
 happen later, so request arrival times at the provider can bunch together.
@@ -55,7 +55,8 @@ happen later, so request arrival times at the provider can bunch together.
 Each process caches a known pause to avoid extra store calls. Without a
 subscriber, another process's `resume()` is noticed on the next store call,
 which may be at the end of the cached pause. With a Redis `subscriber`,
-pause, resume, and slot release wake waiting processes immediately.
+pause, resume, and slot-release notifications prompt waiting processes to
+recheck the store.
 Notifications are hints only; admission is always checked atomically.
 
 `observe()` writes a pause in the background and returns immediately. A failed
@@ -109,7 +110,8 @@ stalls or network partitions, validate fencing tokens in the external system.
 Valve does not guarantee exactly-once side effects.
 
 Without a subscriber, global-slot waiters poll at most every 50ms plus jitter.
-With one, they recheck at least once a second. Waits caused by rate rules
+With one, the fallback polling interval is one second before jitter. Timer
+delays can extend either wait. Waits caused by rate rules
 follow the store's retry hint.
 
 ## Store failures

@@ -6,18 +6,17 @@ author: Saurav K.
 draft: false
 ---
 
-Before replacing a rate limiter, write down what its queue represents. Is it a
-queue of independent tasks that happen to need throttling? Or does each task
-need permission from several counters describing the same provider request?
-Those applications can have identical requests-per-second settings and need
-different admission behavior.
+A queue of independent tasks and a queue of requests sharing overlapping
+provider quotas can need different admission behavior, even at the same
+requests-per-second setting. That difference is worth checking before
+replacing a limiter.
 
-Bottleneck is comfortable as a general task scheduler: independent limiters,
+Bottleneck is a general task scheduler with independent limiters,
 reservoirs, queues, chains, and batching. Valve organizes outbound calls around
 a provider-budget ID, with several rules evaluated together and provider
-feedback attached to that ID. Both can coordinate through Redis. The choice
-depends on whether independent scheduling stages are useful work boundaries or
-an awkward representation of one overlapping quota.
+feedback attached to that ID. Both can coordinate through Redis. Independent
+scheduling stages give each limiter its own queue and lifecycle; a shared
+admission decision keeps overlapping quota charges together.
 
 ## The same request can have different reservations
 
@@ -120,8 +119,8 @@ also observes responses, applying cooldown feedback across the scoped identities
 under that local Valve ID; neither example retries.
 The queue bounds and timeout policies differ deliberately. Bottleneck also has
 a per-contact concurrency slot; Valve's scoped rate rule supplies no such slot.
-A contact request lasting over six seconds exposes that difference. This is
-equivalent intention, not equivalent execution or a drop-in migration.
+A contact request lasting over six seconds exposes that difference. The examples target the same pacing intention but differ in execution and
+concurrency behavior.
 
 Valve checks every applicable rule before spending any of that job's budgets.
 A contact denial spends no business quota. An eligible contact can proceed
@@ -172,7 +171,7 @@ An increasing reservoir adds discrete chunks. Valve GCRA restores eligibility
 smoothly. For example, two units each second up to 40 and
 `{ limit: 2, interval: '1s', burst: 40 }` share an average-rate and burst
 intention, but differ between refill ticks. Initial reservoir settings can
-differ too. Choosing one changes the policy, not merely its spelling.
+differ too.
 
 Valve's `cost` spends the same positive integer against every applicable rate
 rule and counts as one concurrent job. Under GCRA it must fit within each
@@ -279,13 +278,11 @@ its admission `batch` option does not aggregate HTTP payloads. Independent
 chains also remain useful when separate reservations and lifecycles match the
 application.
 
-Valve fits a provider request that must spend overlapping budgets together,
-with shared feedback and explicit global leases. That fit says nothing about
-which library is faster. Compare a migration under the actual policy: exhausted
-contacts, slow responses, queue overflow, worker failure, and ambiguous Redis
-timeouts. Decide which reservations should remain spent and which calls may
-proceed in each case. Those answers give a more useful migration specification
-than an option-renaming table.
+Valve fits requests that must spend overlapping budgets together, with shared
+feedback and optional global leases. This comparison makes no performance
+claim. Before migrating, test exhausted contacts, slow responses, queue
+overflow, worker failure, and ambiguous Redis timeouts. For each case, specify
+which reservations should remain spent and which calls may proceed.
 
 ## Further reading
 

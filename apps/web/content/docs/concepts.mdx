@@ -3,14 +3,14 @@ title: How valve works
 description: The model behind valve, from the id and store to the local queue and atomic admission.
 ---
 
-A valve has two halves. The **budget** lives in a store and is shared by id.
-The **queue** lives in your process and is never shared. Every job moves from
-the queue to the store and back before it runs.
+A valve combines a store-backed budget with a queue in the current process.
+Workers can share the budget by using the same store and id. Each worker
+keeps its own queue and asks the store for admission before running a job.
 
 ## Id
 
-The `id` names one budget. Choose one id per provider credential, because
-that is what providers meter:
+The `id` names one budget. Choose an id that matches the provider’s quota
+scope, such as a credential or account:
 
 ```ts
 createValve({ id: 'hubspot:portal-123', ... });
@@ -36,7 +36,7 @@ When you omit `store`, each valve gets its own private memory store.
 Two valves share a budget only when they use the same store and id. Immutable
 valves also need the same complete rule configuration. Managed valves need the
 same rule structure and read authoritative numeric values from the store. With
-Redis, "the same store" means the same server and key `prefix`.
+Redis, "the same store" means the same server, logical database, and key `prefix`.
 
 ## Rules
 
@@ -59,8 +59,8 @@ priority, then by call order. It enforces `maxQueue`, `maxWait`, cancellation,
 and local concurrency. Queued jobs are lost if the process exits.
 
 Queues are not shared. Two processes with the same id share a budget, but
-neither knows what the other has queued, and there is no fairness between
-them.
+neither knows what the other has queued. There is no cross-worker fairness
+guarantee.
 
 ## Admission
 

@@ -75,15 +75,15 @@ export function InstallCli({ published }: { published: boolean }) {
           ))}
           {pending && (
             <div className="text-muted-foreground">
-              # not on npm yet; available from the first release
+              # this version is not published on npm
             </div>
           )}
         </pre>
       </div>
       {!published && (
         <p className="border-t border-border px-4 py-2.5 text-xs text-muted-foreground">
-          The package is unreleased. Install the tarball with your package
-          manager.{' '}
+          This version is not on npm. Build from source, then install the
+          tarball in your project.{' '}
           <Link
             href="/docs/installation"
             className="text-foreground underline decoration-ring underline-offset-4 hover:decoration-foreground"

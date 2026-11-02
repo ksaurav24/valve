@@ -6,11 +6,11 @@ author: Saurav K.
 draft: false
 ---
 
-A message to recipient A passes the business-wide limiter, then stops at A's recipient limiter. No HTTP request leaves the process. The business budget has still paid for it.
+A message to recipient A passes the business-wide limiter, then stops at A's recipient limiter. No HTTP request leaves the process, but the business quota has already been spent.
 
 That accounting can be intentional at an ingress boundary, where every attempt should count. For an outbound quota shared by many recipients, it can spend capacity on work that cannot run while another recipient waits. Each limiter can be individually correct and still produce this result.
 
-The useful question is which budgets describe one admission decision. When a job needs all of them before it can proceed, checking and spending them together avoids partial reservations. When the charges describe independent events, sequential admission may express the policy more accurately.
+When several budgets govern the same operation, checking and spending them together avoids partial reservations. If the charges describe independent events, sequential admission may express the policy more accurately.
 
 ## One message, two budgets
 
@@ -45,7 +45,7 @@ Worker 2: spends the recipient's available unit
 Worker 1: tries to act on its earlier observations
 ```
 
-If worker 1 updates without checking current state, it can overspend. If each reservation checks current state atomically, it avoids that stale update but can still reserve business capacity before discovering the recipient denial. Better reads do not make two committed reservations one decision.
+If worker 1 updates without checking current state, it can overspend. If each reservation checks current state atomically, it avoids that stale update but can still reserve business capacity before discovering the recipient denial.
 
 Sequential committed reservations solve a narrower problem: each individual limiter protects its own state. That is useful, but it leaves a period where one budget has admitted the job and the other has not.
 
@@ -174,7 +174,7 @@ A lost Redis reply adds uncertainty: the script may have committed even when the
 
 Likewise, lease expiry cannot fence external effects from a stalled worker. Atomic admission provides no exactly-once delivery guarantee. Durable job storage and provider-supported idempotency address delivery concerns beyond admission, as discussed in [Atomic does not mean exactly once](/articles/atomic-does-not-mean-exactly-once/).
 
-Choose the accounting boundary by asking what should remain charged when the next gate refuses work. If every budget describes permission for the same outbound operation, one grant keeps those charges consistent. If the first budget counts an attempt that already happened, preserve that charge and make the sequence explicit.
+For an outbound request that needs several quotas, scoped admission keeps those charges together. Use sequential admission when an earlier charge should survive a later denial, such as an ingress attempt counted before checking an outbound allowance.
 
 ## Further reading
 

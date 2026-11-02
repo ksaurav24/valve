@@ -3,9 +3,9 @@ title: Respect provider feedback
 description: Read rate limit headers and pause every worker when the provider asks you to slow down.
 ---
 
-A provider knows its own counters better than you do. valve reads the rate
-limit headers on each response and, when the provider asks for a pause, writes
-it to the store so every worker sharing the id and store waits.
+Provider responses can report remaining quota or a required delay. Valve
+reads these rate limit headers and records a shared pause when needed.
+Workers using the same id and store respect that cooldown.
 
 Feedback pauses the configured Valve ID; it does not infer which provider
 quota a response describes. Use the same ID and store for a shared quota,

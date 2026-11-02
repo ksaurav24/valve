@@ -1,6 +1,6 @@
 ---
 title: The Thundering Herd Problem in Redis-Backed Rate Limiters
-description: Why atomic Redis admission still attracts competing retries, how Valve schedules them, and how to measure the cost without overstating results.
+description: Why workers retry against one shared Redis budget, how Valve schedules those attempts, and how to measure contention.
 date: '2026-10-29'
 author: Saurav K.
 draft: false
@@ -19,7 +19,7 @@ After replies:     losing workers schedule another check
 
 Those counts describe the assumptions of this illustration. They are neither a recorded Valve result nor a constant 32-attempt amplification factor. Real traffic depends on timer delivery, network delay, batch size, burst allowance, job cost, and how many workers remain backlogged.
 
-The engineering question is how much unsuccessful admission work the fleet performs for each useful grant, and what reducing that work does to waiting jobs.
+To evaluate contention, count unsuccessful acquisition attempts per grant and measure how retry delays affect waiting jobs.
 
 ## Atomic denial still costs work
 
@@ -63,7 +63,7 @@ A release broadcast tells everyone that something changed. Coordinated winner se
 
 A coordinator can reduce competing probes, but must recover a nomination when the chosen worker crashes. Reservations need expiry and may strand capacity while their owner is slow. A shared durable queue adds persistence and ownership machinery; it also needs a policy for ordering tenants, priorities, and expensive jobs.
 
-Partitioning a genuinely shared provider budget into worker budgets avoids some contention but introduces allocation problems. Idle workers can hold unused shares while busy workers wait. Creating independent group children does not enforce an additional shared parent quota. The budget model must survive the scheduling optimization.
+Partitioning a genuinely shared provider budget into worker budgets avoids some contention but introduces allocation problems. Idle workers can hold unused shares while busy workers wait. Creating independent group children does not enforce an additional shared parent quota. Any partitioning scheme still needs to enforce the combined provider quota.
 
 Even lease-based coordination only bounds ownership. Expiry cannot fence an external side effect from a paused worker that later resumes. Redis timeouts add another uncertainty: a command may have committed, or an offline queue may replay it after the caller stopped waiting. Check the [timeout and reconnection contract](/docs/reference/redis-store/#timeouts-and-reconnection) before interpreting retries as harmless failed attempts.
 
@@ -133,7 +133,7 @@ Then examine the existing larger-worker GCRA cells and a separate lease suite wi
 
 The [aggregator](https://github.com/ksaurav24/valve/blob/master/packages/perf/src/analyze/aggregate.ts) withholds inferential candidate conclusions when a cell's A/A control is unresolved or unstable. More repetitions may improve precision; they do not guarantee resolution. Keep safety findings separate, and never pool audit timings with uninstrumented performance trials.
 
-A useful retry change should reduce acquisition work while preserving admission safety, acceptable wait outcomes, and per-worker service. If Redis CPU falls because fewer jobs receive grants, the fleet has merely become quieter. Decide which outcome you need before choosing how aggressively losing workers should sleep.
+Evaluate a retry change against acquisition cost, grants, queue outcomes, and per-worker service together. Lower Redis CPU alone can reflect fewer grants or longer waits. Set acceptable bounds for those outcomes before comparing retry policies.
 
 ## Further reading
 

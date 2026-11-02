@@ -8,9 +8,9 @@ draft: false
 
 A notification addressed to one recipient can consume four budgets. It uses the service's shared capacity, the tenant's allowance, the recipient's pacing allowance, and that recipient's daily allocation. A request with three available budgets still has to wait for the fourth.
 
-The interesting design question is which requests share each counter. Giving every tenant a separate limiter can accidentally multiply a shared allowance. Giving every recipient the same counter can make one busy conversation delay unrelated messages. The identities in the model determine which behavior you get.
+The counter identities need to match the provider’s quota scopes. Giving every tenant a separate limiter can accidentally multiply a shared allowance. Giving every recipient the same counter can make one busy conversation delay unrelated messages.
 
-Consider an illustrative notification API with these policies. Every number here is invented for the example, not a Meta or other provider policy:
+Consider an illustrative notification API with these policies. These numbers are examples, not a provider’s published limits:
 
 | Budget           | Identity                         | Illustrative policy                 |
 | ---------------- | -------------------------------- | ----------------------------------- |
@@ -171,7 +171,9 @@ Scoped admission continues considering later candidates after a denial. A satura
 
 A daily-exhausted recipient may wait longer than `maxWait`, which rejects that queued job. Persist deferred notifications in application storage if they must survive that rejection or a process restart.
 
-## Keep shared and independent domains deliberate
+<span id="keep-shared-and-independent-domains-deliberate" />
+
+## Shared quotas and independent groups
 
 An independent group created with `createValveGroup` from `valvejs/group` gives each key its own child Valve. It fits separate credentials or policy tiers with independent cooldowns. Configuring 80/s on every child would give every child that allowance; it would not create an 80/s parent shared across tenants. See [independent groups](/docs/guides/independent-groups/).
 
@@ -179,7 +181,7 @@ An independent group created with `createValveGroup` from `valvejs/group` gives 
 
 Rate identities also leave feedback and global concurrency under the Valve ID. In the example, observing a recipient's 429 can pause every tenant in `notifications:account-42`. Valve cannot infer the exhausted scope from a generic response. Numeric concurrency is local; configuring global concurrency would share one lease domain across the ID, not allocate a separate pool per recipient.
 
-Finally, admission, callback start, HTTP arrival, and provider completion are different events. Cancellation or failure after a grant does not refund quota. A Redis timeout can have an unknown committed outcome; disabling offline queues reduces replay opportunities without cancelling commands already sent. Atomic counter mutation cannot provide exactly-once message delivery. Choose durable work storage and provider-supported idempotency around the model, as discussed in [atomic admission and exactly-once effects](/articles/atomic-does-not-mean-exactly-once/). The practical review is to trace one message through every identity, reset boundary, and failure path before putting production traffic behind those counters.
+Admission, callback start, HTTP arrival, and provider completion are different events. Cancellation or failure after a grant does not refund quota. A Redis timeout can have an unknown committed outcome; disabling offline queues reduces replay opportunities without cancelling commands already sent. Atomic counter mutation cannot provide exactly-once message delivery. Choose durable work storage and provider-supported idempotency around the model, as discussed in [atomic admission and exactly-once effects](/articles/atomic-does-not-mean-exactly-once/). Before using the configuration in production, trace a message through its counter identities, window boundaries, and failure paths.
 
 ## Further reading
 

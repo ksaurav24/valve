@@ -14,8 +14,7 @@ import { pageMetadata } from '@/lib/metadata';
 
 export const metadata: Metadata = pageMetadata({
   title: 'Changelog',
-  description:
-    'Version history and package changes for valve, generated from the package changelog.',
+  description: 'Release notes and unreleased changes for valve.',
   path: '/changelog',
 });
 
@@ -28,17 +27,16 @@ export default function ChangelogPage() {
         aside={<VersionBadge />}
       >
         <p>
-          Changes for plain-numbered versions, generated from{' '}
+          Release notes and unreleased changes. The{' '}
           <a
             className="text-foreground underline decoration-ring underline-offset-4 hover:decoration-foreground"
             href={`${site.source}/packages/valve/CHANGELOG.md`}
           >
-            packages/valve/CHANGELOG.md
-          </a>
-          . Preview-only history is grouped under plain headings and marked as
-          historical notes. Other versions npm does not list are development
-          versions. Original build versions remain in the full package
-          changelog.
+            full changelog
+          </a>{' '}
+          includes the original preview builds. Entries marked unreleased are
+          not yet available on npm; historical notes collect earlier preview
+          releases.
         </p>
       </PageHeader>
       <ReleaseLog

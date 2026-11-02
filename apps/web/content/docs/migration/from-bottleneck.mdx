@@ -7,7 +7,7 @@ valve and [Bottleneck](https://github.com/SGrondin/bottleneck) both queue jobs
 in-process and can share limits through Redis. The main differences:
 
 - valve describes limits as **rate rules** (`limit` per `interval`) instead of
-  `minTime` and reservoirs.
+  `minTime` and reservoirs. Their timing semantics differ.
 - valve reads **provider rate limit headers** and pauses every worker.
 - valve uses **your** Redis client, and each worker passes its own structure.
   Immutable rules must match completely. Managed named rules can read and
@@ -124,8 +124,9 @@ simply starting Valve with a fresh ID does not transfer Bottleneck reservations.
 
 ### minTime
 
-`minTime` spaces job starts. A GCRA rule with `burst: 1` does the same, and is
-often easier to read as a rate:
+`minTime` spaces scheduled job starts. GCRA with `burst: 1` expresses a similar
+pacing policy at admission. Store latency and callback scheduling can affect
+when work starts:
 
 ```ts
 // Bottleneck: { minTime: 250 }
@@ -136,9 +137,10 @@ rate: { limit: 4, interval: '1s' }
 
 ### Refresh intervals
 
-A reservoir that resets to N every interval is a fixed window. One difference:
-Bottleneck's interval starts when the limiter is created, while valve's windows
-are aligned to the store's epoch clock, so every worker agrees on boundaries.
+A reservoir refresh and a fixed window both restore an allowance periodically,
+but reset timing differs. For a new local Bottleneck limiter, the documented
+refresh interval begins at creation. Valve aligns fixed windows to the store’s
+epoch clock. Check those boundaries before translating the policy.
 
 ```ts
 // Bottleneck: { reservoir: 100, reservoirRefreshAmount: 100, reservoirRefreshInterval: 60_000 }
@@ -158,7 +160,9 @@ rate: [
 ### Increase intervals
 
 A reservoir that grows by N per interval up to a maximum is a token bucket.
-GCRA with `burst` behaves the same way, refilling smoothly instead of in steps.
+GCRA with `burst` restores eligibility smoothly rather than in discrete steps.
+The mapping below preserves the average-rate and capacity intention, but not
+the exact refill schedule.
 
 ```ts
 // Bottleneck: { reservoir: 40, reservoirIncreaseAmount: 2,
@@ -418,11 +422,10 @@ key hygiene, feedback, and close order.
 | `depleted`                | No equivalent. `pause` fires when the provider reports no remaining quota. |
 | `debug`, lifecycle events | No equivalent                                                              |
 
-## What you gain
+<span id="what-you-gain" />
 
-- **Provider feedback.** `Retry-After`, IETF `RateLimit`, and `x-ratelimit-*`
-  headers pause every worker. See [Respect provider feedback](/docs/guides/respect-retry-after/).
-- **Multiple rules per limiter**, checked atomically.
-- **Cancellation and queue deadlines** with `AbortSignal` and `maxWait`.
-- **Typed errors** with stable codes.
-- **No dependencies**, and no Redis client bundled or created for you.
+Before migrating, test queue saturation, slow callbacks, provider cooldowns,
+and worker failures against the behavior your application needs. The
+[provider feedback guide](/docs/guides/respect-retry-after/) covers shared
+header handling; the [comparison article](/articles/bottleneck-vs-valve/)
+discusses scheduler features that may make Bottleneck the better fit.

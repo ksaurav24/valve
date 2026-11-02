@@ -23,7 +23,10 @@ export function ArticleIndex({ articles }: { articles: Article[] }) {
           ) : null
         }
       >
-        <p>Notes on rate limiting, distributed systems, and building valve.</p>
+        <p>
+          Engineering articles on rate limiting, distributed systems, and
+          Valve’s design.
+        </p>
       </PageHeader>
       <section aria-label="Articles" className="page-gutter py-14 sm:py-20">
         {!latest ? (
@@ -32,8 +35,7 @@ export function ArticleIndex({ articles }: { articles: Article[] }) {
               No articles yet
             </h2>
             <p className="max-w-[55ch] leading-relaxed text-muted-foreground">
-              In the meantime, explore the documentation or see what changed in
-              the latest releases.
+              Read the documentation for usage guides and API reference.
             </p>
             <div className="flex flex-wrap gap-x-6 gap-y-2 text-sm font-medium">
               <Link
@@ -56,7 +58,7 @@ export function ArticleIndex({ articles }: { articles: Article[] }) {
             {rest.length > 0 ? (
               <>
                 <h2 className="mt-14 mb-2 text-sm font-medium text-muted-foreground sm:mt-16">
-                  All other articles
+                  More articles
                 </h2>
                 <ol className="article-list">
                   {rest.map((article) => (

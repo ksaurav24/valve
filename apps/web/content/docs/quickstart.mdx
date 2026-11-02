@@ -1,10 +1,10 @@
 ---
 title: Quickstart
-description: Create a valve, queue calls through it, and shut it down cleanly.
+description: Create a valve, queue API calls, and close it when the work finishes.
 ---
 
 This page uses the default in-memory store, so you can run it without Redis.
-To share a budget between processes, finish here and then follow
+For a budget shared between processes, see
 [Share a quota across workers](/docs/guides/share-a-quota/).
 
 ## Before you begin
@@ -53,7 +53,8 @@ const profiles = await Promise.all(
 console.log(profiles.map((p) => `${p.login}: ${p.public_repos}`));
 ```
 
-With the default `burst: 1`, starts are spaced evenly: one every 200ms.
+With the default `burst: 1`, grants are at least 200ms apart. Timers and other
+work can delay callback execution.
 
 </Step>
 <Step>
@@ -91,13 +92,11 @@ await github.close({ drain: true });
 npx tsx quickstart.ts
 ```
 
-## What you learned
+<span id="what-you-learned" />
 
-- A valve is identified by `id`. Valves with the same `id` and the same store
-  share one budget.
-- The default store is a new private memory store per valve. Separate valves
-  share nothing until you give them the same store instance.
-- `run` and `wrapFetch` queue work; `close` shuts the valve down.
+The default store is private to this valve. Creating another valve with the
+same `id` creates a separate budget unless you pass both the same store.
+Valves share a budget only when their `id` and store match.
 
 ## Next steps
 

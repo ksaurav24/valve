@@ -10,7 +10,7 @@ A worker times out while waiting for Redis. Its log says the job failed. Redis m
 
 Later in the same workflow, an HTTP request can time out after the provider created the order. Retrying that request can create another order. Both failures leave the caller uncertain, but they require different recovery decisions: one concerns admission accounting, the other concerns an external effect.
 
-Atomic admission gives the limiter a precise boundary. Building a recoverable workflow means identifying what happens on either side of it.
+Recovery needs to track admission and provider completion separately, including cases where either outcome is unknown.
 
 ## What the Lua script makes atomic
 
@@ -123,7 +123,7 @@ The repository's [replay-test coverage](/docs/reference/testing/#test-against-re
 
 ## A healthy Redis can have lost the history
 
-A reconnecting client and a restarted server are different failure cases. Even perfectly isolated scripts cannot enforce a history that disappeared.
+A reconnecting client and a restarted server are different failure cases. If Redis loses the rate history, subsequent admissions use the remaining state.
 
 Eviction can remove live rate, pause, or lease keys under memory pressure. A restart without persistence loses state; restoring a snapshot or AOF can still lose writes inside its durability window. Asynchronous replication can leave a promoted replica missing admissions acknowledged by the old primary. Redis's [replication documentation](https://redis.io/docs/latest/operate/oss_and_stack/management/replication/) also warns that `WAIT` does not make failover lossless.
 
@@ -139,7 +139,7 @@ Valve's [global concurrency](/docs/guides/global-concurrency/) uses renewable le
 
 A stalled worker can outlive its lease. Another worker takes the available slot, then the first resumes and sends a write before it processes the abort. A callback that ignores the signal can continue too. Passing the signal to an HTTP client enables cooperative cancellation, but it cannot undo a request already committed remotely.
 
-Martin Kleppmann's [lease and fencing discussion](https://martin.kleppmann.com/2016/02/08/how-to-do-distributed-locking.html) explains how a resource can reject stale owners by checking monotonically increasing fencing tokens on writes. That requires enforcement by the resource itself. Valve's lease tokens identify ownership for renewal and release; they are not an advertised external fencing protocol. The article supplies context for the failure model, not evidence that Valve implements Redlock.
+Martin Kleppmann's [lease and fencing discussion](https://martin.kleppmann.com/2016/02/08/how-to-do-distributed-locking.html) explains how a resource can reject stale owners by checking monotonically increasing fencing tokens on writes. That requires enforcement by the resource itself. Valve's lease tokens identify ownership for renewal and release; they are not an advertised external fencing protocol. Valve does not implement Redlock.
 
 ## Recover the work beyond admission
 
@@ -149,7 +149,7 @@ Durability introduces redelivery: a worker can complete an external operation an
 
 Valve's `wrapFetch` does not retry network errors. It retries eligible rate-limit responses, and POST/PATCH require explicit opt-in even when an idempotency header is present. Review the [provider-feedback guide](/docs/guides/respect-retry-after/#requests-with-side-effects) before enabling retries for writes.
 
-For uncertain external outcomes, reconcile against provider status or a durable application record before issuing another write. A spent admission, an attempted request, and a confirmed result should be distinguishable in that record. Then recovery can choose whether to wait for quota, query an existing operation, or safely replay it without pretending a timeout supplied an answer.
+For uncertain external outcomes, reconcile against provider status or a durable application record before issuing another write. A spent admission, an attempted request, and a confirmed result should be distinguishable in that record. That record lets recovery choose whether to wait for quota, query an existing operation, or replay it under the provider’s idempotency contract.
 
 ## Further reading
 

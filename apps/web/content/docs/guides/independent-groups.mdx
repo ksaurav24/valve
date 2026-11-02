@@ -60,9 +60,8 @@ try {
 }
 ```
 
-`createValveGroup` is an opt-in `valvejs/group` export, like `valvejs/redis`
-and `valvejs/headers`. It is not exported from `valvejs`, which keeps the core
-entry within its 17.5 KB gzip budget.
+Import `createValveGroup` from `valvejs/group`. It is a separate entry point,
+like `valvejs/redis` and `valvejs/headers`, and is not exported from `valvejs`.
 
 `resolve(key)` returns `ValveOptions` without `id` or `store`. It runs
 synchronously on first local use and again after eviction, never per job.

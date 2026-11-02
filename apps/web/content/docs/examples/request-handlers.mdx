@@ -3,8 +3,8 @@ title: Request handlers
 description: Call a rate limited provider from a web server, prioritize users, and fail fast when the quota is busy.
 ---
 
-When a user is waiting on a response, an unbounded queue is worse than an
-error. This example uses Express 5, but the pattern fits any framework:
+For interactive requests, bound the time spent waiting for provider capacity.
+This Express 5 example uses three controls:
 
 - user requests get a higher priority than background work;
 - a short `maxWait` turns a saturated quota into a quick `503`;

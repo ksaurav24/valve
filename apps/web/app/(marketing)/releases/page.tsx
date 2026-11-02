@@ -18,8 +18,8 @@ export default function ReleasesPage() {
     <>
       <PageHeader eyebrow="releases" title="Releases" aside={<VersionBadge />}>
         <p>
-          Plain versions published to npm, newest first. Release notes come from
-          the package changelog; development versions stay on the{' '}
+          Versions available on npm, with release notes. For unreleased changes
+          and earlier preview builds, see the{' '}
           <Link
             href="/changelog"
             className="text-foreground underline decoration-ring underline-offset-4 hover:decoration-foreground"
@@ -34,15 +34,15 @@ export default function ReleasesPage() {
           <div className="rounded-md bg-card px-6 py-16 text-center">
             <Package className="mx-auto size-6 text-muted-foreground" />
             <h2 className="mt-4 text-lg font-medium">
-              No plain-version releases yet
+              No published releases yet
             </h2>
             <p className="mx-auto mt-2 max-w-md text-sm text-muted-foreground">
               The current development version is{' '}
               <span className="font-mono text-foreground">
                 v{current.version}
               </span>
-              . It will appear here after npm lists it. Historical prerelease
-              versions are omitted from this list.
+              . It will appear here when published to npm. Earlier preview
+              builds are listed in the changelog.
             </p>
             <Link
               href="/changelog"

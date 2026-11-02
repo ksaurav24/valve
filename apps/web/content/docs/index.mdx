@@ -1,13 +1,16 @@
 ---
 title: Introduction
-description: valve puts one rate limit in front of an API and shares it with every worker that calls that API.
+description: Queue outbound API calls with shared rate limits, concurrency controls, and provider feedback.
 ---
 
-Most providers enforce a quota per credential, not per process. When ten
-workers each run their own limiter, they spend the same quota ten times over
-and the provider starts returning `429 Too Many Requests`. valve keeps the
-budget in Redis or Valkey, so every process that uses the same valve id draws
-from one shared limit. When the provider asks for a pause, every worker pauses.
+Valve queues outbound API calls until the configured rate and concurrency
+limits allow them to run. Use the default memory store for a single process,
+or Redis or Valkey to share a budget across workers.
+
+If a provider meters usage per credential, separate per-process limits can
+exceed that shared quota. Workers using the same Valve ID and shared store
+check and spend one budget. Provider response headers can also establish a
+cooldown for all workers sharing that budget.
 
 ```ts
 import { createValve } from 'valvejs';
@@ -25,25 +28,24 @@ const response = await limitedFetch(
 );
 ```
 
-**Beta until 1.0.** APIs may change between releases. Install `valvejs` with
-plain version numbers through npm’s default channel.
+Valve is in beta. APIs may change before 1.0. See [Installation](/docs/installation/)
+for package requirements and setup.
 
 ## What valve does
 
-- **Shares a budget across processes.** Atomic Lua scripts check and spend
-  every rule in one round trip, on the store's clock.
-- **Queues work locally.** Jobs wait in-process with priorities, cost,
-  concurrency limits, queue bounds, deadlines, and abort signals.
-- **Listens to the provider.** valve reads `Retry-After`, IETF `RateLimit`,
-  and common `x-ratelimit-*` headers, then pauses every worker sharing the
-  budget.
-- **Retries rate limit responses for idempotent methods.** `wrapFetch` retries
-  a 429 after the shared pause ends, without losing its place in the queue.
-- **Updates named limits at runtime.** Managed rules preserve spent budget while
-  the store applies new `limit` and GCRA `burst` values to every worker.
-- **Stays small.** Zero runtime dependencies. ESM and CommonJS builds with
-  full TypeScript declarations. Bring your own `ioredis` or `node-redis`
-  client.
+- Check and spend several rate rules atomically on the store's clock. Redis
+  admission uses a Lua script.
+- Queue jobs locally with priorities, cost, concurrency limits, queue bounds,
+  deadlines, and abort signals.
+- Read `Retry-After`, IETF `RateLimit`, and common `x-ratelimit-*` headers to
+  pause workers sharing the budget.
+- Retry eligible rate limit responses through `wrapFetch`. Each retry returns
+  to the queue and acquires a new grant.
+- Update named managed rules at runtime, preserving spent budget while changing
+  `limit` and GCRA `burst`.
+
+The package has no runtime dependencies and ships ESM, CommonJS, and TypeScript
+declarations. You supply and manage any `ioredis` or `node-redis` connections.
 
 ## When to use it
 
@@ -69,7 +71,7 @@ arbitrary failures, or act as a circuit breaker.
   <Card
     href="/docs/quickstart/"
     title="Quickstart"
-    description="Rate limit your first calls in a few minutes."
+    description="Configure a valve and queue your first API calls."
   />
   <Card
     href="/docs/concepts/"

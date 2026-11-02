@@ -20,7 +20,7 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
     return pageMetadata({
       title: 'Articles',
       description:
-        'Notes on rate limiting, distributed systems, and building valve.',
+        'Engineering articles on rate limiting, distributed systems, and Valve’s design.',
       path: '/articles',
     });
   }

@@ -1,5 +1,5 @@
 export const navLinks = [
-  { href: '/', label: 'readme' },
+  { href: '/', label: 'overview' },
   { href: '/docs', label: 'docs' },
   { href: '/articles', label: 'articles' },
   { href: '/changelog', label: 'changelog' },

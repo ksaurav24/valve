@@ -18,19 +18,19 @@ const starters = [
   {
     icon: CircleDot,
     title: 'Good first issues',
-    description: 'Scoped tasks with context, picked for a first change.',
+    description: 'Find an issue to work on for your first contribution.',
     href: `${site.repository}/issues?q=is%3Aissue+is%3Aopen+label%3A%22good+first+issue%22`,
   },
   {
     icon: GitPullRequest,
     title: 'Open pull requests',
-    description: 'Review in-flight work or pick up a stalled change.',
+    description: 'Review proposed changes and join the discussion.',
     href: `${site.repository}/pulls`,
   },
   {
     icon: Scale,
     title: 'Code of Conduct',
-    description: 'How we work together, and how to report concerns.',
+    description: 'Community expectations and how to report a concern.',
     href: `${site.source}/CODE_OF_CONDUCT.md`,
   },
 ];
@@ -41,24 +41,24 @@ export default function ContributorsPage() {
   const Guide = guide.data.body;
   return (
     <>
-      <PageHeader eyebrow="contributors" title="Built in the open">
+      <PageHeader eyebrow="contributors" title="Contributors">
         <p>
           {contributors.length}{' '}
           {contributors.length === 1 ? 'person has' : 'people have'} contributed
-          to valve. Fixes, docs, benchmarks, and reviews all count.
+          to valve. See their work and find out how to contribute.
         </p>
       </PageHeader>
       <div className="page-gutter space-y-20 py-16">
         <section aria-labelledby="people">
           <h2 id="people" className="mb-8 text-2xl font-medium tracking-tight">
-            contributors
+            Contributors
           </h2>
           <ContributorGrid contributors={contributors} />
         </section>
 
         <section aria-labelledby="start">
           <h2 id="start" className="mb-8 text-2xl font-medium tracking-tight">
-            start here
+            Get involved
           </h2>
           <div className="grid gap-6 lg:grid-cols-3">
             {starters.map(({ icon: Icon, title, description, href }) => (
@@ -87,7 +87,7 @@ export default function ContributorsPage() {
               id="guide-title"
               className="text-2xl font-medium tracking-tight"
             >
-              contribution guide
+              Contribution guide
             </h2>
             <a
               href={`${site.source}/CONTRIBUTING.md`}

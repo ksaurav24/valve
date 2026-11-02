@@ -9,66 +9,66 @@ import {
 
 const features = [
   {
-    title: 'Shared rate rules.',
+    title: 'Rate rules',
     description:
-      'GCRA spaces starts; fixed windows cap aligned intervals. Several rules are checked atomically.',
+      'Use GCRA for pacing or fixed windows for aligned quotas. All rules for a job are checked in one atomic admission.',
     snippet:
       "rate: [{ limit: 10, interval: '1s' }, { limit: 5000, interval: '1h', algorithm: 'fixed-window' }]",
     href: '/docs/choosing-an-algorithm',
   },
   {
-    title: 'Shared and scoped budgets.',
+    title: 'Scoped quotas',
     description:
-      'Spend business and per-recipient or per-tenant budgets atomically. Eligible identities proceed while others wait.',
+      'Apply shared, tenant, and recipient rules to the same request. A blocked identity can wait while other eligible jobs run.',
     snippet: "api.run(send, { scopes: { recipient: 'contact-42' } })",
     href: '/docs/guides/scoped-rate-limits',
   },
   {
-    title: 'One budget, many workers.',
+    title: 'Shared quotas',
     description:
-      'A Redis or Valkey store shares one quota across processes using the same credential.',
+      'Share a credential’s rate budget across processes through Redis or Valkey.',
     snippet: 'store: redisStore({ client: redis })',
     href: '/docs/guides/share-a-quota',
   },
   {
-    title: 'Provider feedback.',
+    title: 'Provider feedback',
     description:
-      'Reads Retry-After and rate limit headers, then pauses every process sharing the valve.',
+      'Read Retry-After and rate-limit headers to pause workers using the same shared budget.',
     snippet: 'api.observe({ status: 429, headers })',
     href: '/docs/guides/respect-retry-after',
   },
   {
-    title: 'A fetch that backs off.',
+    title: 'Fetch retries',
     description:
-      'Retries 429s and 503s with a valid Retry-After for GET, HEAD, OPTIONS, PUT, and DELETE. POST and PATCH opt in.',
+      'Retry eligible 429 responses and 503 responses with a valid Retry-After. POST and PATCH require an explicit opt-in after checking the provider’s idempotency contract.',
     snippet: 'api.wrapFetch(fetch, { retryUnsafeMethods: true })',
     href: '/docs/reference/api',
   },
   {
-    title: 'Concurrency limits.',
+    title: 'Concurrency limits',
     description:
       'Cap running work per process, or share one limit across workers through renewable leases.',
     snippet: "concurrency: { limit: 4, scope: 'global' }",
     href: '/docs/guides/global-concurrency',
   },
   {
-    title: 'Priorities and deadlines.',
+    title: 'Priorities and queue limits',
     description:
-      'Job costs, queue bounds, wait deadlines, and priorities for interactive work.',
+      'Set job costs and priorities, bound queue growth, and reject work that waits too long.',
     snippet: 'api.run(() => sync(id), { priority: 10 })',
     href: '/docs/guides/priorities-and-shutdown',
   },
   {
-    title: 'Observable.',
+    title: 'Events and stats',
     description:
-      'Typed events for pauses, rejections, and retries, plus a stats() snapshot per valve.',
+      'Inspect queue depth and job totals, and listen for pauses, rejections, and store errors.',
     snippet: "api.on('pause', ({ durationMs }) => log(durationMs))",
     href: '/docs/guides/observability',
   },
   {
-    title: 'Zero dependencies.',
+    title: 'Zero runtime dependencies',
     description:
-      'TypeScript types, ESM and CommonJS builds. It uses the Redis client you pass in.',
+      'Use ESM or CommonJS with TypeScript declarations. Redis support works with the client supplied by your application.',
     snippet: 'dependencies: {}',
     href: '/docs/installation',
   },

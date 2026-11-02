@@ -15,8 +15,7 @@ uses the one you pass in.
 
 ## Install the package
 
-**Beta until 1.0.** APIs may change between releases. Published versions use
-plain version numbers and install through npm’s default channel. See the
+Valve is in beta. APIs may change before 1.0. See the
 [release history](/releases/) for published versions and release notes.
 
 <Published>
@@ -58,14 +57,14 @@ bun add valvejs
 
 <Callout type="warn" title="Not on npm yet">
   This version of `valvejs` is not on npm yet. To try this development version,
-  build a tarball from this branch and install that. The default npm install may
-  still provide an earlier version.
+  build and install a tarball from this branch. Installing from npm may still
+  provide an earlier version.
 </Callout>
 
 <Steps>
 <Step>
 
-### Build the workspace
+**Build the workspace**
 
 The workspace uses Node.js 24 and pnpm 11.
 
@@ -79,7 +78,7 @@ pnpm build
 </Step>
 <Step>
 
-### Pack the library
+**Pack the library**
 
 ```sh
 pnpm --filter valvejs pack --out /tmp/valve.tgz
@@ -88,7 +87,7 @@ pnpm --filter valvejs pack --out /tmp/valve.tgz
 </Step>
 <Step>
 
-### Install the tarball in your project
+**Install the tarball in your project**
 
 <Tabs items={['npm', 'pnpm', 'yarn']}>
 <Tab value="npm">
