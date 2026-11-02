@@ -218,6 +218,25 @@ test('home page leads with install, usage, and documentation', async ({
   ).toBeVisible();
 });
 
+for (const [anchor, title] of [
+  ['patch-changes', 'Patch'],
+  ['patch-changes-1', 'Patch'],
+  ['minor-changes-1', 'Minor'],
+  ['patch-changes-8', 'Patch'],
+  ['patch-changes-11', 'Patch'],
+] as const) {
+  test(`legacy changelog link #${anchor} targets its heading`, async ({
+    page,
+  }) => {
+    await page.goto(`/changelog/#${anchor}`);
+    const target = page.locator(`[id="${anchor}"]`);
+    await expect(target).toHaveCount(1);
+    const heading = target.locator('xpath=ancestor-or-self::h3');
+    await expect(heading).toContainText(title);
+    await expect(heading).toBeInViewport({ ratio: 1 });
+  });
+}
+
 test('releases list only published versions', async ({ page }) => {
   await page.goto('/releases/');
   await expect(page.getByRole('heading', { level: 1 })).toHaveText('Releases');

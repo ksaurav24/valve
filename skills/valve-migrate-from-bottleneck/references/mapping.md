@@ -44,12 +44,16 @@ requests; add a rate rule if the provider has a rate limit.
 ```ts
 // Bottleneck: { minTime: 250 }
 rate: { limit: 1, interval: 250 }
-// Same spacing, readable as a rate:
+// Same admission rule, readable as a rate:
 rate: { limit: 4, interval: '1s' }
 ```
 
-GCRA with `burst: 1` spaces starts the same way. If `minTime` did not divide
-evenly (`minTime: 333`), prefer the provider's real figure (`{ limit: 3, interval: '1s' }`).
+GCRA with `burst: 1` expresses a similar pacing intention at admission, while
+Bottleneck's `minTime` spaces scheduled starts. Unit-cost Valve grants are at
+least `interval / limit` apart on the store's clock. Store-reply and scheduling
+delays can bunch callback starts; neither setting guarantees request-arrival
+spacing at the provider. If `minTime` did not divide evenly (`minTime: 333`),
+prefer the provider's real figure (`{ limit: 3, interval: '1s' }`).
 
 ## Reservoirs
 

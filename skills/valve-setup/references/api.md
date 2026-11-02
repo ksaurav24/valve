@@ -56,18 +56,20 @@ rejects with `LEASE_LOST`.
 
 ## Rate rules
 
-| Field       | Default  | Notes                                                                  |
-| ----------- | -------- | ---------------------------------------------------------------------- |
-| `limit`     | required | Positive integer cost units per `interval`.                            |
-| `interval`  | required | Duration, at least 1ms.                                                |
-| `burst`     | `1`      | GCRA only. Units that may start back to back. `cost` must be <= burst. |
-| `algorithm` | `'gcra'` | Or `'fixed-window'` (epoch-aligned windows on the store clock).        |
-| `name`      | none     | Stable identity. Required for scoped rules and managed limits.         |
-| `scope`     | none     | Per-job identity dimension (scoped rules). Needs `name`.               |
+| Field       | Default  | Notes                                                            |
+| ----------- | -------- | ---------------------------------------------------------------- |
+| `limit`     | required | Positive integer cost units per `interval`.                      |
+| `interval`  | required | Duration, at least 1ms.                                          |
+| `burst`     | `1`      | GCRA only. Units admitted back to back. `cost` must be <= burst. |
+| `algorithm` | `'gcra'` | Or `'fixed-window'` (epoch-aligned windows on the store clock).  |
+| `name`      | none     | Stable identity. Required for scoped rules and managed limits.   |
+| `scope`     | none     | Per-job identity dimension (scoped rules). Needs `name`.         |
 
-Bounds at admission: GCRA `burst: 1` admits at most `limit` per interval, spaced
-evenly; with `burst`, at most `limit + burst - 1` in any interval window; fixed
-window, `limit` per aligned window (up to `2 x limit` across a boundary).
+Bounds at admission: GCRA `burst: 1` admits at most `limit` per interval, with
+unit-cost grants at least `interval / limit` apart on the store's clock. With
+`burst`, at most `limit + burst - 1` in any interval window; fixed window,
+`limit` per aligned window (up to `2 x limit` across a boundary). Callback
+execution and request delivery happen later and can bunch together.
 
 ## Valve methods
 

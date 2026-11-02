@@ -86,9 +86,10 @@ single valve. Use the `valve-quota-design` skill if available, or read
 
 Defaults and constraints that matter:
 
-- GCRA with `burst: 1` is the default and spaces starts evenly
-  (`interval / limit` apart). Only raise `burst` when the provider allows
-  bursts.
+- GCRA with `burst: 1` is the default. Unit-cost grants are at least
+  `interval / limit` apart on the store's clock. Callback execution and request
+  delivery happen later and can bunch together. Only raise `burst` when the
+  provider allows bursts.
 - Under GCRA a job's `cost` must be at most `burst`; under fixed window, at most
   `limit`. Otherwise it rejects with `COST_EXCEEDS_LIMIT`.
 - Fixed windows align to the epoch on the store clock (UTC), not to process

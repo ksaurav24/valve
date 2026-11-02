@@ -33,8 +33,9 @@ simpler tool; say so instead of forcing valve in.
 
 `new PQueue({ intervalCap: 10, interval: 1000, concurrency: 2 })` maps to
 `rate: { limit: 10, interval: '1s', algorithm: 'fixed-window' }` for a windowed
-quota, or a GCRA rule `{ limit: 10, interval: '1s' }` to spread
-starts evenly (usually kinder to providers). p-queue `priority` is also
+quota, or a GCRA rule `{ limit: 10, interval: '1s' }` for unit-cost grants at
+least 100ms apart on the store's clock. Callback starts and provider arrivals
+can bunch after admission. p-queue `priority` is also
 higher-first, so values carry over. `queue.onIdle()` maps to `valve.idle()`.
 This is not exact equivalence: valve windows align to the store epoch, while
 p-queue interval timing and carry-over options depend on its configuration.

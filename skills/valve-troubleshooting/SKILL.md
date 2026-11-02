@@ -106,11 +106,12 @@ keeps refusing.
 
 ### Throughput lower than configured
 
-- GCRA `burst: 1` spaces starts evenly; with `limit: 100, interval: '1m'` that
-  is one start every 600ms, not 100 at once. Raise `burst` only if the provider
-  allows bursts.
+- GCRA `burst: 1` spaces unit-cost grants by at least `interval / limit` on
+  the store's clock. With `limit: 100, interval: '1m'`, that is at least 600ms
+  between grants. Callback starts and provider arrivals can bunch after those
+  grants. Raise `burst` only if the provider allows bursts.
 - Timer lateness accumulates under a saturated GCRA queue; valve never catches
-  up by starting closer together.
+  up by granting closer together.
 - Local `concurrency` too low for the call latency (throughput is at most
   `concurrency / latency`).
 - Frequent `backoff` pauses from headerless 429s, or `feedback` pauses from

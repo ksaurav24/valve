@@ -11,6 +11,7 @@ import {
 } from '@/lib/releases';
 import { site } from '@/lib/site';
 import { pageMetadata } from '@/lib/metadata';
+import { changelogSource } from '@/lib/source';
 
 export const metadata: Metadata = pageMetadata({
   title: 'Changelog',
@@ -19,6 +20,29 @@ export const metadata: Metadata = pageMetadata({
 });
 
 export default function ChangelogPage() {
+  const page = changelogSource.getPage([]);
+  if (!page) throw new Error('Run the content sync before building the site.');
+  // Reuse MDX's IDs so punctuation and duplicate-heading suffixes stay compatible.
+  const headingText = new Map(
+    page.data.structuredData.headings.map(({ id, content }) => [
+      `#${id}`,
+      content,
+    ]),
+  );
+  const sectionAnchors = new Map<string, string[]>();
+  let version = '';
+  for (const heading of page.data.toc) {
+    const title = headingText.get(heading.url);
+    if (title === undefined) continue;
+    if (heading.depth === 2) version = title;
+    else if (heading.depth === 3) {
+      const key = `${version}:${title}`;
+      sectionAnchors.set(key, [
+        ...(sectionAnchors.get(key) ?? []),
+        heading.url.slice(1),
+      ]);
+    }
+  }
   return (
     <>
       <PageHeader
@@ -57,7 +81,10 @@ export default function ChangelogPage() {
           publishedAt:
             releases.find((release) => release.version === entry.version)
               ?.publishedAt ?? null,
-          sections: entry.sections,
+          sections: entry.sections.map((section) => ({
+            ...section,
+            anchors: sectionAnchors.get(`${entry.version}:${section.title}`),
+          })),
           ...(entry.sourceVersions
             ? { sourceVersions: entry.sourceVersions }
             : {}),

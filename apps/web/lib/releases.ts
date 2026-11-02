@@ -7,6 +7,8 @@ import { npmVersionState } from './release-state.mjs';
 export interface ChangelogSection {
   title: string | null;
   items: string[];
+  /** Original MDX heading IDs, including aliases for merged preview sections. */
+  anchors?: string[];
 }
 
 export interface ChangelogEntry {

@@ -6,19 +6,20 @@ provide, and don't flag behavior that is by design.
 
 ## Rate bounds
 
-Bounds describe the total cost of jobs **started**, measured on the store's
-clock at atomic admission. Not when requests reach the provider, not when they
-finish.
+Bounds describe the cost **granted by the store**, measured on its clock at
+atomic admission. Callback execution, request delivery, and completion happen
+later and are not paced by these bounds.
 
-| Rule              | Bound                                                                    |
-| ----------------- | ------------------------------------------------------------------------ |
-| GCRA, `burst: 1`  | At most `limit` units per `interval`, spaced `interval / limit` apart.   |
-| GCRA with `burst` | At most `limit + burst - 1` units in any window of length `interval`.    |
-| Fixed window      | At most `limit` per aligned window; up to `2 x limit` across a boundary. |
-| Several rules     | Each holds independently; checked and spent atomically together.         |
+| Rule              | Bound                                                                                         |
+| ----------------- | --------------------------------------------------------------------------------------------- |
+| GCRA, `burst: 1`  | At most `limit` units per `interval`; unit-cost grants are at least `interval / limit` apart. |
+| GCRA with `burst` | At most `limit + burst - 1` units in any window of length `interval`.                         |
+| Fixed window      | At most `limit` per aligned window; up to `2 x limit` across a boundary.                      |
+| Several rules     | Each holds independently; checked and spent atomically together.                              |
 
-Timers can fire late; valve never catches up by starting closer than the rule
-allows. Network delays can still bunch arrivals at the provider.
+Timers can fire late; Valve never catches up by granting closer than the rule
+allows. Variable store-reply or scheduling delays can bunch callback starts,
+and network delays can bunch arrivals at the provider.
 
 ## Shared pauses
 

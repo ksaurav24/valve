@@ -10,10 +10,16 @@ const kinds: Record<string, string> = {
 
 /** Preview series repeat headings; show each kind once, in first-seen order. */
 function mergeSections(sections: ChangelogSection[]) {
-  const merged = new Map<string | null, string[]>();
-  for (const { title, items } of sections)
-    merged.set(title, [...(merged.get(title) ?? []), ...items]);
-  return [...merged].map(([title, items]) => ({ title, items }));
+  const merged = new Map<string | null, ChangelogSection>();
+  for (const { title, items, anchors = [] } of sections) {
+    const previous = merged.get(title);
+    merged.set(title, {
+      title,
+      items: [...(previous?.items ?? []), ...items],
+      anchors: [...new Set([...(previous?.anchors ?? []), ...anchors])],
+    });
+  }
+  return [...merged.values()];
 }
 
 export function ChangelogSections({
@@ -55,7 +61,7 @@ export function ChangelogSections({
 
   return (
     <div className="space-y-8">
-      {mergeSections(sections).map(({ title, items }) =>
+      {mergeSections(sections).map(({ title, items, anchors = [] }) =>
         title === null ? (
           <div key="notes" className="space-y-2">
             {items.map((item, i) => (
@@ -69,7 +75,18 @@ export function ChangelogSections({
           </div>
         ) : (
           <section key={title} className="space-y-4">
-            <h3 className="flex items-center gap-3 text-xs font-medium text-muted-foreground">
+            <h3
+              id={anchors[0]}
+              className="relative flex scroll-mt-24 items-center gap-3 text-xs font-medium text-muted-foreground"
+            >
+              {anchors.slice(1).map((anchor) => (
+                <span
+                  key={anchor}
+                  id={anchor}
+                  aria-hidden="true"
+                  className="absolute top-0 scroll-mt-24"
+                />
+              ))}
               <span
                 className={cn(
                   'change-kind',
