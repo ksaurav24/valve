@@ -169,9 +169,8 @@ Run measurements without builds or tests competing for CPU.
 ## Agent skills
 
 The public skills in [`skills/`](skills/) cover setup, Bottleneck migration,
-reviews, quota design, and troubleshooting. The website's
-[agent skills page](https://valvejs.vercel.app/skills/) offers installation
-commands and prompts to copy into your coding agent.
+reviews, quota design, and troubleshooting. Copy the install command from
+the [homepage](https://valvejs.vercel.app/#agent-skills) and choose skills in the CLI.
 
 For work on this repository, install the internal contribution and performance
 skills from your checkout:
@@ -187,7 +186,7 @@ directly under `.claude/skills/`; other agents can use the installed copies.
 
 When changing public APIs, defaults, errors, or guarantees, update the relevant
 skills and their bundled references in the same PR. When changing skill names,
-paths, or website prompts, update `skills/catalog.json`. Run `pnpm check:skills`,
+paths, or prompts, update `skills/catalog.json`. Run `pnpm check:skills`,
 `pnpm lint`, and `pnpm check:source`. Skills and website documentation alone do
 not need a package changeset. Behavioral skill evaluations are separate from
 these structural checks and can be run when requested.

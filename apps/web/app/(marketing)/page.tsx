@@ -10,7 +10,7 @@ import { ValveFlow } from '@/components/marketing/valve-flow';
 import { HeroActions } from '@/components/marketing/hero-actions';
 import { HeroHeading, HeroReveal } from '@/components/marketing/hero-reveal';
 import { InstallCli } from '@/components/marketing/install-cli';
-import { AgentSkillInstaller } from '@/components/marketing/agent-skill-installer';
+import { CopyButton } from '@/components/shared/copy-button';
 import { highlight } from '@/components/shared/highlight';
 import { VersionBadge } from '@/components/shared/version-badge';
 import { contributors } from '@/lib/github';
@@ -28,6 +28,8 @@ export const metadata: Metadata = pageMetadata({
   path: '/',
   absoluteTitle: true,
 });
+
+const skillsInstallCommand = 'npx skills add ksaurav24/valve';
 
 const samples = [
   {
@@ -219,21 +221,42 @@ export default async function HomePage() {
       </section>
 
       <section
+        id="agent-skills"
         aria-labelledby="agent-skills-title"
-        className="page-gutter section-space"
+        className="page-gutter scroll-mt-24 py-10 sm:py-12"
       >
-        <div className="readme-layout">
+        <div className="readme-layout items-center">
           <div>
-            <h2 id="agent-skills-title" className="section-title">
-              Set up with your agent.
+            <h2
+              id="agent-skills-title"
+              className="text-2xl font-medium tracking-tight"
+            >
+              Agent skills
             </h2>
-            <p className="section-copy mt-6">
-              Give your coding agent the API, quota patterns, and operational
-              details it needs to add valve to your project.
+            <p className="mt-3 max-w-md text-sm leading-relaxed text-muted-foreground">
+              Add Valve skills to your coding agent. Choose the ones you need in
+              the CLI.
             </p>
-            <InlineLink href="/skills">Setup, migrations, and more</InlineLink>
           </div>
-          <AgentSkillInstaller compact />
+          <div
+            data-ui
+            className="flex min-w-0 items-center gap-3 rounded-lg border border-border bg-background py-2 pl-4 pr-2"
+          >
+            <span
+              aria-hidden="true"
+              className="font-mono text-sm text-muted-foreground"
+            >
+              $
+            </span>
+            <code className="min-w-0 flex-1 break-words font-mono text-[13px] leading-6 select-all">
+              {skillsInstallCommand}
+            </code>
+            <CopyButton
+              value={skillsInstallCommand}
+              label="Copy skills install command"
+              showLabel
+            />
+          </div>
         </div>
       </section>
 

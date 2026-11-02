@@ -47,12 +47,14 @@ export function CopyButton({
   label = 'Copy to clipboard',
   icon = 'copy',
   onCopied,
+  showLabel = false,
 }: {
   value: string;
   className?: string;
   label?: string;
   icon?: keyof typeof icons;
   onCopied?: () => void;
+  showLabel?: boolean;
 }) {
   const [status, setStatus] = useState<Status>('idle');
   const [pulse, setPulse] = useState(0);
@@ -94,7 +96,12 @@ export function CopyButton({
             },
           )
         }
-        className="copy-button relative grid size-8 place-items-center rounded-md text-muted-foreground hover:bg-hover hover:text-foreground active:scale-95 data-[status=copied]:text-live-foreground"
+        className={cn(
+          'copy-button relative items-center justify-center rounded-md text-sm text-muted-foreground hover:bg-hover hover:text-foreground active:scale-95 data-[status=copied]:text-live-foreground',
+          showLabel
+            ? 'inline-flex min-h-11 min-w-11 gap-2 px-3'
+            : 'grid size-8',
+        )}
       >
         {status === 'copied' && (
           <span key={pulse} aria-hidden="true" className="copy-ring" />
@@ -115,6 +122,7 @@ export function CopyButton({
             )}
           </span>
         </span>
+        {showLabel && <span className="hidden sm:inline">Copy</span>}
       </button>
       {status !== 'idle' && (
         <span key={`tip-${pulse}`} aria-hidden="true" className="copy-tip">

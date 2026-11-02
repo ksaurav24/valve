@@ -17,16 +17,15 @@ worker sharing that budget pauses. A memory store supports single-process use.
 
 ## Quickstart
 
-Using a coding agent? Install the setup skill, then ask your agent to add valve
-to your project:
+To use Valve with a coding agent, run the interactive skill installer in your
+project:
 
 ```sh
-npx skills add ksaurav24/valve --skill valve-setup
+npx skills add ksaurav24/valve
 ```
 
-The installer lets you choose your agent. See [agent skills](https://valvejs.vercel.app/skills/)
-for Bottleneck migration, reviews, quota design, troubleshooting, and prompts
-you can copy without installing a skill.
+Choose the skills you need and your coding agent. The [skills](skills/) cover
+setup, Bottleneck migration, reviews, quota design, and troubleshooting.
 
 **Beta until 1.0.** APIs may change between releases. Published versions use
 plain version numbers and install through npm’s default channel.

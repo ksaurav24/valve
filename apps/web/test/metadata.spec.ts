@@ -15,7 +15,6 @@ test('marketing and docs export distinct canonical and social metadata', async (
     '/releases/',
     '/contributors/',
     '/articles/',
-    '/skills/',
     '/docs/',
     '/docs/quickstart/',
     '/docs/guides/scoped-rate-limits/',
@@ -118,12 +117,12 @@ test('sitemap contains only canonical pages and robots advertises it', async ({
       `${origin}/changelog/`,
       `${origin}/contributors/`,
       `${origin}/articles/`,
-      `${origin}/skills/`,
       `${origin}/docs/`,
       `${origin}/docs/quickstart/`,
     ]),
   );
   expect(urls).not.toContain(`${origin}/quickstart/`);
+  expect(urls).not.toContain(`${origin}/skills/`);
   for (const url of urls) {
     expect(new URL(url).origin).toBe(origin);
     expect((await request.get(new URL(url).pathname)).status(), url).toBe(200);

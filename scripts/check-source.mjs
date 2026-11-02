@@ -20,7 +20,15 @@ for (const file of files) {
   )
     continue;
   const source = readFileSync(file, 'utf8');
-  if (/[\u2013\u2014]/u.test(source)) {
+  // Next.js owns this block and restores its text during development.
+  const authored =
+    file === 'apps/web/AGENTS.md'
+      ? source.replace(
+          /<!-- BEGIN:nextjs-agent-rules -->[\s\S]*?<!-- END:nextjs-agent-rules -->/gu,
+          '',
+        )
+      : source;
+  if (/[\u2013\u2014]/u.test(authored)) {
     console.error(`${file}: use plain punctuation instead of long dashes`);
     failed = true;
   }

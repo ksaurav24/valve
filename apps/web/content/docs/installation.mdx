@@ -15,20 +15,17 @@ uses the one you pass in.
 
 ## Set up with a coding agent
 
-Install the setup skill into your project, then ask your agent to integrate valve:
+Run the interactive installer in your project, choose the skills you need,
+then ask your coding agent to integrate Valve:
 
 ```sh
-npx skills add ksaurav24/valve --skill valve-setup
+npx skills add ksaurav24/valve
 ```
 
 The [Skills CLI](https://github.com/vercel-labs/skills) requires Node.js 22.20 or
-later and lets you choose your coding agent. This installs instructions and
+later and lets you choose skills and your coding agent. This installs instructions and
 references; your agent installs the `valvejs` package when needed. For the
 library alone, Node.js 20 or later is supported.
-
-Visit [agent skills](/skills/) for task-specific skills and setup prompts you
-can copy without installing. Bottleneck users can choose
-`valve-migrate-from-bottleneck` instead.
 
 ## Install the package
 
