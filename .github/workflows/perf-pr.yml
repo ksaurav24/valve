@@ -48,7 +48,7 @@ jobs:
         run: pnpm perf quick
       - name: Public drift diagnostic
         run: pnpm perf drift --jobs 20 --response-ms 5 --reps 1
-      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         if: always()
         with:
           name: perf-pr-portable-${{ github.run_attempt }}
@@ -90,7 +90,7 @@ jobs:
         run: pnpm perf scoped --stores memory,redis74,valkey8 --iterations 2
       - name: Run the smoke profile
         run: pnpm perf smoke --stores memory,redis74,valkey8
-      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         if: always()
         with:
           name: perf-pr-smoke-${{ github.run_attempt }}
@@ -132,7 +132,7 @@ jobs:
           if [[ -n "$PERF_BASE_REF" ]]; then args+=(--base "$PERF_BASE_REF"); fi
           pnpm perf footprint --check "${args[@]}"
           pnpm perf startup "${args[@]}"
-      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         if: always()
         with:
           name: perf-pr-footprint-${{ github.run_attempt }}
