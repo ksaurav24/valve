@@ -64,7 +64,7 @@ jobs:
         run: pnpm perf plan --profile nightly --budget "$PERF_BUDGET"
       - name: Run the budgeted matrix
         run: pnpm perf matrix --profile nightly --base "$PERF_BASE_REF" --current --budget "$PERF_BUDGET" --isolate --require-authoritative --worker-cpus "$PERF_WORKER_CPUS" --yes
-      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         if: always()
         with:
           name: perf-nightly-${{ github.run_id }}-${{ github.run_attempt }}
@@ -97,7 +97,7 @@ jobs:
       - run: pnpm perf infra up redis74
       - run: pnpm perf infra up valkey8
       - run: pnpm perf smoke --stores memory,redis74,valkey8
-      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         if: always()
         with:
           name: perf-nightly-hosted-smoke-${{ github.run_id }}-${{ github.run_attempt }}
