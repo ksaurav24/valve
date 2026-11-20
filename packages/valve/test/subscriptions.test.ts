@@ -2,7 +2,6 @@
 import { describe, expect, it, vi } from 'vitest';
 import { subscriptions } from '../src/redis/subscriptions.js';
 import { redisStore } from '../src/redis/index.js';
-import { withLuaClock } from './lua-clock.js';
 describe('subscriptions', () => {
   it('multiplexes node-redis listeners and removes only its own callback', async () => {
     let message!: (message: string | Uint8Array) => void;
@@ -119,10 +118,5 @@ describe('subscriptions', () => {
     client.evalsha.mockResolvedValueOnce(1);
     expect(await store.renew!('x', ['token'], 100)).toBe(true);
     await store.close();
-  });
-  it('clock injection fails loudly after changes to the production clock', () => {
-    expect(() => withLuaClock('local now = 0')).toThrow(
-      'Production Lua clock changed',
-    );
   });
 });

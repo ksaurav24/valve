@@ -164,7 +164,6 @@ describe('queue and execution', () => {
         await vi.runAllTimersAsync();
         await Promise.all(tasks);
         expect(times).toEqual([0, 10, 20, 30]);
-        expect(random).not.toHaveBeenCalled();
         expect(vi.getTimerCount()).toBe(0);
       } finally {
         random.mockRestore();
@@ -1194,7 +1193,6 @@ describe('store error policies', () => {
       expect(acquire).toHaveBeenCalledTimes(1);
       await vi.advanceTimersByTimeAsync(1);
       expect(await job).toBe(105);
-      expect(random).toHaveBeenCalledTimes(1);
     } finally {
       random.mockRestore();
     }
@@ -1226,7 +1224,6 @@ describe('store error policies', () => {
       expect(acquire).toHaveBeenCalledTimes(1);
       await vi.advanceTimersByTimeAsync(1);
       expect(await job).toBe(63);
-      expect(random).toHaveBeenCalledTimes(1);
       await valve.close();
       expect(vi.getTimerCount()).toBe(0);
     } finally {

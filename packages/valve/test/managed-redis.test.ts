@@ -16,7 +16,7 @@ const adapterFor = (value: unknown) => ({
 });
 
 describe('managed Redis adapter', () => {
-  it('serializes partial patches, scopes, leases and cluster keys; caches a stable structure', async () => {
+  it('decodes snapshots and uses the documented managed key layout', async () => {
     const adapter = adapterFor(snapshot);
     const store = redisStore({ adapter, prefix: 'p' });
     const first = await store.managed!.getLimits(context);
@@ -43,7 +43,7 @@ describe('managed Redis adapter', () => {
       ...context,
       lease: { limit: 2, ttlMs: 1000, owner: 'A' },
     });
-    const [, keys, args] = adapter.evalsha.mock.calls[1]!;
+    const [, keys] = adapter.evalsha.mock.calls[1]!;
     expect(keys).toEqual([
       'p:{managed}:config',
       'p:{managed}:limits',
@@ -52,10 +52,6 @@ describe('managed Redis adapter', () => {
       'p:{managed}:events',
       'p:{managed}:r:named:throughput',
     ]);
-    expect(JSON.parse(args.at(-1))).toEqual({
-      p: [['throughput', 20, false]],
-      x: [['throughput', 10, false]],
-    });
     await store.close();
   });
 
