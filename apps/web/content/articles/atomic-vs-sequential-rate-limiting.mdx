@@ -55,7 +55,7 @@ Redis can execute a conditional read-and-update script without another client's 
 
 Valve's [scoped rate limits](/docs/guides/scoped-rate-limits/) put the shared business rule and the selected recipient rule in one admission. A scoped rule chooses a counter using the identity supplied with the job. The unscoped rule applies across the whole Valve ID.
 
-These examples assume Node.js 20 or later and unit-cost messages. Both use this application function; the endpoint is illustrative and needs your provider's URL and authentication:
+These examples assume Node.js 22 or later and unit-cost messages. Both use this application function; the endpoint is illustrative and needs your provider's URL and authentication:
 
 ```ts
 async function postMessage(recipientId: string, signal?: AbortSignal) {

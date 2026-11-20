@@ -25,7 +25,7 @@ pnpm install
 pnpm build
 ```
 
-The library supports Node.js 20+ at runtime, but the workspace tooling needs 24.
+The library supports Node.js 22+ at runtime, but the workspace tooling needs 24.
 
 ## Rules CI enforces (easy to trip over)
 

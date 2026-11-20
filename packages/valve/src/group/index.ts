@@ -813,9 +813,6 @@ export function createValveGroup<K extends string = string>(
     },
     stats: () => ({ size: entries.size, active }),
     close,
-    // Node 20 releases before 20.4 only define the registered symbol.
-    [(Symbol.asyncDispose ??
-      Symbol.for('nodejs.asyncDispose')) as typeof Symbol.asyncDispose]: () =>
-      close(),
+    [Symbol.asyncDispose]: () => close(),
   };
 }

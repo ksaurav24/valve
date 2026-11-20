@@ -216,6 +216,31 @@ the fingerprint. Each scoped request uses one bounded Lua execution with sparse
 grants. See [Scoped rate limits](/docs/guides/scoped-rate-limits/) for key
 cardinality, identity handling, and Cluster hot-slot tradeoffs.
 
+## Key layout and compatibility
+
+The key layout, value encoding, and pub/sub messages are part of the stable
+contract in 1.x. Workers on any 1.x version can share one Redis deployment,
+which allows rolling upgrades. A change that breaks this is a major release.
+
+| Key                                 | Holds                                       |
+| ----------------------------------- | ------------------------------------------- |
+| `PREFIX:{ID}:config`                | Versioned configuration fingerprint, no TTL |
+| `PREFIX:{ID}:r:KEY`                 | Rate state for an unscoped rule             |
+| `PREFIX:{ID}:s:named:NAME:IDENTITY` | Rate state for a scoped rule                |
+| `PREFIX:{ID}:pause`                 | Shared pause, expires when the pause ends   |
+| `PREFIX:{ID}:leases`                | Sorted set of global concurrency leases     |
+| `PREFIX:{ID}:limits`                | Managed limits (experimental)               |
+| `PREFIX:{ID}:events`                | Pub/sub channel for notifications           |
+
+The channel carries `pause:MS`, `resume`, `release`, and `limits:VERSION:FLAG`.
+Workers ignore messages they do not recognize, so a minor release may add new
+ones. Fingerprints carry a version, so an incompatible future format fails
+closed with `INVALID_OPTIONS` instead of sharing budget incorrectly.
+
+Treat these keys as read-only. Inspecting them is fine; writing or deleting them
+by hand is unsupported except as described in
+[Configuration drift](/docs/guides/share-a-quota/#configuration-drift).
+
 ## Lifecycle
 
 ```ts

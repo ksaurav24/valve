@@ -97,12 +97,20 @@ export interface Store {
   ): (() => void) | Promise<() => void>;
   /** Frees resources owned by the store. Never closes user provided clients. */
   close(): Promise<void>;
-  /** Managed limits support. Required by `limits: 'managed'`; see {@link ManagedStore}. */
+  /**
+   * Managed limits support. Required by `limits: 'managed'`; see {@link ManagedStore}.
+   *
+   * Experimental: managed limits may change in a minor release. See [Stability](/docs/reference/stability/).
+   * @experimental
+   */
   readonly managed?: ManagedStore;
 }
 
 /** One rule's authoritative values in a {@link LimitsSnapshot}.
+ *
+ * Experimental: managed limits may change in a minor release. See [Stability](/docs/reference/stability/).
  * @example const rule: LimitsRule = { algorithm: 'gcra', intervalMs: 1000, limit: 10, burst: 1 };
+ * @experimental
  */
 export interface LimitsRule {
   readonly algorithm: 'gcra' | 'fixed-window';
@@ -114,7 +122,10 @@ export interface LimitsRule {
 }
 
 /** The managed limits a store enforces for one valve id.
+ *
+ * Experimental: managed limits may change in a minor release. See [Stability](/docs/reference/stability/).
  * @example const snapshot: LimitsSnapshot = { version: '1792662950908123.2', revision: 2, rules: {} };
+ * @experimental
  */
 export interface LimitsSnapshot {
   /** Opaque token. Changes on every committed update and when the store registers the limits again. */
@@ -126,14 +137,20 @@ export interface LimitsSnapshot {
 }
 
 /** New absolute values by rule name. Omitted rules and fields keep their current values.
+ *
+ * Experimental: managed limits may change in a minor release. See [Stability](/docs/reference/stability/).
  * @example const patch: LimitsPatch = { throughput: { limit: 200, burst: 20 } };
+ * @experimental
  */
 export type LimitsPatch = Readonly<
   Record<string, { readonly limit?: number; readonly burst?: number }>
 >;
 
 /** Context shared by every managed store call.
+ *
+ * Experimental: managed limits may change in a minor release. See [Stability](/docs/reference/stability/).
  * @example const context: ManagedContext = { id: 'api', rules: [] };
+ * @experimental
  */
 export interface ManagedContext {
   readonly id: string;
@@ -149,14 +166,20 @@ export interface ManagedContext {
 }
 
 /** Managed static admission.
+ *
+ * Experimental: managed limits may change in a minor release. See [Stability](/docs/reference/stability/).
  * @example const request: ManagedAcquireRequest = { id: 'api', rules: [], costs: [1] };
+ * @experimental
  */
 export interface ManagedAcquireRequest extends ManagedContext {
   readonly costs: readonly number[];
 }
 
 /** Managed static admission result.
+ *
+ * Experimental: managed limits may change in a minor release. See [Stability](/docs/reference/stability/).
  * @example const result: ManagedAcquireResult = { granted: 0, retryAfterMs: 0, pausedMs: 0, impossible: true };
+ * @experimental
  */
 export interface ManagedAcquireResult extends AcquireResult {
   /** The first ungranted job costs more than a rule's current capacity and can never start. */
@@ -166,14 +189,20 @@ export interface ManagedAcquireResult extends AcquireResult {
 }
 
 /** Managed scoped admission.
+ *
+ * Experimental: managed limits may change in a minor release. See [Stability](/docs/reference/stability/).
  * @example const request: ManagedScopedRequest = { id: 'api', rules: [], jobs: [] };
+ * @experimental
  */
 export interface ManagedScopedRequest extends ManagedContext {
   readonly jobs: ScopedAcquireRequest['jobs'];
 }
 
 /** Managed scoped admission result.
+ *
+ * Experimental: managed limits may change in a minor release. See [Stability](/docs/reference/stability/).
  * @example const result: ManagedScopedResult = { grantedIndexes: [], blocked: [] };
+ * @experimental
  */
 export interface ManagedScopedResult extends ScopedAcquireResult {
   readonly blocked: readonly {
@@ -187,7 +216,10 @@ export interface ManagedScopedResult extends ScopedAcquireResult {
 }
 
 /** Atomic partial update of managed limits.
+ *
+ * Experimental: managed limits may change in a minor release. See [Stability](/docs/reference/stability/).
  * @example const request: ManagedUpdateRequest = { id: 'api', rules: [], patch: { throughput: { limit: 20 } } };
+ * @experimental
  */
 export interface ManagedUpdateRequest extends ManagedContext {
   readonly patch: LimitsPatch;
@@ -202,7 +234,10 @@ export interface ManagedUpdateRequest extends ManagedContext {
  * decision and use only those values, never the numbers in `rules`. Reject a
  * different structure, or limits written by an incompatible worker, with
  * `INVALID_OPTIONS` before mutating anything.
+ *
+ * Experimental: managed limits may change in a minor release. See [Stability](/docs/reference/stability/).
  * @example const capability = memoryStore().managed;
+ * @experimental
  */
 export interface ManagedStore {
   readonly version: 1;

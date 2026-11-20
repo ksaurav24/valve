@@ -163,6 +163,9 @@ export interface ValveOptions {
    * {@link Valve.updateLimits} changes them. Names, scopes, algorithms,
    * intervals, and global concurrency stay fixed, as in immutable mode.
    * Requires a store with managed support, such as `memoryStore` or `redisStore`.
+   *
+   * Experimental: managed limits may change in a minor release. See [Stability](/docs/reference/stability/).
+   * @experimental
    */
   limits?: 'immutable' | 'managed';
   /**
@@ -174,7 +177,10 @@ export interface ValveOptions {
 }
 
 /** Options for {@link Valve.updateLimits}.
+ *
+ * Experimental: managed limits may change in a minor release. See [Stability](/docs/reference/stability/).
  * @example const options: UpdateLimitsOptions = { expect: { throughput: { limit: 100 } } };
+ * @experimental
  */
 export interface UpdateLimitsOptions {
   /**
@@ -315,7 +321,12 @@ export interface ValveEventMap {
   'store-error': { readonly error: unknown; readonly policy: StoreErrorPolicy };
   idle: Record<string, never>;
   warning: { readonly message: string };
-  /** Managed limits this process has not seen before, observed in a store reply. */
+  /**
+   * Managed limits this process has not seen before, observed in a store reply.
+   *
+   * Experimental: managed limits may change in a minor release. See [Stability](/docs/reference/stability/).
+   * @experimental
+   */
   limits: LimitsSnapshot;
 }
 
@@ -337,7 +348,7 @@ export interface Valve extends AsyncDisposable {
    * @throws never synchronously. The returned promise rejects with
    * `ValveError` codes `INVALID_OPTIONS`, `COST_EXCEEDS_LIMIT`, `QUEUE_FULL`,
    * `MAX_WAIT_EXCEEDED`, `ABORTED`, `CLOSED`, `STORE_UNAVAILABLE`,
-   * or with the error thrown by `fn`.
+   * `LEASE_LOST`, or with the error thrown by `fn`.
    *
    * @example
    * const user = await github.run(() => octokit.users.getByUsername({ username }));
@@ -421,10 +432,13 @@ export interface Valve extends AsyncDisposable {
    * Reads the store's current managed limits. Registers this valve's rules
    * first if the store has no limits for the id.
    *
+   *
+   * Experimental: managed limits may change in a minor release. See [Stability](/docs/reference/stability/).
    * @throws never synchronously. Rejects with `INVALID_OPTIONS` unless the valve
    * uses `limits: "managed"`, or `STORE_UNAVAILABLE` when the store fails.
    * @example
    * const { rules } = await api.getLimits();
+   * @experimental
    */
   getLimits(): Promise<LimitsSnapshot>;
 
@@ -439,6 +453,8 @@ export interface Valve extends AsyncDisposable {
    * their next admission. Spent budget carries over: fixed windows keep their
    * count, and GCRA keeps its outstanding cost units, which drain at the new rate.
    *
+   *
+   * Experimental: managed limits may change in a minor release. See [Stability](/docs/reference/stability/).
    * @throws never synchronously. Rejects with `INVALID_OPTIONS` for unknown
    * rules or fields, values that are not positive integers, a burst on a
    * fixed-window rule, unsafe numeric precision, or an immutable valve; `LIMITS_CONFLICT` when `expect`
@@ -446,6 +462,7 @@ export interface Valve extends AsyncDisposable {
    * update may or may not have been applied.
    * @example
    * await api.updateLimits({ throughput: { limit: 200, burst: 20 } });
+   * @experimental
    */
   updateLimits(
     patch: LimitsPatch,

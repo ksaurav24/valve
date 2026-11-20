@@ -7,6 +7,7 @@
     "errors",
     "events",
     "custom-stores",
+    "stability",
     "implementation-status",
     "testing"
   ]

@@ -3,6 +3,11 @@ title: Update limits at runtime
 description: Change named rule limits safely across workers without resetting spent budget.
 ---
 
+<Callout type="warn" title="Experimental">
+  Managed limits may change in a minor release. See
+  [Stability](/docs/reference/stability/#experimental-apis).
+</Callout>
+
 Use managed limits when a provider changes an existing quota while your workers
 are running. The store becomes authoritative for each named rule's `limit` and
 GCRA `burst`; rule names, scopes, algorithms, intervals, and global concurrency

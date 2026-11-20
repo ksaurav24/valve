@@ -1497,9 +1497,6 @@ export function createValve(options: ValveOptions): Valve {
         else idleResolvers.push(resolve);
       }),
     close,
-    // Node 20 releases before 20.4 only define the registered symbol.
-    [(Symbol.asyncDispose ??
-      Symbol.for('nodejs.asyncDispose')) as typeof Symbol.asyncDispose]: () =>
-      close(),
+    [Symbol.asyncDispose]: () => close(),
   };
 }

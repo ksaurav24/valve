@@ -24,7 +24,7 @@ The package ships full TypeScript declarations; read
 | `valvejs/headers` | `retryAfter`, `ietfRateLimit`, `xRateLimit`, `combine`, `defaultFeedback`                                 |
 | `valvejs/group`   | `createValveGroup` and group types (opt-in subpath, not in `valvejs`)                                     |
 
-ESM and CommonJS builds. Node.js 20+. Zero runtime and peer dependencies.
+ESM and CommonJS builds. Node.js 22+. Zero runtime and peer dependencies.
 
 ## createValve options
 

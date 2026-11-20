@@ -1,0 +1,91 @@
+---
+title: Stability and versioning
+description: What Valve 1.x guarantees, what counts as a breaking change, and which APIs are experimental.
+---
+
+Valve follows [Semantic Versioning](https://semver.org/) from 1.0.0. This page
+defines the public contract that versioning applies to.
+
+## Stable surface
+
+These are covered by semver. A breaking change to any of them requires a new
+major version:
+
+- Every export of `valvejs`, `valvejs/redis`, `valvejs/headers`, and
+  `valvejs/group`, in both ESM and CommonJS, and their TypeScript types.
+- Documented behavior, including admission order, error codes, events, and the
+  defaults listed below.
+- The `Store` interface for [custom stores](/docs/reference/custom-stores/).
+- The Redis [key layout and wire format](/docs/reference/redis-store/#key-layout-and-compatibility),
+  so workers on different 1.x versions can share one Redis deployment.
+- The supported Node.js range (`engines`: Node.js 22 or later) and the
+  supported Redis and Valkey versions.
+
+Anything not documented, any symbol marked `@internal`, and anything reachable
+only by importing files outside the package `exports` map is not covered.
+
+## Closed sets
+
+Some types are unions or maps that callers switch over. Valve treats them as
+follows in 1.x:
+
+| Type                | Minor release may                         | Requires a major release            |
+| ------------------- | ----------------------------------------- | ----------------------------------- |
+| `ValveErrorCode`    | Nothing                                   | Adding, removing, or renaming codes |
+| `PauseReason`       | Add a reason                              | Removing or renaming a reason       |
+| `ValveEventMap`     | Add an event or an optional payload field | Removing an event or payload field  |
+| `StoreNotification` | Add a notification type                   | Removing or changing a type         |
+
+Handle unknown `PauseReason` values, events, and notification types gracefully,
+for example with a `default` branch. Error codes stay closed so exhaustive
+`switch` statements over `ValveErrorCode` keep compiling across 1.x.
+
+## Custom stores
+
+Required `Store` members stay required with the same signatures in 1.x. A minor
+release may add optional members, such as a new fast path; Valve keeps working
+with stores that do not implement them. A store written against 1.0 works with
+every 1.x release.
+
+## Defaults
+
+Changing any of these defaults is a breaking change:
+
+| Option                                                  | Default                      |
+| ------------------------------------------------------- | ---------------------------- |
+| `algorithm`                                             | `"gcra"`                     |
+| GCRA `burst`                                            | `1`                          |
+| `cost` / `priority`                                     | `1` / `0`                    |
+| `maxQueue`                                              | `Infinity`                   |
+| `maxPause`                                              | `"15m"`                      |
+| `backoff`                                               | `{ base: "1s", max: "30s" }` |
+| `onStoreError`                                          | `"wait"`                     |
+| `limits`                                                | `"immutable"`                |
+| `batch`                                                 | `32` (scoped maximum `128`)  |
+| lease TTL                                               | `"30s"`                      |
+| `wrapFetch` `retries`                                   | `2` (three total requests)   |
+| `wrapFetch` `retryUnsafeMethods`                        | `false`                      |
+| `wrapFetch` `maxReplayBodySize`                         | `65536` bytes                |
+| `redisStore` `prefix` / `timeout`                       | `"valve"` / `"2s"`           |
+| `createValveGroup` `maxSize` / `maxPending` / `idleTtl` | `1000` / `1000` / `"10m"`    |
+
+Bug fixes that make behavior match this documentation are not breaking, even
+when code depended on the old behavior.
+
+## Experimental APIs
+
+APIs marked **Experimental** in the reference may change or be removed in a
+minor release. Each change is called out in the changelog.
+
+Experimental in 1.x:
+
+- [Managed limits](/docs/guides/runtime-limits/): `limits: "managed"`,
+  `getLimits`, `updateLimits`, `UpdateLimitsOptions`, the `limits` event, and
+  the `LimitsRule`, `LimitsSnapshot`, `LimitsPatch`, and `Managed*` store types.
+
+An experimental API becomes stable in a minor release by removing the marker.
+
+## Deprecation
+
+A stable API is deprecated with a `@deprecated` tag and a changelog entry for at
+least one minor release before it is removed in the next major release.
