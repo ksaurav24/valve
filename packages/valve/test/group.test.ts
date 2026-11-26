@@ -902,4 +902,26 @@ describe('createValveGroup close', () => {
     vi.useRealTimers();
     await store.close();
   });
+
+  it('captures globalThis.fetch at wrapFetch time', async () => {
+    const first = vi.fn(async () => ({ status: 200, headers: {} }));
+    const second = vi.fn(async () => ({ status: 500, headers: {} }));
+    const original = globalThis.fetch;
+    globalThis.fetch = first as unknown as typeof fetch;
+    const g = createValveGroup({
+      id: 'wrap-capture',
+      resolve: () => ({ concurrency: 1 }),
+    });
+    try {
+      const wrapped = g.get('k').wrapFetch();
+      globalThis.fetch = second as unknown as typeof fetch;
+      const response = await wrapped('https://example.test');
+      expect(response.status).toBe(200);
+      expect(first).toHaveBeenCalledTimes(1);
+      expect(second).not.toHaveBeenCalled();
+    } finally {
+      globalThis.fetch = original;
+      await g.close();
+    }
+  });
 });

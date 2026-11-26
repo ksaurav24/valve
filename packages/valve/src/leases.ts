@@ -46,7 +46,10 @@ export function leaseManager(
         timer = undefined;
         void renew();
       },
-      Math.max(1, Math.min(ttlMs / 3, earliest - Date.now())),
+      Math.min(
+        2147483647,
+        Math.max(1, Math.min(ttlMs / 3, earliest - Date.now())),
+      ),
     );
   }
   async function renew() {
@@ -67,7 +70,12 @@ export function leaseManager(
             timer = undefined;
             resolve(false);
           };
-          timer = setTimeout(cancelWatch, Math.max(1, deadline - Date.now()));
+          const wait = () => {
+            const left = deadline - Date.now();
+            if (left > 0) timer = setTimeout(wait, Math.min(2147483647, left));
+            else cancelWatch!();
+          };
+          wait();
         });
         let valid: boolean;
         try {

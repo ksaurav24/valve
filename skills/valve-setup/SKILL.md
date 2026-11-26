@@ -29,7 +29,7 @@ source when versions differ; do not upgrade an existing integration implicitly.
 
 Look for, and note in your final summary:
 
-- Runtime and module setup: Node.js version (valve needs 20+), ESM or CommonJS,
+- Runtime and module setup: Node.js version (valve needs 22+), ESM or CommonJS,
   TypeScript, package manager (lockfile).
 - Every place that calls the provider: `fetch`, undici, axios, got, or an SDK.
   Grep for the provider's hostname and SDK imports. All of them must go through

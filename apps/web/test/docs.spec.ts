@@ -1,5 +1,6 @@
 // Verify the MDX site, navigation, search, and layout.
 import { expect, test } from '@playwright/test';
+import { isBetaVersion } from '../lib/release-state.mjs';
 import release from '../.generated/release.json' with { type: 'json' };
 import metadata from '../.generated/metadata.json' with { type: 'json' };
 import changelog from '../.generated/changelog.json' with { type: 'json' };
@@ -33,7 +34,11 @@ test('every page and the generated reference resolve', async ({
     '/docs/choosing-an-algorithm/',
     '/docs/guarantees/',
     '/docs/guides/share-a-quota/',
+    '/docs/guides/runtime-limits/',
+    '/docs/guides/provider-quota-scopes/',
     '/docs/guides/scoped-rate-limits/',
+    '/docs/guides/compose-valves/',
+    '/docs/guides/independent-groups/',
     '/docs/guides/global-concurrency/',
     '/docs/guides/respect-retry-after/',
     '/docs/guides/priorities-and-shutdown/',
@@ -53,6 +58,7 @@ test('every page and the generated reference resolve', async ({
     '/docs/reference/errors/',
     '/docs/reference/events/',
     '/docs/reference/custom-stores/',
+    '/docs/reference/stability/',
     '/docs/reference/implementation-status/',
     '/docs/reference/testing/',
     '/docs/faq/',
@@ -129,11 +135,17 @@ test('home page leads with install, usage, and documentation', async ({
       'pnpm add valvejs',
     );
   }
-  await expect(
-    page.getByText('Valve is in beta. APIs may change before 1.0.', {
-      exact: true,
-    }),
-  ).toBeVisible();
+  if (isBetaVersion(release.version)) {
+    await expect(
+      page.getByText('Valve is in beta. APIs may change before 1.0.', {
+        exact: true,
+      }),
+    ).toBeVisible();
+  } else {
+    await expect(
+      page.getByRole('link', { name: 'Stability and versioning', exact: true }),
+    ).toHaveAttribute('href', '/docs/reference/stability/');
+  }
   await page.getByRole('tab', { name: 'shared.ts' }).click();
   await expect(page.getByRole('tabpanel', { name: 'shared.ts' })).toContainText(
     'redisStore',

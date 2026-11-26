@@ -379,10 +379,13 @@ export function createValve(options: ValveOptions): Valve {
     if (closed && closeResolve && !closingStore) {
       if (inFlight && leases && !waitedOut) {
         // Leases granted by a store that never answers expire within leaseTtl.
-        closeWait ??= setTimeout(() => {
-          waitedOut = true;
-          finishIdle();
-        }, config.leaseTtl);
+        closeWait ??= setTimeout(
+          () => {
+            waitedOut = true;
+            finishIdle();
+          },
+          Math.min(2147483647, config.leaseTtl),
+        );
         return;
       }
       clearTimeout(closeWait);
@@ -1151,6 +1154,7 @@ export function createValve(options: ValveOptions): Valve {
   }
   /** Translate provider feedback or repeated 429 responses into a bounded shared pause. */
   function observe(response: ResponseLike): void {
+    if (closingStore) return;
     let signal;
     try {
       signal = feedback?.(response);
@@ -1370,17 +1374,20 @@ export function createValve(options: ValveOptions): Valve {
       noticeVersion++;
       if (notice.type === 'resume') delayed?.wake();
       if (notice.type === 'pause') {
-        const next = Date.now() + notice.durationMs;
-        const extended = next > pausedUntil;
-        pausedUntil = Math.max(pausedUntil, next);
-        if (extended)
+        if (!(notice.durationMs > 0)) return;
+        const now = Date.now();
+        const wasPaused = pausedUntil > now;
+        pausedUntil = Math.max(pausedUntil, now + notice.durationMs);
+        if (!wasPaused)
           events.emit('pause', {
             durationMs: notice.durationMs,
             reason: 'store',
           });
       } else if (notice.type === 'resume') {
-        pausedUntil = 0;
-        events.emit('resume', { reason: 'manual' });
+        if (pausedUntil > Date.now()) {
+          pausedUntil = 0;
+          events.emit('resume', { reason: 'manual' });
+        } else pausedUntil = 0;
       } else {
         // Every subscribed valve hears each release; coalesce and spread them.
         if (leaseWait) soon();
@@ -1411,67 +1418,68 @@ export function createValve(options: ValveOptions): Valve {
         submit(() => fn(...args), runOptions),
     wrapFetch,
     observe,
-    pause: (value) => {
+    pause: async (value) => {
+      if (closed) throw failure(id, 'CLOSED', 'valve is closed.');
       const ms = duration(value, id, 'pause');
-      return sharedPause(ms, 'manual');
+      if (ms) await sharedPause(ms, 'manual');
     },
-    resume: () =>
-      store.resume(id).then(() => {
-        pausedUntil = 0;
-        delayed?.wake();
-        clearWake();
-        events.emit('resume', { reason: 'manual' });
-        schedule();
-      }),
-    getLimits: () => {
+    resume: async () => {
+      if (closed) throw failure(id, 'CLOSED', 'valve is closed.');
+      await store.resume(id);
+      const active = pausedUntil > Date.now();
+      pausedUntil = 0;
+      delayed?.wake();
+      clearWake();
+      if (active) events.emit('resume', { reason: 'manual' });
+      schedule();
+    },
+    getLimits: async () => {
+      if (closed) throw failure(id, 'CLOSED', 'valve is closed.');
       if (!config.managed)
-        return Promise.reject(
-          failure(
-            id,
-            'INVALID_OPTIONS',
-            'getLimits requires limits: "managed".',
-          ),
+        throw failure(
+          id,
+          'INVALID_OPTIONS',
+          'getLimits requires limits: "managed".',
         );
       const issued = ++limitsIssued;
-      return call(() => store.managed!.getLimits(context())).then((next) => {
-        if (!next)
-          throw failure(
-            id,
-            'INVALID_OPTIONS',
-            'Store returned no managed limits.',
-          );
-        if (accept(next, issued)) relax();
-        return next;
-      });
+      const next = await call(() => store.managed!.getLimits(context()));
+      if (!next)
+        throw failure(
+          id,
+          'INVALID_OPTIONS',
+          'Store returned no managed limits.',
+        );
+      if (accept(next, issued)) relax();
+      return next;
     },
-    updateLimits: (patch: LimitsPatch, updateOptions?: UpdateLimitsOptions) => {
-      try {
-        if (!config.managed)
-          throw failure(
-            id,
-            'INVALID_OPTIONS',
-            'updateLimits requires limits: "managed". Immutable limits change only through a coordinated migration.',
-          );
-        if (
-          updateOptions !== undefined &&
-          (!updateOptions ||
-            typeof updateOptions !== 'object' ||
-            Array.isArray(updateOptions))
-        )
-          invalid(
-            id,
-            'updateLimits options must be an object',
-            updateOptions,
-            'Pass { expect }',
-          );
-        checkPatch(id, rules, patch);
-        if (updateOptions?.expect !== undefined)
-          checkPatch(id, rules, updateOptions.expect, 'limits expect');
-      } catch (error) {
-        return Promise.reject(error);
-      }
+    updateLimits: async (
+      patch: LimitsPatch,
+      updateOptions?: UpdateLimitsOptions,
+    ) => {
+      if (closed) throw failure(id, 'CLOSED', 'valve is closed.');
+      if (!config.managed)
+        throw failure(
+          id,
+          'INVALID_OPTIONS',
+          'updateLimits requires limits: "managed". Immutable limits change only through a coordinated migration.',
+        );
+      if (
+        updateOptions !== undefined &&
+        (!updateOptions ||
+          typeof updateOptions !== 'object' ||
+          Array.isArray(updateOptions))
+      )
+        invalid(
+          id,
+          'updateLimits options must be an object',
+          updateOptions,
+          'Pass { expect }',
+        );
+      checkPatch(id, rules, patch);
+      if (updateOptions?.expect !== undefined)
+        checkPatch(id, rules, updateOptions.expect, 'limits expect');
       const issued = ++limitsIssued;
-      return call(() =>
+      const next = await call(() =>
         store.managed!.updateLimits({
           ...context(),
           patch,
@@ -1479,10 +1487,9 @@ export function createValve(options: ValveOptions): Valve {
             ? {}
             : { expect: updateOptions.expect }),
         }),
-      ).then((next) => {
-        if (accept(next, issued)) relax();
-        return next;
-      });
+      );
+      if (accept(next, issued)) relax();
+      return next;
     },
     stats: () => ({
       queued: waiting.size - reserved,

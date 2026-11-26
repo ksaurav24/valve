@@ -14,6 +14,8 @@ export function subscriptions(
       off: () => Promise<unknown>;
     }
   >();
+  // In-flight channel unsubscribes, awaited before re-subscribing the same channel.
+  const closing = new Map<string, Promise<unknown>>();
   /** Decode recognized wire notices and dispatch them to the channel's listeners. */
   function deliver(channel: string, message: string) {
     const listeners = entries.get(channel)?.listeners;
@@ -46,11 +48,14 @@ export function subscriptions(
         const message = (text: string | Uint8Array) => {
           if (typeof text === 'string') deliver(channel, text);
         };
+        const previous = closing.get(channel);
+        const start = () =>
+          ioClient
+            ? ioClient.subscribe(channel)
+            : nodeClient.subscribe(channel, message);
         entry = {
           listeners: new Set(),
-          ready: ioClient
-            ? ioClient.subscribe(channel)
-            : nodeClient.subscribe(channel, message),
+          ready: previous ? previous.then(start, start) : start(),
           off: () =>
             ioClient
               ? ioClient.unsubscribe(channel)
@@ -63,26 +68,38 @@ export function subscriptions(
         await entry.ready;
       } catch (error) {
         entry.listeners.delete(listener);
-        if (!entry.listeners.size) entries.delete(channel);
+        if (!entry.listeners.size && entries.get(channel) === entry)
+          entries.delete(channel);
         throw error;
       }
       const current = entry;
       return () => {
         current.listeners.delete(listener);
-        // Keep the Redis subscription until store.close(): reuse is race-free when a new valve arrives during unsubscribe.
+        if (!current.listeners.size && entries.get(channel) === current) {
+          entries.delete(channel);
+          const done = Promise.resolve()
+            .then(() => current.off())
+            .catch(() => undefined)
+            .finally(() => {
+              if (closing.get(channel) === done) closing.delete(channel);
+            });
+          closing.set(channel, done);
+        }
       };
     },
     async close() {
       ioClient?.off('message', ioListener);
       const pending = [...entries.values()];
+      const finishing = [...closing.values()];
       entries.clear();
-      await Promise.all(
-        pending.map(async (entry) => {
+      await Promise.all([
+        ...finishing,
+        ...pending.map(async (entry) => {
           entry.listeners.clear();
           await entry.ready.catch(() => undefined);
           await entry.off();
         }),
-      );
+      ]);
     },
   };
 }

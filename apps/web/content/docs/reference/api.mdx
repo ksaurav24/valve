@@ -17,20 +17,20 @@ is invalid. At least one of `rate` or a finite `concurrency` is required.
 
 ### ValveOptions
 
-| Option         | Type                                  | Default                      | Description                                                                                                    |
-| -------------- | ------------------------------------- | ---------------------------- | -------------------------------------------------------------------------------------------------------------- |
-| `id`           | `string`                              | Required                     | Name of the shared budget. 1 to 200 characters, without `{` or `}`.                                            |
-| `rate`         | `RateRule \| RateRule[]`              | None                         | One rule, or a non-empty array of rules.                                                                       |
-| `concurrency`  | `number \| ConcurrencyOptions`        | `Infinity`                   | A number limits this instance. The object form can select global scope.                                        |
-| `store`        | `Store`                               | A new private memory store   | Where the shared budget lives.                                                                                 |
-| `maxQueue`     | `number`                              | `Infinity`                   | Maximum jobs waiting in this process. Beyond it, `run` rejects with `QUEUE_FULL`.                              |
-| `maxWait`      | `Duration`                            | No limit                     | Maximum time a job may wait before starting.                                                                   |
-| `feedback`     | `Feedback \| false`                   | `defaultFeedback`            | Reads provider responses. `false` disables header reading.                                                     |
-| `maxPause`     | `Duration`                            | `'15m'`                      | Cap on any one pause caused by feedback or backoff.                                                            |
-| `backoff`      | `{ base?: Duration; max?: Duration }` | `{ base: '1s', max: '30s' }` | Exponential pause after a 429 with no usable header.                                                           |
-| `onStoreError` | `'wait' \| 'throw' \| 'open'`         | `'wait'`                     | Behavior when the store fails. See [Store failures](/docs/guarantees/#store-failures).                         |
-| `limits`       | `'immutable' \| 'managed'`            | `'immutable'`                | Store-authoritative runtime values when managed. See [Update limits at runtime](/docs/guides/runtime-limits/). |
-| `batch`        | `number`                              | `32`                         | Maximum jobs requested from the store in one call.                                                             |
+| Option         | Type                                  | Default                      | Description                                                                                                                      |
+| -------------- | ------------------------------------- | ---------------------------- | -------------------------------------------------------------------------------------------------------------------------------- |
+| `id`           | `string`                              | Required                     | Name of the shared budget. 1 to 200 characters, without `{` or `}`.                                                              |
+| `rate`         | `RateRule \| RateRule[]`              | None                         | One rule, or a non-empty array of rules.                                                                                         |
+| `concurrency`  | `number \| ConcurrencyOptions`        | `Infinity`                   | A number limits this instance. The object form can select global scope.                                                          |
+| `store`        | `Store`                               | A new private memory store   | Where the shared budget lives.                                                                                                   |
+| `maxQueue`     | `number`                              | `Infinity`                   | Maximum jobs waiting in this process. Beyond it, `run` rejects with `QUEUE_FULL`.                                                |
+| `maxWait`      | `Duration`                            | No limit                     | Maximum time a job may wait before starting.                                                                                     |
+| `feedback`     | `Feedback \| false`                   | `defaultFeedback`            | Reads provider responses. `false` disables header reading.                                                                       |
+| `maxPause`     | `Duration`                            | `'15m'`                      | Cap on any one pause caused by feedback or backoff.                                                                              |
+| `backoff`      | `{ base?: Duration; max?: Duration }` | `{ base: '1s', max: '30s' }` | Exponential pause after a 429 with no usable header.                                                                             |
+| `onStoreError` | `'wait' \| 'throw' \| 'open'`         | `'wait'`                     | Behavior when the store fails. See [Store failures](/docs/guarantees/#store-failures).                                           |
+| `limits`       | `'immutable' \| 'managed'`            | `'immutable'`                | **Experimental.** Store-authoritative runtime values when managed. See [Update limits at runtime](/docs/guides/runtime-limits/). |
+| `batch`        | `number`                              | `32`                         | Maximum jobs requested from the store in one call.                                                                               |
 
 ### RateRule
 
@@ -177,7 +177,9 @@ pause(duration: Duration): Promise<void>
 ```
 
 Pauses the valve in every process sharing it. Only extends an existing pause.
-Resolves once the store records it. Not capped by `maxPause`.
+Resolves once the store records it. Not capped by `maxPause`. A `0` duration is
+a no-op. Never throws synchronously; rejects with `INVALID_OPTIONS` for a bad
+duration or `CLOSED` once the valve is closed.
 
 ### resume
 
@@ -185,24 +187,31 @@ Resolves once the store records it. Not capped by `maxPause`.
 resume(): Promise<void>
 ```
 
-Ends the current pause in every process sharing the valve.
+Ends the current pause in every process sharing the valve. Never throws
+synchronously; rejects with `CLOSED` once the valve is closed.
 
 ### getLimits
+
+<Callout type="warn" title="Experimental">
+  Managed limits may change in a minor release. See
+  [Stability](/docs/reference/stability/#experimental-apis).
+</Callout>
 
 ```ts
 getLimits(): Promise<LimitsSnapshot>
 ```
 
 Reads the store's authoritative managed limits, registering this valve's seeds
-if the store has no values for the ID. Rejects with `INVALID_OPTIONS` on an
-immutable valve and `STORE_UNAVAILABLE` on store failure.
+if the store has no values for the ID. Rejects with `CLOSED` once the valve is
+closed, `INVALID_OPTIONS` on an immutable valve, and `STORE_UNAVAILABLE` on
+store failure.
 
 ### updateLimits
 
 ```ts
 updateLimits(
   patch: LimitsPatch,
-  options?: { expect?: LimitsPatch },
+  options?: UpdateLimitsOptions,
 ): Promise<LimitsSnapshot>
 ```
 
@@ -214,17 +223,23 @@ and the call rejects with `LIMITS_CONFLICT`.
 
 Validation rejects unknown rules or fields, values that are not positive safe
 integers, `burst` on fixed-window rules, and immutable valves with
-`INVALID_OPTIONS`. A store failure becomes `STORE_UNAVAILABLE`; its outcome can
+`INVALID_OPTIONS`, and closed valves with `CLOSED`. A store failure becomes `STORE_UNAVAILABLE`; its outcome can
 be unknown, and repeating the same absolute patch is safe. See
 [Update limits at runtime](/docs/guides/runtime-limits/) for debt, concurrency,
 scoped, and deployment semantics.
 
 ### Managed limit types
 
+Experimental: these types may change in a minor release.
+
 ```ts
 type LimitsPatch = Readonly<
   Record<string, { readonly limit?: number; readonly burst?: number }>
 >;
+
+interface UpdateLimitsOptions {
+  expect?: LimitsPatch;
+}
 
 interface LimitsSnapshot {
   readonly version: string;
@@ -493,14 +508,14 @@ not rejected. The helper never closes a valve or store and never calls
 
 ## Other exports
 
-| Export                       | Entry point       | Description                                            |
-| ---------------------------- | ----------------- | ------------------------------------------------------ |
-| `memoryStore(options?)`      | `valvejs`         | In-process store. Share one instance to share budgets. |
-| `createValveGroup(options)`  | `valvejs/group`   | Independent keyed valves with bounded local children.  |
-| `redisStore(options)`        | `valvejs/redis`   | See [Redis store](/docs/reference/redis-store/).       |
-| `ValveError`, `isValveError` | `valvejs`         | See [Errors](/docs/reference/errors/).                 |
-| `defaultFeedback`            | Both              | The default feedback reader.                           |
-| Feedback readers             | `valvejs/headers` | See [Feedback readers](/docs/reference/feedback/).     |
+| Export                       | Entry point                  | Description                                            |
+| ---------------------------- | ---------------------------- | ------------------------------------------------------ |
+| `memoryStore(options?)`      | `valvejs`                    | In-process store. Share one instance to share budgets. |
+| `createValveGroup(options)`  | `valvejs/group`              | Independent keyed valves with bounded local children.  |
+| `redisStore(options)`        | `valvejs/redis`              | See [Redis store](/docs/reference/redis-store/).       |
+| `ValveError`, `isValveError` | `valvejs`                    | See [Errors](/docs/reference/errors/).                 |
+| `defaultFeedback`            | `valvejs`, `valvejs/headers` | The default feedback reader.                           |
+| Feedback readers             | `valvejs/headers`            | See [Feedback readers](/docs/reference/feedback/).     |
 
 `memoryStore` accepts `{ clock?: () => number }`, a source of epoch
 milliseconds. It defaults to `Date.now`.

@@ -29,8 +29,9 @@ library alone, Node.js 22 or later is supported.
 
 ## Install the package
 
-Valve is in beta. APIs may change before 1.0. See the
-[release history](/releases/) for published versions and release notes.
+See the [release history](/releases/) for published versions and release notes,
+and [Stability and versioning](/docs/reference/stability/) for the 1.x semver
+contract.
 
 <Published>
 
@@ -134,11 +135,12 @@ yarn add /tmp/valve.tgz
 
 ## Entry points
 
-| Import            | Contains                                                                                             |
-| ----------------- | ---------------------------------------------------------------------------------------------------- |
-| `valvejs`         | `createValve`, `memoryStore`, `ValveError`, `isValveError`, `defaultFeedback`, and the public types. |
-| `valvejs/redis`   | `redisStore` and the structural client and adapter types.                                            |
-| `valvejs/headers` | Feedback readers: `retryAfter`, `ietfRateLimit`, `xRateLimit`, `combine`, `defaultFeedback`.         |
+| Import            | Contains                                                                                                              |
+| ----------------- | --------------------------------------------------------------------------------------------------------------------- |
+| `valvejs`         | `createValve`, `runSequential`, `memoryStore`, `ValveError`, `isValveError`, `defaultFeedback`, and the public types. |
+| `valvejs/redis`   | `redisStore` and the structural client and adapter types.                                                             |
+| `valvejs/headers` | Feedback readers: `retryAfter`, `ietfRateLimit`, `xRateLimit`, `combine`, `defaultFeedback`.                          |
+| `valvejs/group`   | `createValveGroup` and group types (opt-in subpath for independent keyed valves).                                     |
 
 Each entry point ships as ESM and CommonJS with TypeScript declarations.
 

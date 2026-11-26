@@ -1010,6 +1010,72 @@ describe('pauses and feedback', () => {
     await tick();
     expect(errors).toHaveBeenCalledTimes(1);
   });
+  it('emits pause and resume once on the caller, treats pause(0) as a no-op, and rejects invalid or closed control calls', async () => {
+    const pause = vi.fn();
+    const resume = vi.fn();
+    const backing = memoryStore();
+    const listeners = new Set<Parameters<NonNullable<Store['subscribe']>>[1]>();
+    const store: Store = {
+      ...backing,
+      pause: async (id, ms) => {
+        await backing.pause(id, ms);
+        vi.advanceTimersByTime(5);
+        for (const l of listeners) l({ type: 'pause', durationMs: ms });
+      },
+      resume: async (id) => {
+        await backing.resume(id);
+        for (const l of listeners) l({ type: 'resume' });
+      },
+      subscribe: (_id, l) => {
+        listeners.add(l);
+        return () => listeners.delete(l);
+      },
+    };
+    const valve = make({
+      id: 'ctrl',
+      rate: { name: 'r', limit: 10, interval: '1s' },
+      limits: 'managed',
+      store,
+    });
+    valve.on('pause', pause);
+    valve.on('resume', resume);
+    await valve.pause(0);
+    expect(pause).not.toHaveBeenCalled();
+    await valve.pause(100);
+    expect(pause).toHaveBeenCalledTimes(1);
+    expect(pause).toHaveBeenCalledWith({ durationMs: 100, reason: 'manual' });
+    await valve.resume();
+    expect(resume).toHaveBeenCalledTimes(1);
+    expect(resume).toHaveBeenCalledWith({ reason: 'manual' });
+    await valve.resume();
+    expect(resume).toHaveBeenCalledTimes(1);
+    await expect(valve.pause(-1)).rejects.toMatchObject({
+      code: 'INVALID_OPTIONS',
+    });
+    await valve.close();
+    await expect(valve.pause(100)).rejects.toMatchObject({ code: 'CLOSED' });
+    await expect(valve.resume()).rejects.toMatchObject({ code: 'CLOSED' });
+    await expect(valve.getLimits()).rejects.toMatchObject({ code: 'CLOSED' });
+    await expect(
+      valve.updateLimits({ r: { limit: 20 } }),
+    ).rejects.toMatchObject({ code: 'CLOSED' });
+    valve.observe({ status: 429, headers: { 'retry-after': '10' } });
+    expect(pause).toHaveBeenCalledTimes(1);
+    const syncThrow = make({
+      id: 'sync-resume',
+      concurrency: 1,
+      store: {
+        ...failing(() =>
+          Promise.resolve({ granted: 1, retryAfterMs: 0, pausedMs: 0 }),
+        ),
+        resume: () => {
+          throw new Error('sync resume');
+        },
+      },
+    });
+    await expect(syncThrow.resume()).rejects.toThrow('sync resume');
+    await syncThrow.close();
+  });
 });
 
 describe('optional subscriptions', () => {

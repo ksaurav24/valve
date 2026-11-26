@@ -27,8 +27,9 @@ npx skills add ksaurav24/valve
 Choose the skills you need and your coding agent. The [skills](skills/) cover
 setup, Bottleneck migration, reviews, quota design, and troubleshooting.
 
-**Beta until 1.0.** APIs may change between releases. Published versions use
-plain version numbers and install through npm’s default channel.
+Requires Node.js 22 or later. See
+[Stability and versioning](https://valvejs.vercel.app/docs/reference/stability/)
+for the 1.x semver contract and experimental APIs.
 
 ```sh
 npm install valvejs
@@ -158,8 +159,34 @@ parent plus per-key quota, use one valve with atomic scoped rules.
 See [Independent keyed groups](https://valvejs.vercel.app/docs/guides/independent-groups/)
 for tier policies, Redis, managed updates, capacity backpressure, and shutdown.
 
-## Runtime limit updates
+## Compose valves
 
+Use one valve with scoped rules when budgets must be spent together or not at
+all. When independent budgets with separate IDs should be admitted in order,
+`runSequential` makes that explicit:
+
+```ts
+import { runSequential } from 'valvejs';
+
+await runSequential(
+  [
+    { valve: ingress },
+    { valve: tenants, options: { scopes: { tenant: 'tenant-1' } } },
+  ],
+  ({ signal }) => callProvider(signal),
+  { signal },
+);
+```
+
+It is not atomic: an earlier admission stays spent if a later stage rejects,
+and outer jobs keep their concurrency slots and global leases while later
+stages wait.
+See [Compose valves](apps/web/content/docs/guides/compose-valves.mdx).
+
+## Runtime limit updates (experimental)
+
+**Experimental:** managed limits may change in a minor release; see
+[Stability](https://valvejs.vercel.app/docs/reference/stability/#experimental-apis).
 Opt in with named rules and `limits: 'managed'`. Configured numeric values seed
 only a new ID; the store is authoritative afterwards.
 
@@ -184,6 +211,28 @@ workers before the first managed update, and use Redis with
 `maxmemory-policy noeviction`. See
 [Update limits at runtime](apps/web/content/docs/guides/runtime-limits.mdx).
 
+## Shared concurrency and immediate resume
+
+```ts
+const subscriber = redis.duplicate(); // Separate ioredis subscription connection
+const store = redisStore({ client: redis, subscriber });
+const api = createValve({
+  id: 'partner:credential-42',
+  concurrency: { limit: 5, scope: 'global', leaseTtl: '30s' },
+  store,
+});
+await api.run(({ signal }) => fetch(url, { signal }));
+```
+
+The store renews active leases and recovers slots after a worker crashes. Jobs
+must honor the signal when ownership is lost. A process stalled past its TTL
+can outlive its lease; external fencing is needed for strict partition safety.
+Close the valves, then `store.close()`, then your own subscriber and command
+clients. For node-redis, connect the duplicated subscriber before use.
+
+Rate bounds are measured at atomic store admission. A delayed callback or network
+write can occur later, so actual HTTP arrival times may bunch together.
+
 ## Documentation and development
 
 ```sh
@@ -205,12 +254,18 @@ See [website maintenance](apps/web/README.md) for content and routing convention
 - [Priorities and shutdown](apps/web/content/docs/guides/priorities-and-shutdown.mdx)
 - [Migrate from Bottleneck](apps/web/content/docs/migration/from-bottleneck.mdx)
 - [API reference](apps/web/content/docs/reference/api.mdx)
+- [Stability and versioning](apps/web/content/docs/reference/stability.mdx)
 - [Tests and benchmarks](apps/web/content/docs/reference/testing.mdx)
 - [Contributing](CONTRIBUTING.md)
 
 Run `pnpm test` for unit and property tests, `pnpm test:coverage` for coverage,
 and `pnpm test:types` for inference checks. With Redis running, use
 `REDIS_URL=redis://127.0.0.1:6379 pnpm test:integration` for real-store tests.
+
+Benchmark tooling lives in the private [performance workspace](packages/perf/README.md).
+Run `pnpm perf quick` for portable checks or `pnpm perf:sylvie` for the laptop
+comparison preset. Shared-store comparisons use dedicated harness-owned stores;
+see the harness documentation for setup, evidence, and workload limitations.
 
 Postgres stores, provider presets, and Bottleneck compatibility are planned for
 later versions. Shared global concurrency is supported by Redis and Valkey.
@@ -222,30 +277,3 @@ Contributions are welcome through [GitHub Issues](https://github.com/ksaurav24/v
 ## License
 
 [Apache License 2.0](LICENSE). Copyright 2026 Saurav K.
-
-Rate bounds are measured at atomic store admission. A delayed callback or network
-write can occur later, so actual HTTP arrival times may bunch together.
-
-## Shared concurrency and immediate resume
-
-```ts
-const subscriber = redis.duplicate(); // Separate ioredis subscription connection
-const store = redisStore({ client: redis, subscriber });
-const api = createValve({
-  id: 'partner:credential-42',
-  concurrency: { limit: 5, scope: 'global', leaseTtl: '30s' },
-  store,
-});
-await api.run(({ signal }) => fetch(url, { signal }));
-```
-
-The store renews active leases and recovers slots after a worker crashes. Jobs
-must honor the signal when ownership is lost. A process stalled past its TTL
-can outlive its lease; external fencing is needed for strict partition safety.
-Close the valves, then `store.close()`, then your own subscriber and command
-clients. For node-redis, connect the duplicated subscriber before use.
-
-Benchmark tooling lives in the private [performance workspace](packages/perf/README.md).
-Run `pnpm perf quick` for portable checks or `pnpm perf:sylvie` for the laptop
-comparison preset. Shared-store comparisons use dedicated harness-owned stores;
-see the harness documentation for setup, evidence, and workload limitations.

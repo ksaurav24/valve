@@ -82,6 +82,8 @@ Experimental in 1.x:
 - [Managed limits](/docs/guides/runtime-limits/): `limits: "managed"`,
   `getLimits`, `updateLimits`, `UpdateLimitsOptions`, the `limits` event, and
   the `LimitsRule`, `LimitsSnapshot`, `LimitsPatch`, and `Managed*` store types.
+  `LIMITS_CONFLICT` stays in `ValveErrorCode` across 1.x even if managed limits
+  change, so exhaustive error-code switches keep compiling.
 
 An experimental API becomes stable in a minor release by removing the marker.
 

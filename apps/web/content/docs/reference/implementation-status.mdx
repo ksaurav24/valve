@@ -18,13 +18,20 @@ Check the [changelog](/changelog/) for version history and
 ## Included
 
 - `createValve` with `run`, `wrap`, `wrapFetch`, `observe`, `pause`, `resume`,
-  managed `getLimits` and `updateLimits`, `stats`, `on`, `idle`, and `close`.
+  experimental managed `getLimits` and `updateLimits`, `stats`, `on`, `idle`,
+  and `close`.
+- `runSequential` for explicit, non-atomic composition of independent valves.
+- `createValveGroup` in the opt-in `valvejs/group` entry for independent keyed
+  valves with a bounded local cache.
 - GCRA and fixed-window rate rules, with several rules checked atomically
   on the store's clock.
+- Atomic scoped rate limits (`scope` rules with per-job `scopes`), letting
+  eligible identities proceed past blocked jobs.
 - Memory and Redis/Valkey stores. An optional subscriber wakes queues on
-  shared pause, resume, and concurrency-slot release notifications.
-- Store-authoritative managed `limit` and GCRA `burst` updates for named static
-  and scoped rules, with compare-and-set expectations and limits events.
+  shared pause, resume, concurrency-slot release, and managed-limit notifications.
+- Experimental store-authoritative managed `limit` and GCRA `burst` updates for
+  named static and scoped rules, with compare-and-set expectations and `limits`
+  events.
 - Local concurrency and global concurrency through renewable leases.
 - Local priorities, job cost, `maxQueue`, `maxWait`, and `AbortSignal`
   cancellation.
@@ -36,30 +43,6 @@ Check the [changelog](/changelog/) for version history and
   are not retried. Every response still updates provider feedback.
 - ESM and CommonJS entry points with TypeScript declarations, and zero
   runtime or peer dependencies. Applications supply their own Redis client.
-
-## Scoped admission in the 0.4 series
-
-Named rules with `scope` and per-job `scopes` support atomic shared and
-per-identity admission in memory and Redis/Valkey. Eligible identities can
-proceed past blocked jobs. This extension preserves the static store path;
-custom stores opt in through `acquireScoped`. Targeted pause/resume is deferred:
-feedback remains Valve-ID-wide. See [Scoped rate limits](/docs/guides/scoped-rate-limits/).
-
-## Changes in 0.1.2
-
-The footprint update minifies embedded Redis Lua at build time and lets
-bundlers discard unused default feedback readers. Public exports, types,
-rate algorithms, and store behavior are preserved.
-
-In the paired Node.js 24 measurements, the built Redis ESM entry decreased
-from **3,521 to 3,151 gzip bytes**. A consumer importing only `retryAfter()`
-decreased from **1,089 to 445 gzip bytes**. Core size is unchanged.
-
-These are bundle-size improvements. The measurements do not establish a
-general startup, throughput, or latency improvement. See the
-[0.1.2 changelog entry](/changelog/#012) and the
-[footprint report](https://github.com/ksaurav24/valve/blob/161d4b09d974ae8f0fcdc4e9b38a1a10c258491e/packages/valve/bench/FOOTPRINT.md)
-for the measurement settings, regression controls, and build-time tradeoffs.
 
 ## Not included
 
@@ -92,25 +75,19 @@ contains paired measurements across Node.js 20, 22, and 24, including the
 additional denied checks introduced by the asynchronous timing adjustment.
 These scheduler measurements do not predict production HTTP throughput.
 
-### Bundle-size targets
+### Bundle size
 
-The 0.1.2 footprint report records these minified and gzipped built ESM
-entry sizes, using Node.js 24.21.0 and esbuild 0.28.2:
-
-| Entry   | Recorded size | Original target | Status        |
-| ------- | ------------: | --------------: | ------------- |
-| Core    |   8,358 bytes |     4,096 bytes | Above target  |
-| Redis   |   3,151 bytes |     3,072 bytes | Above target  |
-| Headers |   1,130 bytes |     2,048 bytes | Within target |
-
-Those historical measurements predate scoped admission. The scoped extension
-uses source-entry CI ceilings of 12,750 bytes for core, 6,300 for Redis, and
-2,048 for headers. It adds identity validation, a delayed queue, and a second
-Lua script; it does not meet the original core or Redis size targets. See the
-[scoped benchmark report](https://github.com/ksaurav24/valve/blob/master/packages/perf/docs/history/SCOPED.md)
-for historical sizes and measured growth. Consumer sizes depend on which exports
-remain reachable after bundling; the full headers entry is larger than a
-consumer importing only `retryAfter()`.
+Embedded Redis Lua is minified at build time, default feedback readers are
+tree-shakeable, and `valvejs/group` is a separate subpath so core consumers do
+not pay for group management. Scoped admission, managed limits, and group
+support grew the library past its earliest pre-1.0 size targets. CI enforces
+gzipped bundle regression ceilings across `valvejs`, `valvejs/redis`,
+`valvejs/headers`, and `valvejs/group` through `pnpm check:size` (in
+`packages/perf`). Consumer sizes depend on which exports remain reachable after
+bundling; a consumer importing only `retryAfter()` bundles a fraction of the
+full headers entry. See the
+[historical footprint reports](https://github.com/ksaurav24/valve/tree/master/packages/perf/docs/history)
+for earlier measurements.
 
 ### Distributed guarantees
 

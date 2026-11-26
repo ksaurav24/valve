@@ -13,8 +13,9 @@ worker sharing that budget pauses. A memory store supports single-process use.
 
 ## Quickstart
 
-**Beta until 1.0.** APIs may change between releases. Published versions use
-plain version numbers and install through npm’s default channel.
+Requires Node.js 22 or later. See
+[Stability and versioning](https://valvejs.vercel.app/docs/reference/stability/)
+for the 1.x semver contract and experimental APIs.
 
 ```sh
 npm install valvejs
@@ -167,8 +168,10 @@ and outer jobs keep their concurrency slots and global leases while later
 stages wait.
 See [Compose valves](https://valvejs.vercel.app/docs/guides/compose-valves/).
 
-## Runtime limit updates
+## Runtime limit updates (experimental)
 
+**Experimental:** managed limits may change in a minor release; see
+[Stability](https://valvejs.vercel.app/docs/reference/stability/#experimental-apis).
 Opt in with named rules and `limits: 'managed'`. Configured numeric values seed
 only a new ID; the store is authoritative afterwards.
 
@@ -193,40 +196,6 @@ workers before the first managed update, and use Redis with
 `maxmemory-policy noeviction`. See
 [Update limits at runtime](https://valvejs.vercel.app/docs/guides/runtime-limits/).
 
-## Documentation and development
-
-```sh
-pnpm install
-pnpm check
-pnpm docs:dev
-```
-
-The Next.js and Fumadocs MDX documentation site lives in `apps/web/`. Build it with `pnpm docs:build`.
-
-- [Quickstart](https://valvejs.vercel.app/docs/quickstart/)
-- [Share a quota](https://valvejs.vercel.app/docs/guides/share-a-quota/)
-- [Choose provider quota scopes](https://valvejs.vercel.app/docs/guides/provider-quota-scopes/)
-- [Respect Retry-After](https://valvejs.vercel.app/docs/guides/respect-retry-after/)
-- [Priorities and shutdown](https://valvejs.vercel.app/docs/guides/priorities-and-shutdown/)
-- [Migrate from Bottleneck](https://valvejs.vercel.app/docs/migration/from-bottleneck/)
-- [API reference](https://valvejs.vercel.app/docs/reference/api/)
-- [Tests and benchmarks](https://valvejs.vercel.app/docs/reference/testing/)
-- [Contributing](https://github.com/ksaurav24/valve/blob/master/CONTRIBUTING.md)
-
-Run `pnpm test` for unit and property tests, `pnpm test:coverage` for coverage,
-and `pnpm test:types` for inference checks. With Redis running, use
-`REDIS_URL=redis://127.0.0.1:6379 pnpm test:integration` for real-store tests.
-
-Postgres stores, provider presets, and Bottleneck compatibility are planned for
-later versions. Shared global concurrency is supported by Redis and Valkey.
-
-## License
-
-[Apache License 2.0](LICENSE). Copyright 2026 Saurav K.
-
-Rate bounds are measured at atomic store admission. A delayed callback or network
-write can occur later, so actual HTTP arrival times may bunch together.
-
 ## Shared concurrency and immediate resume
 
 ```ts
@@ -246,7 +215,42 @@ can outlive its lease; external fencing is needed for strict partition safety.
 Close the valves, then `store.close()`, then your own subscriber and command
 clients. For node-redis, connect the duplicated subscriber before use.
 
+Rate bounds are measured at atomic store admission. A delayed callback or network
+write can occur later, so actual HTTP arrival times may bunch together.
+
+## Documentation and development
+
+```sh
+pnpm install
+pnpm check
+pnpm docs:dev
+```
+
+The Next.js and Fumadocs MDX documentation site lives in `apps/web/`. Build it with `pnpm docs:build`.
+
+- [Quickstart](https://valvejs.vercel.app/docs/quickstart/)
+- [Share a quota](https://valvejs.vercel.app/docs/guides/share-a-quota/)
+- [Choose provider quota scopes](https://valvejs.vercel.app/docs/guides/provider-quota-scopes/)
+- [Respect Retry-After](https://valvejs.vercel.app/docs/guides/respect-retry-after/)
+- [Priorities and shutdown](https://valvejs.vercel.app/docs/guides/priorities-and-shutdown/)
+- [Migrate from Bottleneck](https://valvejs.vercel.app/docs/migration/from-bottleneck/)
+- [API reference](https://valvejs.vercel.app/docs/reference/api/)
+- [Stability and versioning](https://valvejs.vercel.app/docs/reference/stability/)
+- [Tests and benchmarks](https://valvejs.vercel.app/docs/reference/testing/)
+- [Contributing](https://github.com/ksaurav24/valve/blob/master/CONTRIBUTING.md)
+
+Run `pnpm test` for unit and property tests, `pnpm test:coverage` for coverage,
+and `pnpm test:types` for inference checks. With Redis running, use
+`REDIS_URL=redis://127.0.0.1:6379 pnpm test:integration` for real-store tests.
+
 Benchmark tooling lives in the private [performance workspace](https://github.com/ksaurav24/valve/tree/master/packages/perf).
 Run `pnpm perf quick` for portable checks or `pnpm perf:sylvie` for the laptop
 comparison preset. Shared-store comparisons use dedicated harness-owned stores;
 see the harness documentation for setup, evidence, and workload limitations.
+
+Postgres stores, provider presets, and Bottleneck compatibility are planned for
+later versions. Shared global concurrency is supported by Redis and Valkey.
+
+## License
+
+[Apache License 2.0](LICENSE). Copyright 2026 Saurav K.

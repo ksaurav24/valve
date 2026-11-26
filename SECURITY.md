@@ -2,7 +2,7 @@
 
 ## Supported versions
 
-Security fixes are prioritized for the latest released version of `valvejs`. Older versions may not receive updates while the project is in early development.
+Security fixes are prioritized for the latest released version of `valvejs`. Older major versions may not receive updates.
 
 ## Reporting a vulnerability
 

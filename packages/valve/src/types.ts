@@ -164,7 +164,7 @@ export interface ValveOptions {
    * intervals, and global concurrency stay fixed, as in immutable mode.
    * Requires a store with managed support, such as `memoryStore` or `redisStore`.
    *
-   * Experimental: managed limits may change in a minor release. See [Stability](/docs/reference/stability/).
+   * Experimental: managed limits may change in a minor release. See [Stability](https://valvejs.vercel.app/docs/reference/stability/).
    * @experimental
    */
   limits?: 'immutable' | 'managed';
@@ -178,7 +178,7 @@ export interface ValveOptions {
 
 /** Options for {@link Valve.updateLimits}.
  *
- * Experimental: managed limits may change in a minor release. See [Stability](/docs/reference/stability/).
+ * Experimental: managed limits may change in a minor release. See [Stability](https://valvejs.vercel.app/docs/reference/stability/).
  * @example const options: UpdateLimitsOptions = { expect: { throughput: { limit: 100 } } };
  * @experimental
  */
@@ -324,7 +324,7 @@ export interface ValveEventMap {
   /**
    * Managed limits this process has not seen before, observed in a store reply.
    *
-   * Experimental: managed limits may change in a minor release. See [Stability](/docs/reference/stability/).
+   * Experimental: managed limits may change in a minor release. See [Stability](https://valvejs.vercel.app/docs/reference/stability/).
    * @experimental
    */
   limits: LimitsSnapshot;
@@ -410,9 +410,10 @@ export interface Valve extends AsyncDisposable {
 
   /**
    * Pauses this valve in every process sharing it. A pause only ever
-   * extends an existing pause, never shortens it.
+   * extends an existing pause, never shortens it. A `0` duration is a no-op.
    *
-   * @throws `INVALID_OPTIONS` for a bad duration.
+   * @throws never synchronously. Rejects with `INVALID_OPTIONS` for a bad
+   * duration, or `CLOSED` once the valve is closed.
    * @example
    * await api.pause("30s");
    */
@@ -423,6 +424,7 @@ export interface Valve extends AsyncDisposable {
    * Stores with subscriptions notify other processes immediately. Redis
    * needs a separate subscriber client; otherwise the next acquire notices.
    *
+   * @throws never synchronously. Rejects with `CLOSED` once the valve is closed.
    * @example
    * await api.resume();
    */
@@ -432,10 +434,10 @@ export interface Valve extends AsyncDisposable {
    * Reads the store's current managed limits. Registers this valve's rules
    * first if the store has no limits for the id.
    *
-   *
-   * Experimental: managed limits may change in a minor release. See [Stability](/docs/reference/stability/).
-   * @throws never synchronously. Rejects with `INVALID_OPTIONS` unless the valve
-   * uses `limits: "managed"`, or `STORE_UNAVAILABLE` when the store fails.
+   * Experimental: managed limits may change in a minor release. See [Stability](https://valvejs.vercel.app/docs/reference/stability/).
+   * @throws never synchronously. Rejects with `CLOSED` once the valve is closed,
+   * `INVALID_OPTIONS` unless the valve uses `limits: "managed"`, or
+   * `STORE_UNAVAILABLE` when the store fails.
    * @example
    * const { rules } = await api.getLimits();
    * @experimental
@@ -453,13 +455,12 @@ export interface Valve extends AsyncDisposable {
    * their next admission. Spent budget carries over: fixed windows keep their
    * count, and GCRA keeps its outstanding cost units, which drain at the new rate.
    *
-   *
-   * Experimental: managed limits may change in a minor release. See [Stability](/docs/reference/stability/).
-   * @throws never synchronously. Rejects with `INVALID_OPTIONS` for unknown
-   * rules or fields, values that are not positive integers, a burst on a
-   * fixed-window rule, unsafe numeric precision, or an immutable valve; `LIMITS_CONFLICT` when `expect`
-   * fails; or `STORE_UNAVAILABLE` when the store fails, in which case the
-   * update may or may not have been applied.
+   * Experimental: managed limits may change in a minor release. See [Stability](https://valvejs.vercel.app/docs/reference/stability/).
+   * @throws never synchronously. Rejects with `CLOSED` once the valve is closed,
+   * `INVALID_OPTIONS` for unknown rules or fields, values that are not positive
+   * integers, a burst on a fixed-window rule, unsafe numeric precision, or an
+   * immutable valve; `LIMITS_CONFLICT` when `expect` fails; or `STORE_UNAVAILABLE`
+   * when the store fails, in which case the update may or may not have been applied.
    * @example
    * await api.updateLimits({ throughput: { limit: 200, burst: 20 } });
    * @experimental

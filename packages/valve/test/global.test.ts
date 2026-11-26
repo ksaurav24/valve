@@ -342,6 +342,30 @@ describe('global concurrency', () => {
     await api.close();
     expect(vi.getTimerCount()).toBe(0);
   });
+  it('clamps lease timers above the 32-bit timeout maximum', async () => {
+    vi.useFakeTimers();
+    const backing = memoryStore();
+    const renew = vi.fn(backing.renew!);
+    const store: Store = { ...backing, renew };
+    const api = createValve({
+      id: 'long-lease',
+      concurrency: { limit: 1, scope: 'global', leaseTtl: 3_000_000_000 },
+      store,
+    });
+    let release!: () => void;
+    const job = api.run(async ({ signal }) => {
+      await new Promise<void>((r) => {
+        release = r;
+      });
+      return signal?.aborted;
+    });
+    await vi.advanceTimersByTimeAsync(10_000);
+    expect(renew).not.toHaveBeenCalled();
+    release();
+    expect(await job).toBe(false);
+    await api.close();
+    expect(vi.getTimerCount()).toBe(0);
+  });
 
   it('does not restore a cached pause after a concurrent resume notification', async () => {
     const backing = memoryStore();

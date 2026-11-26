@@ -31,20 +31,20 @@ ESM and CommonJS builds. Node.js 22+. Zero runtime and peer dependencies.
 `createValve(options)` throws `ValveError` code `INVALID_OPTIONS` on bad input.
 At least one of `rate` or a finite `concurrency` is required.
 
-| Option         | Type                                     | Default                      | Notes                                                                  |
-| -------------- | ---------------------------------------- | ---------------------------- | ---------------------------------------------------------------------- |
-| `id`           | `string`                                 | required                     | Names the shared budget. 1 to 200 chars, no `{` `}`.                   |
-| `rate`         | `RateRule \| RateRule[]`                 | none                         | One rule or a non-empty array; every job spends from every rule.       |
-| `concurrency`  | `number \| { limit, scope?, leaseTtl? }` | `Infinity`                   | Number = this instance. `scope: 'global'` = all processes with the id. |
-| `store`        | `Store`                                  | new private memory store     | `memoryStore()` or `redisStore(...)`.                                  |
-| `maxQueue`     | `number`                                 | `Infinity`                   | Waiting jobs in this process; beyond it `QUEUE_FULL`.                  |
-| `maxWait`      | `Duration`                               | no limit                     | Max time a job waits before starting; then `MAX_WAIT_EXCEEDED`.        |
-| `feedback`     | `Feedback \| false`                      | `defaultFeedback`            | Header reader. `false` disables headers but keeps 429 backoff.         |
-| `maxPause`     | `Duration`                               | `'15m'`                      | Cap on one feedback/backoff pause (manual `pause()` is not capped).    |
-| `backoff`      | `{ base?, max? }`                        | `{ base: '1s', max: '30s' }` | Exponential pause after a 429 without a usable header.                 |
-| `onStoreError` | `'wait' \| 'throw' \| 'open'`            | `'wait'`                     | `'open'` drops shared rate guarantees during outages.                  |
-| `limits`       | `'immutable' \| 'managed'`               | `'immutable'`                | `'managed'` makes stored `limit`/`burst` authoritative and updatable.  |
-| `batch`        | `number`                                 | `32`                         | Max jobs per store call.                                               |
+| Option         | Type                                     | Default                      | Notes                                                                               |
+| -------------- | ---------------------------------------- | ---------------------------- | ----------------------------------------------------------------------------------- |
+| `id`           | `string`                                 | required                     | Names the shared budget. 1 to 200 chars, no `{` `}`.                                |
+| `rate`         | `RateRule \| RateRule[]`                 | none                         | One rule or a non-empty array; every job spends from every rule.                    |
+| `concurrency`  | `number \| { limit, scope?, leaseTtl? }` | `Infinity`                   | Number = this instance. `scope: 'global'` = all processes with the id.              |
+| `store`        | `Store`                                  | new private memory store     | `memoryStore()` or `redisStore(...)`.                                               |
+| `maxQueue`     | `number`                                 | `Infinity`                   | Waiting jobs in this process; beyond it `QUEUE_FULL`.                               |
+| `maxWait`      | `Duration`                               | no limit                     | Max time a job waits before starting; then `MAX_WAIT_EXCEEDED`.                     |
+| `feedback`     | `Feedback \| false`                      | `defaultFeedback`            | Header reader. `false` disables headers but keeps 429 backoff.                      |
+| `maxPause`     | `Duration`                               | `'15m'`                      | Cap on one feedback/backoff pause (manual `pause()` is not capped).                 |
+| `backoff`      | `{ base?, max? }`                        | `{ base: '1s', max: '30s' }` | Exponential pause after a 429 without a usable header.                              |
+| `onStoreError` | `'wait' \| 'throw' \| 'open'`            | `'wait'`                     | `'open'` drops shared rate guarantees during outages.                               |
+| `limits`       | `'immutable' \| 'managed'`               | `'immutable'`                | Experimental: `'managed'` makes stored `limit`/`burst` authoritative and updatable. |
+| `batch`        | `number`                                 | `32`                         | Max jobs per store call.                                                            |
 
 `Duration`: milliseconds as a number, or a string with `ms`, `s`, `m`, `h`
 (`'1.5s'`, `'10m'`, `'24h'`). No days unit: use `'24h'`.
@@ -73,19 +73,19 @@ execution and request delivery happen later and can bunch together.
 
 ## Valve methods
 
-| Method                              | Notes                                                                                  |
-| ----------------------------------- | -------------------------------------------------------------------------------------- |
-| `run(fn, options?)`                 | Queues `fn({ signal })`; resolves/rejects with its result. Never throws synchronously. |
-| `wrap(fn, options?)`                | Same parameters as `fn`; each call goes through `run`.                                 |
-| `wrapFetch(fetchImpl?, options?)`   | fetch-compatible wrapper with feedback and 429 retries.                                |
-| `observe(response)`                 | Feed `{ status, headers }` to the feedback reader; writes a pause in the background.   |
-| `pause(duration)` / `resume()`      | Shared across every process with the id; resolve once stored.                          |
-| `getLimits()` / `updateLimits(...)` | Managed limits only. See the runtime limits guide.                                     |
-| `stats()`                           | `{ queued, running, pausedUntil, totals }` for this process.                           |
-| `on(event, listener)`               | Returns an unsubscribe function.                                                       |
-| `idle()`                            | Resolves when nothing is queued or running in this process.                            |
-| `close({ drain? })`                 | Stop accepting work. Without drain, queued jobs reject `CLOSED`. Awaits running jobs.  |
-| `[Symbol.asyncDispose]`             | `await using valve = createValve(...)` closes without draining.                        |
+| Method                              | Notes                                                                                                             |
+| ----------------------------------- | ----------------------------------------------------------------------------------------------------------------- |
+| `run(fn, options?)`                 | Queues `fn({ signal })`; resolves/rejects with its result. Never throws synchronously.                            |
+| `wrap(fn, options?)`                | Same parameters as `fn`; each call goes through `run`.                                                            |
+| `wrapFetch(fetchImpl?, options?)`   | fetch-compatible wrapper with feedback and 429 retries.                                                           |
+| `observe(response)`                 | Feed `{ status, headers }` to the feedback reader; writes a pause in the background.                              |
+| `pause(duration)` / `resume()`      | Shared across every process with the id; resolve once stored. `pause(0)` is a no-op; reject `CLOSED` after close. |
+| `getLimits()` / `updateLimits(...)` | Experimental managed limits only. Reject `CLOSED` after close. See the runtime limits guide.                      |
+| `stats()`                           | `{ queued, running, pausedUntil, totals }` for this process.                                                      |
+| `on(event, listener)`               | Returns an unsubscribe function.                                                                                  |
+| `idle()`                            | Resolves when nothing is queued or running in this process.                                                       |
+| `close({ drain? })`                 | Stop accepting work. Without drain, queued jobs reject `CLOSED`. Awaits running jobs.                             |
+| `[Symbol.asyncDispose]`             | `await using valve = createValve(...)` closes without draining.                                                   |
 
 ## Run options
 
@@ -121,15 +121,15 @@ returned unchanged (it does not throw on 429).
 
 ## Events and stats
 
-| Event         | Payload                             | When                                                 |
-| ------------- | ----------------------------------- | ---------------------------------------------------- |
-| `pause`       | `{ durationMs, reason }`            | reason: `manual`, `feedback`, `backoff`, `store`     |
-| `resume`      | `{ reason: 'manual' \| 'expired' }` | A pause ends.                                        |
-| `reject`      | `{ code }`                          | valve rejected a job with a `ValveError`.            |
-| `store-error` | `{ error, policy }`                 | A store call failed or timed out.                    |
-| `idle`        | `{}`                                | Last queued/running job settled.                     |
-| `warning`     | `{ message }`                       | A callback threw, a pause was capped, managed drift. |
-| `limits`      | `LimitsSnapshot`                    | This process saw a new managed-limits version.       |
+| Event         | Payload                             | When                                                         |
+| ------------- | ----------------------------------- | ------------------------------------------------------------ |
+| `pause`       | `{ durationMs, reason }`            | reason: `manual`, `feedback`, `backoff`, `store`             |
+| `resume`      | `{ reason: 'manual' \| 'expired' }` | A pause ends.                                                |
+| `reject`      | `{ code }`                          | valve rejected a job with a `ValveError`.                    |
+| `store-error` | `{ error, policy }`                 | A store call failed or timed out.                            |
+| `idle`        | `{}`                                | Last queued/running job settled.                             |
+| `warning`     | `{ message }`                       | A callback threw, a pause was capped, managed drift.         |
+| `limits`      | `LimitsSnapshot`                    | Experimental: this process saw a new managed-limits version. |
 
 `stats().totals` has `started`, `succeeded`, `failed`, `rejected`, `retried`,
 `storeErrors`. Events and stats are per process.

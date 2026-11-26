@@ -2,6 +2,11 @@
 
 Source: [Update limits at runtime](https://valvejs.vercel.app/docs/guides/runtime-limits/).
 
+**Experimental in 1.x:** managed limits (`limits: 'managed'`, `getLimits`,
+`updateLimits`, the `limits` event, and `Managed*`/`Limits*` types) may change
+in a minor release. See
+[Stability](https://valvejs.vercel.app/docs/reference/stability/#experimental-apis).
+
 Opt in with `limits: 'managed'`. The store becomes authoritative for each named
 rule's `limit` and GCRA `burst`. Names, scopes, algorithms, intervals, and
 global concurrency stay fixed (structural).

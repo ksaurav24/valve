@@ -75,10 +75,11 @@ Merging a version PR publishes to npm through trusted publishing, then creates
 the git tag and GitHub Release.
 
 Releases use plain `x.y.z` versions and npm's default `latest` channel. Users
-install with `npm install valvejs`. Valve is **beta until 1.0**: its APIs may
-change between releases. This maturity notice belongs in the READMEs and
-website, rather than in version suffixes or a separate npm channel. Review
-release notes before upgrading a 0.x version.
+install with `npm install valvejs`. From 1.0.0 onward, Valve follows Semantic
+Versioning as documented in
+[Stability and versioning](apps/web/content/docs/reference/stability.mdx).
+Earlier 0.x releases were beta; review release notes before upgrading across
+major versions.
 
 Run `pnpm version-packages` to consume changesets and generate the next version
 and changelog. Run `pnpm --filter @valve/web sync` afterward to regenerate the

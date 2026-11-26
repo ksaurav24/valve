@@ -14,6 +14,7 @@ import { CopyButton } from '@/components/shared/copy-button';
 import { highlight } from '@/components/shared/highlight';
 import { VersionBadge } from '@/components/shared/version-badge';
 import { contributors } from '@/lib/github';
+import { isBetaVersion } from '@/lib/release-state.mjs';
 import {
   changelogAnchor,
   changelogEntries,
@@ -153,9 +154,22 @@ export default async function HomePage() {
             </HeroReveal>
             <HeroReveal delay={0.26} className="space-y-5">
               <HeroActions />
-              <p className="text-sm text-muted-foreground">
-                Valve is in beta. APIs may change before 1.0.
-              </p>
+              {isBetaVersion(current.version) ? (
+                <p className="text-sm text-muted-foreground">
+                  Valve is in beta. APIs may change before 1.0.
+                </p>
+              ) : (
+                <p className="text-sm text-muted-foreground">
+                  Node.js 22+.{' '}
+                  <Link
+                    href="/docs/reference/stability"
+                    className="text-foreground underline decoration-ring underline-offset-4"
+                  >
+                    Stability and versioning
+                  </Link>
+                  .
+                </p>
+              )}
             </HeroReveal>
           </div>
           <HeroReveal delay={0.2} from="right" className="hero-stage">

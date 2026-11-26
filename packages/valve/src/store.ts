@@ -100,7 +100,7 @@ export interface Store {
   /**
    * Managed limits support. Required by `limits: 'managed'`; see {@link ManagedStore}.
    *
-   * Experimental: managed limits may change in a minor release. See [Stability](/docs/reference/stability/).
+   * Experimental: managed limits may change in a minor release. See [Stability](https://valvejs.vercel.app/docs/reference/stability/).
    * @experimental
    */
   readonly managed?: ManagedStore;
@@ -108,7 +108,7 @@ export interface Store {
 
 /** One rule's authoritative values in a {@link LimitsSnapshot}.
  *
- * Experimental: managed limits may change in a minor release. See [Stability](/docs/reference/stability/).
+ * Experimental: managed limits may change in a minor release. See [Stability](https://valvejs.vercel.app/docs/reference/stability/).
  * @example const rule: LimitsRule = { algorithm: 'gcra', intervalMs: 1000, limit: 10, burst: 1 };
  * @experimental
  */
@@ -123,7 +123,7 @@ export interface LimitsRule {
 
 /** The managed limits a store enforces for one valve id.
  *
- * Experimental: managed limits may change in a minor release. See [Stability](/docs/reference/stability/).
+ * Experimental: managed limits may change in a minor release. See [Stability](https://valvejs.vercel.app/docs/reference/stability/).
  * @example const snapshot: LimitsSnapshot = { version: '1792662950908123.2', revision: 2, rules: {} };
  * @experimental
  */
@@ -138,7 +138,7 @@ export interface LimitsSnapshot {
 
 /** New absolute values by rule name. Omitted rules and fields keep their current values.
  *
- * Experimental: managed limits may change in a minor release. See [Stability](/docs/reference/stability/).
+ * Experimental: managed limits may change in a minor release. See [Stability](https://valvejs.vercel.app/docs/reference/stability/).
  * @example const patch: LimitsPatch = { throughput: { limit: 200, burst: 20 } };
  * @experimental
  */
@@ -148,7 +148,7 @@ export type LimitsPatch = Readonly<
 
 /** Context shared by every managed store call.
  *
- * Experimental: managed limits may change in a minor release. See [Stability](/docs/reference/stability/).
+ * Experimental: managed limits may change in a minor release. See [Stability](https://valvejs.vercel.app/docs/reference/stability/).
  * @example const context: ManagedContext = { id: 'api', rules: [] };
  * @experimental
  */
@@ -167,7 +167,7 @@ export interface ManagedContext {
 
 /** Managed static admission.
  *
- * Experimental: managed limits may change in a minor release. See [Stability](/docs/reference/stability/).
+ * Experimental: managed limits may change in a minor release. See [Stability](https://valvejs.vercel.app/docs/reference/stability/).
  * @example const request: ManagedAcquireRequest = { id: 'api', rules: [], costs: [1] };
  * @experimental
  */
@@ -177,7 +177,7 @@ export interface ManagedAcquireRequest extends ManagedContext {
 
 /** Managed static admission result.
  *
- * Experimental: managed limits may change in a minor release. See [Stability](/docs/reference/stability/).
+ * Experimental: managed limits may change in a minor release. See [Stability](https://valvejs.vercel.app/docs/reference/stability/).
  * @example const result: ManagedAcquireResult = { granted: 0, retryAfterMs: 0, pausedMs: 0, impossible: true };
  * @experimental
  */
@@ -190,7 +190,7 @@ export interface ManagedAcquireResult extends AcquireResult {
 
 /** Managed scoped admission.
  *
- * Experimental: managed limits may change in a minor release. See [Stability](/docs/reference/stability/).
+ * Experimental: managed limits may change in a minor release. See [Stability](https://valvejs.vercel.app/docs/reference/stability/).
  * @example const request: ManagedScopedRequest = { id: 'api', rules: [], jobs: [] };
  * @experimental
  */
@@ -200,7 +200,7 @@ export interface ManagedScopedRequest extends ManagedContext {
 
 /** Managed scoped admission result.
  *
- * Experimental: managed limits may change in a minor release. See [Stability](/docs/reference/stability/).
+ * Experimental: managed limits may change in a minor release. See [Stability](https://valvejs.vercel.app/docs/reference/stability/).
  * @example const result: ManagedScopedResult = { grantedIndexes: [], blocked: [] };
  * @experimental
  */
@@ -217,7 +217,7 @@ export interface ManagedScopedResult extends ScopedAcquireResult {
 
 /** Atomic partial update of managed limits.
  *
- * Experimental: managed limits may change in a minor release. See [Stability](/docs/reference/stability/).
+ * Experimental: managed limits may change in a minor release. See [Stability](https://valvejs.vercel.app/docs/reference/stability/).
  * @example const request: ManagedUpdateRequest = { id: 'api', rules: [], patch: { throughput: { limit: 20 } } };
  * @experimental
  */
@@ -235,7 +235,7 @@ export interface ManagedUpdateRequest extends ManagedContext {
  * different structure, or limits written by an incompatible worker, with
  * `INVALID_OPTIONS` before mutating anything.
  *
- * Experimental: managed limits may change in a minor release. See [Stability](/docs/reference/stability/).
+ * Experimental: managed limits may change in a minor release. See [Stability](https://valvejs.vercel.app/docs/reference/stability/).
  * @example const capability = memoryStore().managed;
  * @experimental
  */

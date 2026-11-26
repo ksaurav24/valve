@@ -751,7 +751,11 @@ export function createValveGroup<K extends string = string>(
           // pause, so a wait for room can exhaust it but never shortens it.
           return use<unknown>(
             key,
-            (valve) => valve.wrapFetch(fetchImpl, config.options)(...args),
+            (valve) =>
+              valve.wrapFetch(
+                impl as typeof fetchImpl,
+                config.options,
+              )(...args),
             {
               signal: config.signal,
               maxWait: config.options.maxWait,

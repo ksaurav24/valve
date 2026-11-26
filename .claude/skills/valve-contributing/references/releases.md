@@ -12,9 +12,10 @@ Sources: `CONTRIBUTING.md`, `.changeset/README.md`, `AGENTS.md`, `apps/web/READM
    (`.github/workflows/version.yml`), creates the `valvejs@x.y.z` tag and GitHub
    Release, waits for npm metadata, then calls `VERCEL_DEPLOY_HOOK`.
 
-Versions are plain `x.y.z` on npm's `latest` channel. "Beta until 1.0"
-describes API maturity in READMEs and the website, not a version suffix or
-dist-tag. The release guard rejects prerelease versions and custom channels.
+Versions are plain `x.y.z` on npm's `latest` channel. Pre-1.0 versions show a
+beta maturity notice automatically; from 1.0.0 onward Valve follows the
+documented semver stability contract. The release guard rejects prerelease
+versions and custom channels.
 
 ## Manual versioning (rare)
 

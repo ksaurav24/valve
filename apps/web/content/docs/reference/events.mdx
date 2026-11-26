@@ -21,7 +21,7 @@ throws is reported as a `warning` event and does not affect the valve.
 | `store-error` | `{ error: unknown; policy: StoreErrorPolicy }` | A store call fails or times out.                                                                               |
 | `idle`        | `{}`                                           | The last queued or running job settles.                                                                        |
 | `warning`     | `{ message: string }`                          | A callback threw, a pause was capped, or managed limits show seed drift, re-registration, or version rollback. |
-| `limits`      | `LimitsSnapshot`                               | This process caches a managed-limit version it had not seen.                                                   |
+| `limits`      | `LimitsSnapshot`                               | **Experimental.** This process caches a managed-limit version it had not seen.                                 |
 
 The `limits` event is local observation, not a global commit acknowledgement.
 It can follow `getLimits`, `updateLimits`, admission, polling, or a store notice.

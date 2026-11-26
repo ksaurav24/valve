@@ -119,4 +119,41 @@ describe('subscriptions', () => {
     expect(await store.renew!('x', ['token'], 100)).toBe(true);
     await store.close();
   });
+  it('unsubscribes channels when the last listener leaves and serializes resubscription', async () => {
+    let finishUnsubscribe!: () => void;
+    const order: string[] = [];
+    const subscriber = {
+      subscribe: vi.fn(async (channel: string) => {
+        order.push(`sub:${channel}`);
+      }),
+      unsubscribe: vi.fn(async (channel: string) => {
+        order.push(`unsub-start:${channel}`);
+        await new Promise<void>((resolve) => {
+          finishUnsubscribe = resolve;
+        });
+        order.push(`unsub-end:${channel}`);
+      }),
+    };
+    const hub = subscriptions(subscriber, 'p');
+    const off1 = await hub.subscribe('k', vi.fn());
+    off1();
+    await Promise.resolve();
+    expect(subscriber.unsubscribe).toHaveBeenCalledTimes(1);
+    const second = hub.subscribe('k', vi.fn());
+    await Promise.resolve();
+    expect(subscriber.subscribe).toHaveBeenCalledTimes(1);
+    finishUnsubscribe();
+    const off2 = await second;
+    expect(order).toEqual([
+      'sub:p:{k}:events',
+      'unsub-start:p:{k}:events',
+      'unsub-end:p:{k}:events',
+      'sub:p:{k}:events',
+    ]);
+    off2();
+    await Promise.resolve();
+    finishUnsubscribe();
+    await hub.close();
+    expect(subscriber.unsubscribe).toHaveBeenCalledTimes(2);
+  });
 });
